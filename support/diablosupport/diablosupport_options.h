@@ -1,12 +1,6 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
-#ifdef STAGE
-  #ifdef _MSC_VER
-    #include "config.h"
-  #else    
-    #include "../diablosupport/config.h"
-  #endif
-#else
+#ifndef STAGE
 #include <diablosupport.h>
 #endif
 /* Option Typedefs {{{ */

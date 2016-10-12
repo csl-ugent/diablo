@@ -78,8 +78,6 @@
 
 #if STAGE>0
 #include "options.h"
-#else
-#include "../diablosupport/config.h"
 #endif
 
 #if STAGE>1

@@ -18,7 +18,6 @@ target_compile_definitions(opt_gen_stage_0
 )
 target_include_directories(opt_gen_stage_0
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
-  PRIVATE ${PROJECT_SOURCE_DIR}/win32/bisonflex/diablosupport
 )
 target_link_libraries(opt_gen_stage_0
   PRIVATE ${FLEX_LIBRARIES}
@@ -61,7 +60,6 @@ target_compile_definitions(opt_gen
 target_include_current_directories(opt_gen)
 target_include_directories(opt_gen
   PRIVATE ${OPTIONS_DIR}
-  PRIVATE ${PROJECT_SOURCE_DIR}/win32/bisonflex/diablosupport
 )
 target_link_libraries(opt_gen
   PRIVATE ${FLEX_LIBRARIES}
