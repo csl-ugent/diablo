@@ -1,0 +1,30 @@
+group "obfuscation" string_option obfuscation_bbl_class
+{
+  short="dbgbblobf";
+  long="debug-bbl-obfuscation";
+  description="Only select bbl obfuscation to apply from this class, mostly for debugging purposes";
+  default="";
+}
+
+group "obfuscation" string_option obfuscation_fun_class
+{
+  short="dbgfunobf";
+  long="debug-fun-obfuscation";
+  description="Only select function obfuscation to apply from this class, mostly for debugging purposes";
+  default="";
+}
+
+group "obfuscation" string_option obfuscation_script_file
+{
+  short="obfscr";
+  long="obfuscation-script-file";
+  description="If set, apply the transformations line per line from this file";
+  default=NULL;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

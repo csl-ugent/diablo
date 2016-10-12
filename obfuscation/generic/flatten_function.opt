@@ -1,0 +1,20 @@
+group "obfuscation" bool_option flatten_function
+{
+  short="off";
+  long="obfuscationFlattenFunctions";
+  description="Flatten functions";
+  default=off;
+}
+group "obfuscation" bool_option flatten_function_double
+{
+  short="offd";
+  long="obfuscationFlattenFunctionsDouble";
+  description="Double flatten functions (this significantly slows down diablo and the executable!)";
+  default=off;
+}
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

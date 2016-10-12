@@ -1,0 +1,38 @@
+group "obfuscation" bool_option branch_function
+{
+  short="obf";
+  long="obfuscationBranchFunctions";
+  description="Add branch functions";
+  default=off;
+}
+
+group "obfuscation" bool_option call_function
+{
+  short="ocf";
+  long="obfuscationCallFunctions";
+  description="Add call functions";
+  default=off;
+}
+
+group "obfuscation" bool_option split_off_calls
+{
+  short="osoc";
+  long="obfuscationSplitOfCalls";
+  description="Split off calls in their own BBLs through the use of branch functions";
+  default=off;
+}
+
+group "obfuscation" bool_option split_off_function_head
+{
+  short="osofh";
+  long="obfuscationSplitOfFunctionHead";
+  description="Split off the entry BBL of the rest of the function using a branch function";
+  default=off;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

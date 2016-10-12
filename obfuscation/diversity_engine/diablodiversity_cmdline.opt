@@ -1,0 +1,349 @@
+/* The options for diablo, use opt_gen to generate */
+
+group "diversity" int_option div_limit_n_opcodes
+{
+  short="dlis";
+  long="diversityLimitInstructionSet";
+  description="Limit the number of different instructions";
+  default=0;
+}
+
+group "diversity" bool_option div_unlimit_is
+{
+  short="dulis";
+  long="diversityUnLimitInstructionSet";
+  description="Unlimit the number of different instructions";
+  default=off;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}
+
+/*version_option version
+{
+  long="version";
+  short="V";
+  description="Print the version of this library";
+}*/
+
+group "diversity" bool_option div_factor_functions 
+{
+  short="dff";
+  long="diversityFactorFunctions";
+  description="Factor functions";
+  default=off;
+}
+
+group "diversity" bool_option div_factor_epilogues
+{
+  short="dfe";
+  long="diversityFactoreEpilogues";
+  description="Factor epilogues";
+  default=off;
+}
+
+group "diversity" bool_option div_factor_bbls
+{
+  short="dfb";
+  long="diversityFactorBbls";
+  description="Factor basic blocks";
+  default=off;
+}
+
+group "diversity" bool_option div_inline_functions
+{
+  short="dif";
+  long="diversityInlineFunctions";
+  description="Inline functions";
+  default=off;
+}
+
+group "diversity" bool_option div_inline_two_way_predicates
+{
+  short="dit";
+  long="diversityTwoWayPredicates";
+  description="Split basic blocks by two-way predicates";
+  default=off;
+}
+
+group "diversity" bool_option div_inline_bbls
+{
+  short="dib";
+  long="diversityInlineBbls";
+  description="Inline basic blocks";
+  default=off;
+}
+
+
+group "diversity" bool_option div_obfuscation_flatten
+{
+  short="dof";
+  long="diversityObfuscationFlatten";
+  description="Flatten the CFG per function";
+  default=off;
+}
+
+group "diversity" bool_option div_obfuscation_static_disassembly_thwarting
+{
+  short="dot";
+  long="diversityObfuscationStaticDisassemblyThwarting";
+  description="Jump redirection over the entire program";
+  default=off;
+}
+
+group "diversity" bool_option div_obfuscation_opaque_predicates
+{
+  short="doo";
+  long="diversityObfuscationOpaquePredicates";
+  description="Insert opaque predicates with non-taken path to existing code";
+  default=off;
+}
+
+group "diversity" bool_option div_backend_instruction_selection
+{
+  short="dbi";
+  long="diversityBackendInstructionSelection";
+  description="Replace instructions by equivalent instructions";
+  default=off;
+}
+
+group "diversity" bool_option div_backend_scheduling
+{
+  short="dbs";
+  long="diversityBackendScheduling";
+  description="Reorder instructions in basic blocks";
+  default=off;
+}
+
+group "diversity" bool_option div_backend_branch_flipping
+{
+  short="dbj";
+  long="diversityBackendBranchFlipping";
+  description="Flip condition of branches";
+  default=off;
+}
+
+group "diversity" bool_option div_backend_code_layout
+{
+  short="dbc";
+  long="diversityBackendCodeLayout";
+  description="Reorder chains of basic blocks";
+  default=off;
+}
+
+group "diversity" bool_option div_smc_factor1
+{
+  short="ds1";
+  long="diversitySelfmodFactor1";
+  description="Factor using one-byte code modifiers";
+  default=off;
+}
+
+group "diversity" bool_option div_smc_factor4
+{
+  short="ds4";
+  long="diversitySelfmodFactor4";
+  description="Factor using four-byte code modifiers";
+  default=off;
+}
+
+group "diversity" int_option div_inline_functions_chance
+{
+  short="difc";
+  long="diversityInlineFunctionsChance";
+  description="Chance for function inlining";
+  default=20;
+}
+
+group "diversity" int_option div_inline_two_way_predicates_chance
+{
+  short="ditc";
+  long="diversityTwoWayPredicatesChance";
+  description="Chance for splitting basic blocks by two-way predicates";
+  default=20;
+}
+
+group "diversity" int_option div_inline_bbls_chance
+{
+  short="dibc";
+  long="diversityInlineBblsChance";
+  description="Chance for inlining basic blocks";
+  default=20;
+}
+
+group "diversity" int_option div_obfuscation_opaque_predicates_chance
+{
+  short="dooc";
+  long="diversityObfuscationOpaquePredicatesChance";
+  description="Chance of Inserting opaque predicates with non-taken path to existing code";
+  default=20;
+}
+
+group "diversity" int_option div_obfuscation_static_disassembly_thwarting_chance
+{
+  short="dotc";
+  long="diversityObfuscationStaticDisassemblyThwartingChance";
+  description="Chance of Jump redirection over the entire program";
+  default=20;
+}
+
+group "diversity" int_option div_random_seed
+{
+  short="drs";
+  long="diversityRandomSeed";
+  description="Seed of randomness";
+  default=0;
+}
+
+group "diversity" int_option div_factor_functions_chance
+{
+  short="dffc";
+  long="diversityFactorFunctionsChance";
+  description="Factor functions Chance";
+  default=50;
+}
+
+group "diversity" int_option div_factor_epilogues_chance
+{
+  short="dfec";
+  long="diversityFactoreEpiloguesChance";
+  description="Factor epilogues Chance";
+  default=50;
+}
+
+group "diversity" int_option div_factor_bbls_chance
+{
+  short="dfbc";
+  long="diversityFactorBblsChance";
+  description="Factor basic blocks Chance";
+  default=50;
+}
+
+group "diversity" int_option div_backend_branch_flipping_chance
+{
+  short="dbjc";
+  long="diversityBackendBranchFlippingChance";
+  description="Flip condition of branches Chance";
+  default=50;
+}
+
+group "diversity" int_option div_obfuscation_flatten_chance
+{
+  short="dofc";
+  long="diversityObfuscationFlattenChance";
+  description="Flatten the CFG per function Chance";
+  default=20;
+}
+
+group "diversity" int_option div_backend_instruction_selection_chance
+{
+  short="dbic";
+  long="diversityBackendInstructionSelectionChance";
+  description="The chance that the original instruction is replaced by an equivalent one if alternatives are available";
+  default=100;
+}
+
+group "diversity" int_option div_smc_factor1_chance
+{
+  short="ds1c";
+  long="diversitySelfmodFactor1Chance";
+  description="Factor using one-byte code modifiers";
+  default=20;
+}
+
+group "diversity" int_option div_smc_factor4_chance
+{
+  short="ds4c";
+  long="diversitySelfmodFactor4Chance";
+  description="Factor using one-byte code modifiers";
+  default=20;
+}
+
+
+group "diversity" file_option div_iterative_input
+{
+   short="dii";
+   long= "iterative_input";
+   description="the input file for iterative diversity";
+}
+
+group "diversity" file_option div_iterative_allowed_transforms_file
+{
+   short="datpff";
+   long= "allowed_transforms_per_function_file";
+   description="which transforms are allowed for which functions in iterative diversity";
+}
+
+group "diversity" file_option div_iterative_allowed_transforms_output_file
+{
+   short="datpfof";
+   long= "allowed_transforms_per_function_output_file";
+   description="output again which transforms were allowed for which functions in iterative diversity";
+}
+
+group "diversity" file_option div_matched_instructions_and_why_file
+{
+   short="dmiawf";
+   long= "matched_instructions_and_why_file";
+   description="which instructions have still been matched by BinDiff, and the reason for its matching";
+}
+
+
+
+group "diversity" file_option div_iterative_output
+{
+   short="dio";
+   long= "iterative_output";
+   description="the output file for iterative diversity";
+}
+
+group "diversity" file_option div_iterative_rules
+{
+   short="dir";
+   long= "iterative_rules";
+   description="the rules file for iterative diversity";
+}
+
+group "diversity" int_option div_initial_max_cost
+{
+   short="dimc";
+   long="initial_max_cost";
+   description="the initial max cost for a function";
+   default=0;
+}
+
+group "diversity" int_option div_restart_divider
+{
+   short="drd";
+   long="restart_divider";
+   description="increase max cost after the we used the current cost for (number of transformations at this cost left)/restart_divider";
+   default=2;
+}
+
+group "diversity" int_option div_max_with_cost
+{
+   short="dmwc";
+   long="max_with_cost";
+   description="increase max cost after max_with_cost iterations";
+   default=4;
+}
+
+group "diversity" int_option div_cost_increase
+{
+   short="dci";
+   long="cost_increase";
+   description="increase max cost with this number";
+   default=1;
+}
+
+group "diversity" bool_option div_if_still_mapped_retransform_from_scratch
+{
+   short="dismrfs";
+   long= "div_if_still_mapped_retransform_from_scratch";
+   description="when a function is still mapped, retransform from scratch (TRUE), or continue adding new transforms to the previous result (FALSE)?";
+   default=off;
+}

@@ -1,0 +1,63 @@
+bool_option rely_on_calling_conventions
+{
+   long="rely_on_calling_conventions";
+   short="cc";
+   description="rely on calling conventions during first optimization phases";
+   default=on;
+}
+
+group "Optimization and analysis" bool_option forward_liveness
+{
+  short="fl";
+  long="forward_liveness";
+  default=off;
+  description="Perform forward liveness calculations after normal liveness analysis";
+}
+
+group "Optimization and analysis" bool_option copy_propagation
+{
+   short="Ocp";
+   long= "copy_propagation";
+   default=on;
+   description="Turn copy propagation on or off";
+}
+
+
+group "Optimization and analysis" bool_option copy_analysis
+{
+   short="Oca";
+   long= "copy_analysis";
+   default=on;
+   description="Turn fixpoint copy_analysis on or off";
+}
+version_option version
+{
+  long="version";
+  short="V";
+  description="Print the version of this library";
+}
+
+hidden bool_option do_compute_savedchanged_regs
+{
+  long="do_compute_savedchanged_regs";
+  short="dcscr";
+  description="pseudo option: this option is typically unset by a frontend that does not want to compute changed registers - don't touch";
+  default=on;
+}
+
+hidden bool_option annotate_loops
+{
+   long="annotate_loops";
+   short="ale";
+   description="Annotate Edges with information about entry in and exit from Loops";
+   default=off;
+}
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+
+

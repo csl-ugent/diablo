@@ -1,0 +1,20 @@
+Main developers (people that made too many changes to Diablo to list them):
+
+Bruno De Bus		<bdebus@elis.ugent.be>
+Bjorn De Sutter         <brdsutte@elis.ugent.be>
+Dominique Chanet	<dchanet@elis.ugent.be>
+Ludo Van Put		<lvanput@elis.ugent.be>
+Bertrand Anckaert	<bankaer@elis.ugent.be>
+Matthias Madou          <mmadou@elis.ugent.be>
+Frederik Vandeputte     <fgvdeputte@elis.ugent.be>
+
+Contributors (students,... that wrote a backend for Diablo at some point in time):
+
+Luk Claes (SH3 backend, currently unmaintained)
+Daan Mervielde (original i386 backend, completely rewritten by Dominique)
+Wim Hillewaert (original i386 backend, completely rewritten by Dominique)
+Wouter Verlinden (PPC backend, currently unmaintained) 
+
+Pieter Ruts (some code for factoring, not finished)
+Wim De Houwer (Thumb backend support for the ARM)
+Dieter Govaerts (Optimization of data accesses in ARM code)

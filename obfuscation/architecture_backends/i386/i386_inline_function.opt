@@ -1,0 +1,14 @@
+group "obfuscation" bool_option inline_functions
+{
+  short="oif";
+  long="obfuscationInlineFunctions";
+  description="Inline Functions";
+  default=off;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

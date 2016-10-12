@@ -1,0 +1,80 @@
+/* The options for diablo, use opt_gen to generate */
+
+hidden bool_option annotate_loops
+{
+   long="annotate_loops";
+   short="ale";
+   description="Annotate Edges with information about entry in and exit from Loops";
+   default=off;
+}
+
+group "Binary rewriting" bool_option fullthumb2
+{
+   long="fullthumb2";
+   short="ft2";
+   description="Allow Diablo to use any Thumb-2 instructions while reassembling the binary";
+   default=on;
+}
+
+group "Binary rewriting" bool_option nofixcortexa8
+{
+  long="no-fix-cortex-a8";
+  short="noffe";
+  description="Do not fixup short backwards branches spanning a page boundary to avoid Cortex-A8 erratum 657417";
+  default=off;
+}
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+
+group "ARM" int_option orderseed
+{
+  short="os";
+  long="orderseed";
+  default=0;
+  description="order seed. If different from 0, used to seed the random number generator to randomize the order in which instruction chains and data are placed in the binary.";
+}
+
+group "ARM" bool_option keepcodeorder
+{
+  short="kco";
+  long="keepcodeorder";
+  default=0;
+  description="Flag that determines whether code can be reordered to optimize or randomize it, or whether the original order of the code in the binary must be maintained. The latter typically only works well if few, and only basic transformations are done.";
+}
+
+group "ARM" bool_option shuffleexidx
+{
+  short="se";
+  long="shuffleexidx";
+  default=0;
+  description="Whether to shuffle the .exidx section contents or not.";
+}
+
+group "ARM" bool_option nomergeexidx
+{
+  short="nme";
+  long="no-merge-exidx";
+  default=0;
+  description="Whether or not to merge equal exidx sections.";
+}
+
+group "ARM" bool_option exidxsplitfunctions
+{
+  short="esf";
+  long="exidx-split-functions";
+  default=0;
+  description="Whether or not to create separate exidx subsections for every function."
+}
+
+group "ARM" bool_option nomovwmovtprod
+{
+  short="nomovwmovtprod";
+  long="no-movw-movt-producers"
+  default=off;
+  description="Disables the conversion of MOVW/NOVT instruction pairs into address/constant producers (use with caution)."
+}

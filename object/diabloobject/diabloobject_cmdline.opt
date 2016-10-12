@@ -1,0 +1,187 @@
+/* The options for diablo, use opt_gen to generate */
+
+bool_option dump_multiple
+{
+   short="dm";
+   long="add-dump";
+   default=off;
+   description="Dump all information for debugging and add it to an existing dump";
+}
+
+bool_option verbose_relocation
+{
+   short="vr";
+   long="verbose-relocation";
+   default=off;
+   description="Dump extra information about the relocation process... Only useful for debugging relocation code";
+}
+
+bool_option symbols
+{
+  short="S";
+  long="symbols";
+  default=off;
+  description="Write symbol table";
+}
+
+bool_option gc_sections
+{
+  short="gc";
+  long="gc-sections";
+  default=off;
+  description="Support local undefined symbols (that might be undefined because of --gc-sections used for linking, but can hence not cause harm)";
+}
+
+group "File" path_option libpath
+{
+   short="L";
+   long= "library_path";
+   environment="LIBPATH";
+   default=".";
+   description="sets the library-path (i.e. the path where libraries linked with the program are stored, necessary for ADS1.1 development platform, GCC normally uses absolute paths) to <path>";
+}
+
+bool_option use_map_indexes
+{
+   short="mi";
+   long="use-map-indexes";
+   default=off;
+   description="Interpret the section indexes in the map file as corresponding to the section indexes in the original object files (requires support in map parser)";
+}
+
+group "File" path_option objpath
+{
+   short="O";
+   long= "object_path";
+   environment="OBJPATH";
+   default=".";
+   description="sets the object-path (i.e. the path where object files linked with the program and the program itself are stored) to <path>";
+}
+
+group "File" file_option linkerscript
+{
+   short="T";
+   long= "linker_script";
+   description="the linker script to use. if none is given, the default linker script for this architecture will be used";
+}
+
+group "File" path_option linkerscriptprefix
+{
+   short="P";
+   long="script_prefix";
+   description="the path to the directory that holds the linker descriptions"; 
+}
+
+group "File" file_option layoutscript
+{
+   short="Tl";
+   long= "layout_script";
+   default=NULL;
+   description="the layout script to use. if none is given, the default layout script embedded in the linker script will be used";
+}
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+
+version_option version
+{
+  long="version";
+  short="V";
+  description="Print the version of this library";
+}
+
+hidden string_option host 
+{
+   short="H";
+   description="sets the host on which we will execute";
+}
+
+hidden string_option input_files
+{
+   short="In";
+   long="input";
+   description="sets the input files, separated by ;";
+}
+
+hidden string_option output_files
+{
+   short="Out";
+   long="output";
+   description="sets the output files, separated by ;";
+}
+
+hidden string_option arguments 
+{
+   long="args";
+   short="A";
+   description="Arguments for an exec";
+}
+
+group "Dump" forbidden ifset (restore||restore_multi) bool_option dump
+{
+   short="d";
+   long="dump";
+   default=off; // Its also possible to use 0 or FALSE (when simple_types.h is include before the array)
+   description="Dump all information for debugging";
+}
+
+group "Dump" forbidden ifset (dump||dump_multiple) bool_option restore
+{
+   short="r";
+   long="restore";
+   default=off;
+   description="Restore a previous dump";
+}
+
+group "Dump" forbidden ifset (dump||dump_multiple) int_option restore_multi
+{
+   short="s";
+   long="restore-multi";
+   default=-1;
+   description="Restore a previous dump, select the number";
+}
+
+bool_option patch_ads
+{
+   short="pa";
+   long="patch-ads";
+   default=off;
+   description="Rename stdin, stdout and stderr to itt, ott, ett. Usefull for ARM ADS binaries";
+}
+
+
+int_option data_order_seed
+{
+  short="dos";
+  long="dataorderseed";
+  default=0;
+  description="Data order seed. If different from 0, used to seed the random number generator to randomize the order in data subsections are placed in the binary.";
+}
+
+group "File" bool_option read_debug_info
+{
+  short="g";
+  long="read-debug";
+  default=off;
+  description="Read the debug information from the object files and binary";
+}
+
+bool_option no_toolchain_check
+{
+  short="notccheck";
+  long="no-toolchain-check";
+  default=off;
+  description="Disable compiler tool chain verification"
+}
+
+bool_option keep_exidx
+{
+  short="exidx";
+  long="keep-exidx";
+  default=off;
+  description="Keep .ARM.exidx sections"
+}

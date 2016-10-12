@@ -1,0 +1,551 @@
+#include <diabloalpha.h>
+
+#ifndef ALPHA_OPCODES_TYPEDEFS
+#define ALPHA_OPCODES_TYPEDEFS
+
+/*! ordering of this enum IS IMPORTANT
+ *  the array alpha_opcode_table depends on it */
+
+typedef enum _t_alpha_opcode 
+{
+
+  /* Normal load/store operations */
+
+  ALPHA_LDA,
+  ALPHA_LDAH,
+  ALPHA_LDBU,
+  ALPHA_LDWU,
+  ALPHA_LDF,
+  ALPHA_LDG,
+  ALPHA_LDL,
+  ALPHA_LDL_L,
+  ALPHA_LDQ,
+  ALPHA_LDQ_L,
+  ALPHA_LDQ_U,
+  ALPHA_LDS,
+  ALPHA_LDT,
+  ALPHA_STB,
+  ALPHA_STF,
+  ALPHA_STG,
+  ALPHA_STS,
+  ALPHA_STL,
+  ALPHA_STL_C,
+  ALPHA_STQ,
+  ALPHA_STQ_C,
+  ALPHA_STQ_U,
+  ALPHA_STT,
+  ALPHA_STW,
+
+  /* Normal branch instructions */
+
+  ALPHA_BEQ,
+  ALPHA_BGE,
+  ALPHA_BGT,
+  ALPHA_BLBC,
+  ALPHA_BLBS,
+  ALPHA_BLE,
+  ALPHA_BLT,
+  ALPHA_BNE,
+  ALPHA_BR,
+  ALPHA_BSR,
+  ALPHA_FBEQ,
+  ALPHA_FBGE,
+  ALPHA_FBGT,
+  ALPHA_FBLE,
+  ALPHA_FBLT,
+  ALPHA_FBNE,
+
+  /* Floating point instructions */
+
+  ALPHA_ADDF,
+  ALPHA_ADDG,
+  ALPHA_ADDS,
+  ALPHA_ADDT,
+  ALPHA_CMPGEQ,
+  ALPHA_CMPGLE,
+  ALPHA_CMPGLT,
+  ALPHA_CMPTEQ,
+  ALPHA_CMPTLE,
+  ALPHA_CMPTLT,
+  ALPHA_CMPTUN,
+  ALPHA_CPYS,
+  ALPHA_CPYSE,
+  ALPHA_CPYSN,
+  ALPHA_CVTDG,
+  ALPHA_CVTGD,
+  ALPHA_CVTGF,
+  ALPHA_CVTGQ,
+  ALPHA_CVTLQ,
+  ALPHA_CVTQF,
+  ALPHA_CVTQG,
+  ALPHA_CVTQL,
+  ALPHA_CVTQS,
+  ALPHA_CVTQT,
+  ALPHA_CVTST,
+  ALPHA_CVTTQ,
+  ALPHA_CVTTS,
+  ALPHA_DIVF,
+  ALPHA_DIVG,
+  ALPHA_DIVS,
+  ALPHA_DIVT,
+  ALPHA_FCMOVEQ,
+  ALPHA_FCMOVGE,
+  ALPHA_FCMOVGT,
+  ALPHA_FCMOVLE,
+  ALPHA_FCMOVLT,
+  ALPHA_FCMOVNE,
+  ALPHA_FTOIS,
+  ALPHA_FTOIT,
+  ALPHA_ITOFF,
+  ALPHA_ITOFS,
+  ALPHA_ITOFT,
+  ALPHA_MF_FPCR,
+  ALPHA_MT_FPCR,
+  ALPHA_MULF,
+  ALPHA_MULG,
+  ALPHA_MULS,
+  ALPHA_MULT,
+  ALPHA_SQRTF,
+  ALPHA_SQRTG,
+  ALPHA_SQRTS,
+  ALPHA_SQRTT,
+  ALPHA_SUBF,
+  ALPHA_SUBG,
+  ALPHA_SUBS,
+  ALPHA_SUBT,
+
+  /* Integer data operations */
+
+  ALPHA_ADDL,
+  ALPHA_ADDQ,
+  ALPHA_AMASK,
+  ALPHA_AND,
+  ALPHA_BIC,
+  ALPHA_BIS,
+  ALPHA_CMOVEQ,
+  ALPHA_CMOVGE,
+  ALPHA_CMOVGT,
+  ALPHA_CMOVLBC,
+  ALPHA_CMOVLBS,
+  ALPHA_CMOVLE,
+  ALPHA_CMOVLT,
+  ALPHA_CMOVNE,
+  ALPHA_CMPBGE,
+  ALPHA_CMPEQ,
+  ALPHA_CMPLE,
+  ALPHA_CMPLT,
+  ALPHA_CMPULE,
+  ALPHA_CMPULT,
+  ALPHA_CTLZ,
+  ALPHA_CTPOP,
+  ALPHA_CTTZ,
+  ALPHA_EQV,
+  ALPHA_EXTBL,
+  ALPHA_EXTLH,
+  ALPHA_EXTLL,
+  ALPHA_EXTQH,
+  ALPHA_EXTQL,
+  ALPHA_EXTWH,
+  ALPHA_EXTWL,
+  ALPHA_IMPLVER,
+  ALPHA_INSBL,
+  ALPHA_INSLH,
+  ALPHA_INSLL,
+  ALPHA_INSQH,
+  ALPHA_INSQL,
+  ALPHA_INSWH,
+  ALPHA_INSWL,
+  ALPHA_MAXSB8,
+  ALPHA_MAXSW4,
+  ALPHA_MAXUB8,
+  ALPHA_MAXUW4,
+  ALPHA_MINSB8,
+  ALPHA_MINSW4,
+  ALPHA_MINUB8,
+  ALPHA_MINUW4,
+  ALPHA_MSKBL,
+  ALPHA_MSKLH,
+  ALPHA_MSKLL,
+  ALPHA_MSKQH,
+  ALPHA_MSKQL,
+  ALPHA_MSKWH,
+  ALPHA_MSKWL,
+  ALPHA_MULL,
+  ALPHA_MULQ,
+  ALPHA_ORNOT,
+  ALPHA_PERR,
+  ALPHA_PKLB,
+  ALPHA_PKWB,
+  ALPHA_S4ADDL,
+  ALPHA_S4ADDQ,
+  ALPHA_S4SUBL,
+  ALPHA_S4SUBQ,
+  ALPHA_S8ADDL,
+  ALPHA_S8ADDQ,
+  ALPHA_S8SUBL,
+  ALPHA_S8SUBQ,
+  ALPHA_SEXTB,
+  ALPHA_SEXTW,
+  ALPHA_SLL,
+  ALPHA_SRA,
+  ALPHA_SRL,
+  ALPHA_SUBL,
+  ALPHA_SUBL_V,
+  ALPHA_SUBQ,
+  ALPHA_SUBQ_V,
+  ALPHA_UMULH,
+  ALPHA_UNPKBL,
+  ALPHA_UNPKBW,
+  ALPHA_XOR,
+  ALPHA_ZAP,
+  ALPHA_ZAPNOT,
+
+  /* Memory instructions with a functions code */
+
+  ALPHA_RPCC,
+  ALPHA_ECB,
+  ALPHA_EXCB,
+  ALPHA_FETCH,
+  ALPHA_FETCH_M,
+  ALPHA_MB,
+  ALPHA_TRAPB,
+  ALPHA_WH64,
+  ALPHA_WMB,
+
+  /* Memory branch instructions */
+
+//  ALPHA_MBR,
+  ALPHA_JMP,
+  ALPHA_JSR,
+  ALPHA_JSR_COROUTINE,
+  ALPHA_RET,
+
+  /* PAL Code - Privileged Instrucions */
+
+  ALPHA_PAL_halt,
+	ALPHA_PAL_cflush,
+	ALPHA_PAL_draina,
+	ALPHA_PAL_cserve,
+	ALPHA_PAL_swppal,
+	ALPHA_PAL_wripir,
+	ALPHA_PAL_rdmces,
+	ALPHA_PAL_wrmces,
+	ALPHA_PAL_wrent,
+	ALPHA_PAL_wrperfmon,
+	ALPHA_PAL_wtint,
+	ALPHA_PAL_urti,
+	ALPHA_PAL_clrfen,
+  ALPHA_PAL_rdps,
+  ALPHA_PAL_rdusp,
+  ALPHA_PAL_rdval,
+  ALPHA_PAL_rtsys,
+  ALPHA_PAL_rti,
+  ALPHA_PAL_swpctx,
+  ALPHA_PAL_swpipl,
+  ALPHA_PAL_tbi,
+  ALPHA_PAL_whami,
+  ALPHA_PAL_wrfen,
+  ALPHA_PAL_wrkgp,
+  ALPHA_PAL_wrusp,
+  ALPHA_PAL_wrval,
+  ALPHA_PAL_wrvptptr,
+
+  /* PALcode - Unpriviledged instructions */
+
+  ALPHA_PAL_pbt,
+  ALPHA_PAL_bugchk,
+  ALPHA_PAL_callsys,
+  ALPHA_PAL_gentrap,
+  ALPHA_PAL_imb,
+  ALPHA_PAL_rduniq,
+  ALPHA_PAL_wruniq,
+
+ /* IEEE Floating point instructions */
+
+  ALPHA_ADDS_C,
+  ALPHA_ADDS_M,
+  ALPHA_ADDS_D,
+  ALPHA_ADDS_U,
+  ALPHA_ADDS_UC,
+  ALPHA_ADDS_UM,
+  ALPHA_ADDS_UD,
+  ALPHA_ADDS_SU,
+  ALPHA_ADDS_SUC,
+  ALPHA_ADDS_SUM,
+  ALPHA_ADDS_SUD,
+  ALPHA_ADDS_SUI,
+  ALPHA_ADDS_SUIC,
+  ALPHA_ADDS_SUIM,
+  ALPHA_ADDS_SUID,
+
+  ALPHA_ADDT_C,
+  ALPHA_ADDT_M,
+  ALPHA_ADDT_D,
+  ALPHA_ADDT_U,
+  ALPHA_ADDT_UC,
+  ALPHA_ADDT_UM,
+  ALPHA_ADDT_UD,
+  ALPHA_ADDT_SU,
+  ALPHA_ADDT_SUC,
+  ALPHA_ADDT_SUM,
+  ALPHA_ADDT_SUD,
+  ALPHA_ADDT_SUI,
+  ALPHA_ADDT_SUIC,
+  ALPHA_ADDT_SUIM,
+  ALPHA_ADDT_SUID,
+ 
+  ALPHA_CMPTEQ_SU,
+	ALPHA_CMPTLE_SU,
+	ALPHA_CMPTLT_SU,
+	ALPHA_CMPTUN_SU,
+
+	ALPHA_CVTQS_C,
+	ALPHA_CVTQS_M,
+	ALPHA_CVTQS_D,
+	ALPHA_CVTQS_SUI,
+	ALPHA_CVTQS_SUIC,
+	ALPHA_CVTQS_SUIM,
+	ALPHA_CVTQS_SUID,
+
+	ALPHA_CVTQT_C,
+	ALPHA_CVTQT_M,
+	ALPHA_CVTQT_D,
+	ALPHA_CVTQT_SUI,
+	ALPHA_CVTQT_SUIC,
+	ALPHA_CVTQT_SUIM,
+	ALPHA_CVTQT_SUID,
+
+	ALPHA_CVTST_S,
+
+  ALPHA_CVTTQ_C,
+	ALPHA_CVTTQ_V,
+	ALPHA_CVTTQ_VC,
+	ALPHA_CVTTQ_SV,
+	ALPHA_CVTTQ_SVC,
+	ALPHA_CVTTQ_SVI,
+	ALPHA_CVTTQ_SVIC,
+	ALPHA_CVTTQ_D,
+	ALPHA_CVTTQ_VD,
+	ALPHA_CVTTQ_SVD,
+	ALPHA_CVTTQ_SVID,
+	ALPHA_CVTTQ_M,
+	ALPHA_CVTTQ_VM,
+	ALPHA_CVTTQ_SVM,
+	ALPHA_CVTTQ_SVIM,
+
+	ALPHA_CVTTS_C,
+	ALPHA_CVTTS_M,
+	ALPHA_CVTTS_D,
+	ALPHA_CVTTS_U,
+	ALPHA_CVTTS_UC,
+	ALPHA_CVTTS_UM,
+	ALPHA_CVTTS_UD,
+	ALPHA_CVTTS_SU,
+	ALPHA_CVTTS_SUC,
+	ALPHA_CVTTS_SUM,
+	ALPHA_CVTTS_SUD,
+	ALPHA_CVTTS_SUI,
+	ALPHA_CVTTS_SUIC,
+	ALPHA_CVTTS_SUIM,
+	ALPHA_CVTTS_SUID,
+
+	ALPHA_DIVS_C,
+	ALPHA_DIVS_M,
+	ALPHA_DIVS_D,
+	ALPHA_DIVS_U,
+	ALPHA_DIVS_UC,
+	ALPHA_DIVS_UM,
+	ALPHA_DIVS_UD,
+	ALPHA_DIVS_SU,
+	ALPHA_DIVS_SUC,
+	ALPHA_DIVS_SUM,
+	ALPHA_DIVS_SUD,
+	ALPHA_DIVS_SUI,
+	ALPHA_DIVS_SUIC,
+	ALPHA_DIVS_SUIM,
+	ALPHA_DIVS_SUID,
+
+	ALPHA_DIVT_C,
+	ALPHA_DIVT_M,
+	ALPHA_DIVT_D,
+	ALPHA_DIVT_U,
+	ALPHA_DIVT_UC,
+	ALPHA_DIVT_UM,
+	ALPHA_DIVT_UD,
+	ALPHA_DIVT_SU,
+	ALPHA_DIVT_SUC,
+	ALPHA_DIVT_SUM,
+	ALPHA_DIVT_SUD,
+	ALPHA_DIVT_SUI,
+	ALPHA_DIVT_SUIC,
+	ALPHA_DIVT_SUIM,
+	ALPHA_DIVT_SUID,
+
+	ALPHA_MULS_C,
+	ALPHA_MULS_M,
+	ALPHA_MULS_D,
+	ALPHA_MULS_U,
+	ALPHA_MULS_UC,
+	ALPHA_MULS_UM,
+	ALPHA_MULS_UD,
+	ALPHA_MULS_SU,
+	ALPHA_MULS_SUC,
+	ALPHA_MULS_SUM,
+	ALPHA_MULS_SUD,
+	ALPHA_MULS_SUI,
+	ALPHA_MULS_SUIC,
+	ALPHA_MULS_SUIM,
+	ALPHA_MULS_SUID,
+
+	ALPHA_MULT_C,
+	ALPHA_MULT_M,
+	ALPHA_MULT_D,
+	ALPHA_MULT_U,
+	ALPHA_MULT_UC,
+	ALPHA_MULT_UM,
+	ALPHA_MULT_UD,
+	ALPHA_MULT_SU,
+	ALPHA_MULT_SUC,
+	ALPHA_MULT_SUM,
+	ALPHA_MULT_SUD,
+	ALPHA_MULT_SUI,
+	ALPHA_MULT_SUIC,
+	ALPHA_MULT_SUIM,
+	ALPHA_MULT_SUID,
+
+	ALPHA_SQRTS_C,
+	ALPHA_SQRTS_M,
+	ALPHA_SQRTS_D,
+	ALPHA_SQRTS_U,
+	ALPHA_SQRTS_UC,
+	ALPHA_SQRTS_UM,
+	ALPHA_SQRTS_UD,
+	ALPHA_SQRTS_SU,
+	ALPHA_SQRTS_SUC,
+	ALPHA_SQRTS_SUM,
+	ALPHA_SQRTS_SUD,
+	ALPHA_SQRTS_SUI,
+	ALPHA_SQRTS_SUIC,
+	ALPHA_SQRTS_SUIM,
+	ALPHA_SQRTS_SUID,
+
+	ALPHA_SQRTT_C,
+	ALPHA_SQRTT_M,
+	ALPHA_SQRTT_D,
+	ALPHA_SQRTT_U,
+	ALPHA_SQRTT_UC,
+	ALPHA_SQRTT_UM,
+	ALPHA_SQRTT_UD,
+	ALPHA_SQRTT_SU,
+	ALPHA_SQRTT_SUC,
+	ALPHA_SQRTT_SUM,
+	ALPHA_SQRTT_SUD,
+	ALPHA_SQRTT_SUI,
+	ALPHA_SQRTT_SUIC,
+	ALPHA_SQRTT_SUIM,
+	ALPHA_SQRTT_SUID,
+
+	ALPHA_SUBS_C,
+	ALPHA_SUBS_M,
+	ALPHA_SUBS_D,
+	ALPHA_SUBS_U,
+	ALPHA_SUBS_UC,
+	ALPHA_SUBS_UM,
+	ALPHA_SUBS_UD,
+	ALPHA_SUBS_SU,
+	ALPHA_SUBS_SUC,
+	ALPHA_SUBS_SUM,
+	ALPHA_SUBS_SUD,
+	ALPHA_SUBS_SUI,
+	ALPHA_SUBS_SUIC,
+	ALPHA_SUBS_SUIM,
+	ALPHA_SUBS_SUID,
+
+	ALPHA_SUBT_C,
+	ALPHA_SUBT_M,
+	ALPHA_SUBT_D,
+	ALPHA_SUBT_U,
+	ALPHA_SUBT_UC,
+	ALPHA_SUBT_UM,
+	ALPHA_SUBT_UD,
+	ALPHA_SUBT_SU,
+	ALPHA_SUBT_SUC,
+	ALPHA_SUBT_SUM,
+	ALPHA_SUBT_SUD,
+	ALPHA_SUBT_SUI,
+	ALPHA_SUBT_SUIC,
+	ALPHA_SUBT_SUIM,
+	ALPHA_SUBT_SUID
+
+
+} t_alpha_opcode;
+
+#endif
+
+#ifdef DIABLOALPHA_TYPES
+
+#ifndef ALPHA_OPCODE_DEFINES
+#define ALPHA_OPCODE_DEFINES
+
+#define NR_INS 425
+
+/* Types of Alpha Instructions */
+
+#define ALPHA_ITYPE_BR 0 /* branch */
+#define ALPHA_ITYPE_FP 1 /* Floating Point */
+#define ALPHA_ITYPE_MEM 2 /* Memory */
+#define ALPHA_ITYPE_MFC 3 /* Memory & Function code */
+#define ALPHA_ITYPE_MBR 4 /* Mem & Branch */
+#define ALPHA_ITYPE_OPR 5 /* Operation */
+#define ALPHA_ITYPE_PAL 6 /* PAL Code */
+
+/* Bit extraction macros */
+
+#define ALPHA_GET_OPCODE(instr) (instr >> 26)
+
+/* Extra register fields */
+
+#define ALPHA_GET_REGA(instr) (instr & 0x03E00000) >> 21
+#define ALPHA_GET_REGB(instr) (instr & 0x001F0000) >> 16
+#define ALPHA_GET_REGC(instr) (instr & 0x0000001F) 
+
+#define ALPHA_GET_FUNC(instr) (instr & 0x0000FFE0) >> 5
+/* Extract the memory displacement field in memory format instructions */
+#define ALPHA_GET_DISP_MEM(instr) (instr & 0x0000FFFF)
+/* Extract memory displacement in branch format instructions */
+#define ALPHA_GET_DISP_BRA(instr) (instr & 0x001FFFFF)
+/* Get the sub function from an operate type instruction */
+#define ALPHA_GET_OPR_FUNC(instr) (instr & 0x00000FE0) >> 5
+/* Get memory/branch opcode and hint fields */
+#define ALPHA_GET_MEMBRA_OPC(instr) (instr & 0x0000C000) >> 14 /* JSR etc */
+#define ALPHA_GET_MEMBRA_HINT(instr) (instr & 0x00003FFF)
+/* Get PALcode sub function field */
+#define ALPHA_GET_PAL_FCODE(instr) (instr & 0x03FFFFFF)
+/* Get Memory/function code sub function field */
+#define ALPHA_GET_MFC_FCODE(instr) ALPHA_GET_DISP_MEM(instr)
+
+#endif
+
+#ifndef ALPHA_OPCODE_TYPES
+#define ALPHA_OPCODE_TYPES
+
+typedef void (*AlphaDisassembleFunction) \
+  (t_alpha_ins * ins, t_uint32 instr, t_uint16 opc);
+
+typedef void (*AlphaAssembleFunction) \
+  (t_alpha_ins * ins, t_uint32 * instr);
+
+typedef struct _alpha_opcode 
+{
+  t_uint32 opcode; /* Specify the instructions opcode */
+  t_uint32 fcode;  /* Function code for certain instructions */
+  t_uint32 type;    /* Type of function */
+  t_string desc;   /* Readable name of instruction */
+  AlphaDisassembleFunction Disassemble;  /* Associated disassembly function */
+	AlphaAssembleFunction Assemble; /* Associated assembly function */
+} alpha_opcode;
+
+extern const alpha_opcode alpha_opcode_table[];
+
+#endif
+#endif

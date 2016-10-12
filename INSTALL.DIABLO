@@ -1,0 +1,34 @@
+Diablo build an install instructions
+------------------------------------
+
+Prerequisites
+-------------
+
+In order to properly run Diablo, you need a machine of the same 
+endianess as the target cpu for which you want to rewrite binaries with 
+at least 512MB of RAM.  The programs you want to run through Diablo 
+should be compiled with a patched tool chain, in case you are using 
+gcc/binutils. See the Diablo web site (http://www.elis.ugent.be/diablo/) 
+for more information about this topic.
+
+Configuration and building
+--------------------------
+
+We use CMake to configure and build Diablo. Create a build directory,
+for example in the root directory of your Diablo sources. Change to the
+build directory, and configure the build using ccmake path/to/diablo-src.
+
+In the screen that appears, press "c" to generate an initial
+configuration. Important: amongst the build targets that appear next,
+make sure to disable the "Diversity" target, as it has not yet been
+implemented and will fail. Next, press "c" again and then "g" to
+generate the makefiles. ccmake will then exit and you can type "make" in
+the build directory to build Diablo.
+
+If something goes wrong
+-----------------------
+
+If building Diablo doesn't work, contact us and we will try to help you out.
+Send an email to diablo@elis.ugent.be. Be sure to mention what system you
+tried to build Diablo on, and if possible include the output of the make
+command.

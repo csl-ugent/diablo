@@ -1,0 +1,701 @@
+/* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
+
+/* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
+
+#include <diabloarm.h>
+
+#ifdef DIABLOARM_TYPES
+#ifndef THUMB_OPCODES_TYPES
+#define THUMB_OPCODES_TYPES
+/*! The structure of the different disassemble functions */
+typedef void (*ThumbDisassembleFunction) (t_arm_ins *, t_uint32 instr, t_uint16 opc);
+/*! The opcode structure, used in the opcode table to specify what disassembly
+ * function corresponds to what bitpattern */
+typedef struct _thumb_opcode
+{
+	/*! \todo Document */
+	t_uint32 mask;
+	/*! \todo Document */
+	t_uint32 opcode;
+	/*! \todo Document */
+	t_string desc;
+	t_arm_opcode arm_opcode;
+	/*! \todo Document */
+	ThumbDisassembleFunction Disassemble;
+} thumb_opcode;
+/*! The opcode table */
+extern const thumb_opcode thumb_opcode_table[];
+extern const t_uint32 arm2thumb32_opcode_table[];
+/* The opcodes {{{ */
+typedef enum _t_thumb_opcode
+{
+/* 32-bit thumb opcodes */
+	TH32_LEAVEX,
+	TH32_ENTERX,
+	TH32_CLREX,
+
+	TH32_NOP,
+	TH32_YIELD,
+	TH32_WFE,
+	TH32_WFI,
+	TH32_SEV,
+	TH32_DBG,
+	TH32_DSB,
+	TH32_DMB,
+	TH32_ISB,
+
+
+
+
+  /* ARMv7 Advanced SIMD instructions */
+#define TH32_SIMD_FIRST TH32_VAND
+  #define TH32_SIMD_FIRST3SAME TH32_VAND
+  /* opcode: 5 */
+  TH32_VAND,
+  TH32_VBIC,
+  TH32_VORR,
+  TH32_VORN,
+  TH32_VEOR,
+  TH32_VBSL,
+  TH32_VBIT,
+  TH32_VBIF,
+  TH32_VADD,
+  TH32_VSUB,
+  TH32_VTST,
+  TH32_VCEQ,
+  TH32_VMLA,
+  TH32_VMLS,
+  TH32_VQDMULH,
+  TH32_VQRDMULH,
+  TH32_VPADD,
+  TH32_VFMA,
+  TH32_VFMS,
+#define TH32_SIMD_3REGSSAMELENGTH_FIRSTF TH32_VADD_F
+  TH32_VADD_F,
+  TH32_VSUB_F,
+  TH32_VPADD_F,
+  TH32_VABD_F,
+  TH32_VMLA_F,
+  TH32_VMLS_F,
+  TH32_VMUL_F,
+  TH32_VCEQ_F,
+  TH32_VCGE_F,
+  TH32_VCGT_F,
+  TH32_VACGE_F,
+  TH32_VACGT_F,
+  TH32_VMAX_F,
+  TH32_VMIN_F,
+  TH32_VPMAX_F,
+  TH32_VPMIN_F,
+  TH32_VRECPS_F,
+  TH32_VRSQRTS_F,
+#define TH32_SIMD_3REGSSAMELENGTH_LASTF TH32_VRSQRTS_F
+  TH32_VHADD,
+  TH32_VQADD,
+  TH32_VRHADD,
+  TH32_VHSUB,
+  TH32_VQSUB,
+  TH32_VCGT,
+  TH32_VCGE,
+  TH32_VSHL,
+  TH32_VQSHL,
+  TH32_VRSHL,
+  TH32_VQRSHL,
+  TH32_VMAX,
+  TH32_VMIN,
+  TH32_VABD,
+  TH32_VABA,
+  TH32_VMUL,
+  TH32_VPMAX,
+  TH32_VPMIN,
+  #define TH32_SIMD_LAST3SAME TH32_VPMIN
+
+  /*
+   * modified immediate values
+   * see Table A7-15 [ARM-DDI-0406C.b/A7-269]
+   * _IMMi: i = index to table, start from 0
+   */
+#define TH32_SIMDIMM_FIRST TH32_VMOV_IMM_3
+  TH32_VMOV_IMM_3,
+  TH32_VMVN_IMM_2,
+  TH32_VMOV_IMM_1,
+  TH32_VORR_IMM_1,
+  TH32_VMVN_IMM_1,
+  TH32_VBIC_IMM_1,
+  TH32_VMOV_IMM_2,
+  TH32_VMOV_IMM_0,
+  TH32_VORR_IMM_0,
+  TH32_VMVN_IMM_0,
+  TH32_VBIC_IMM_0,
+#define TH32_SIMDIMM_LAST TH32_VBIC_IMM_0
+
+  /* 2 registers, shift
+   */
+#define TH32_SIMD2REGSSHIFT_FIRST TH32_VSHRN
+  TH32_VSHRN,
+  TH32_VRSHRN,
+  TH32_VQSHRUN,
+  TH32_VQRSHRUN,
+  TH32_VSRI,
+  TH32_VSHL_IMM,
+  TH32_VSLI,
+  TH32_VMOVL1,
+  TH32_VMOVL2,
+  TH32_VMOVL3,
+  TH32_VQSHRN,
+  TH32_VQRSHRN,
+  TH32_VSHLL_IMM,
+  TH32_VSHR,
+  TH32_VSRA,
+  TH32_VRSHR,
+  TH32_VRSRA,
+  TH32_VQSHL_IMM,
+  TH32_VQSHLU_IMM,
+  TH32_VCVT_FX,
+#define TH32_SIMD2REGSSHIFT_LAST TH32_VCVT_FX
+
+  /* 2 registers, miscellaneous value
+   */
+#define TH32_SIMD2MISC_FIRST TH32_VMOVN
+  TH32_VMOVN,
+  TH32_VQMOVUN,
+  TH32_VSHLL,
+  TH32_VREV64,
+  TH32_VREV32,
+  TH32_VREV16,
+  TH32_VCLS,
+  TH32_VCLZ,
+  TH32_VCNT,
+  TH32_VMVN,
+  TH32_VQABS,
+  TH32_VQNEG,
+  TH32_VSWP,
+  TH32_VTRN,
+  TH32_VUZP,
+  TH32_VZIP,
+  TH32_VQMOVN,
+  TH32_VPADDL,
+  TH32_VPADAL,
+  TH32_VCVT_HS,
+  TH32_VRECPE,
+  TH32_VRSQRTE,
+  TH32_VCVT_FI,
+  TH32_VCGT_IMM,
+  TH32_VCGE_IMM,
+  TH32_VCEQ_IMM,
+  TH32_VCLE_IMM,
+  TH32_VCLT_IMM,
+  TH32_VABS,
+  TH32_VNEG,
+#define TH32_SIMD2MISC_LAST TH32_VNEG
+
+#define TH32_SIMDVAR_FIRST TH32_VDUP_SCALAR
+  /* entry in table at [ARM-DDI-0406C.b/A7-261] */
+  TH32_VDUP_SCALAR,
+  /* entry in table at [ARM-DDI-0406C.b/A7-261] */
+  TH32_VTBL,
+  TH32_VTBX,
+  TH32_VEXT,
+#define TH32_SIMDVAR_LAST TH32_VEXT
+
+  /* 3 registers, different length
+   */
+#define TH32_SIMD3REGSDIFFLENGTH_FIRST TH32_VADDHN
+  TH32_VADDHN,
+  TH32_VRADDHN,
+  TH32_VSUBHN,
+  TH32_VRSUBHN,
+  TH32_VQDMLAL,
+  TH32_VQDMLSL,
+  TH32_VQDMULL,
+  TH32_VADDL,
+  TH32_VADDW,
+  TH32_VSUBL,
+  TH32_VSUBW,
+  TH32_VABAL,
+  TH32_VABDL,
+  TH32_VMLAL,
+  TH32_VMLSL,
+  TH32_VMULL,
+  TH32_VMULL_POLY,
+#define TH32_SIMD3REGSDIFFLENGTH_LAST TH32_VMULL_POLY
+
+  /* 2 registers, scalar
+   */
+#define TH32_SIMD2REGSSCALAR_FIRST TH32_VQDMLAL_SCALAR
+  TH32_VQDMLAL_SCALAR,
+  TH32_VQDMLSL_SCALAR,
+  TH32_VQDMULL_SCALAR,
+  TH32_VMLAL_SCALAR,
+  TH32_VMLSL_SCALAR,
+  TH32_VMULL_SCALAR,
+  TH32_VQDMULH_SCALAR,
+  TH32_VQRDMULH_SCALAR,
+  TH32_VMLA_SCALAR,
+  TH32_VMLS_SCALAR,
+  TH32_VMUL_SCALAR,
+#define TH32_SIMD2REGSSCALAR_LAST TH32_VMUL_SCALAR
+
+  /* element or structure load/store instructions
+  TODO: fix ordering
+   */
+#define TH32_SIMD_FIRSTSTORE TH32_VST1_MULTI2OR4
+  TH32_VST1_MULTI2OR4,
+  TH32_VST1_MULTI1OR3,
+  TH32_VST2_MULTI2,
+  TH32_VST2_MULTI1,
+  TH32_VST3_MULTI,
+  TH32_VST4_MULTI,
+  TH32_VST1_ONE,
+  TH32_VST2_ONE,
+  TH32_VST3_ONE,
+  TH32_VST4_ONE,
+#define TH32_SIMD_LASTSTORE TH32_VST4_ONE
+#define TH32_SIMD_FIRSTLOAD TH32_VLD1_MULTI2OR4
+  TH32_VLD1_MULTI2OR4,
+  TH32_VLD1_MULTI1OR3,
+  TH32_VLD2_MULTI2,
+  TH32_VLD2_MULTI1,
+  TH32_VLD3_MULTI,
+  TH32_VLD4_MULTI,
+  TH32_VLD1_ALL,
+  TH32_VLD1_ONE,
+  TH32_VLD2_ALL,
+  TH32_VLD2_ONE,
+  TH32_VLD3_ALL,
+  TH32_VLD3_ONE,
+  TH32_VLD4_ALL,
+  TH32_VLD4_ONE,
+#define TH32_SIMD_LASTLOAD TH32_VLD4_ONE
+
+#define TH32_SIMD_LAST TH32_VLD4_ONE
+
+
+
+
+	TH32_SXTH,
+	TH32_UXTH,
+	TH32_SXTB16,
+	TH32_UXTB16,
+	TH32_SXTB,
+	TH32_UXTB,
+
+	TH32_RRX,
+  TH32_MOV,
+
+	TH32_ROR_IMM,
+	TH32_LSL_IMM,
+	TH32_LSR_IMM,
+	TH32_ASR_IMM,
+	TH32_TST_IMM,
+	TH32_TEQ_IMM,
+	TH32_CMN_IMM,
+	TH32_CMP_IMM,
+	TH32_MOVT,
+	TH32_MOV_IMM,
+	TH32_MVN_IMM,
+	TH32_ADR,
+	TH32_AND_IMM,
+	TH32_ADD_IMM,
+	TH32_ADDW,
+	TH32_BIC_IMM,
+	TH32_ORR_IMM,
+	TH32_ORN_IMM,
+	TH32_EOR_IMM,
+	TH32_ADC_IMM,
+	TH32_SBC_IMM,
+	TH32_RSB_IMM,
+	TH32_MOVW,
+	TH32_SUB_IMM,
+	TH32_SUBW,
+
+	TH32_BFC,
+	TH32_BFI,
+	TH32_SBFX,
+	TH32_UBFX,
+
+	TH32_HVC,
+	TH32_SMC,
+	TH32_UDF,
+
+	TH32_SUBSPCLR,
+	TH32_MRS,
+	TH32_MSR,
+	TH32_ERET,
+	TH32_BXJ,
+	TH32_CPS,
+	TH32_MSR_BANKED,
+	TH32_MRS_BANKED,
+	TH32_BLX,
+	TH32_BL,
+	TH32_B,
+
+	TH32_PUSHONE,
+	TH32_POPONE,
+	TH32_PUSH,
+	TH32_POP,
+	TH32_STM,
+	TH32_STMDB,
+	TH32_LDM,
+	TH32_LDMDB,
+
+	TH32_SRS,
+	TH32_RFE,
+
+	TH32_TBB,
+	TH32_TBH,
+
+#define TH32_LDRSTREX_FIRST TH32_LDREXB
+	TH32_LDREXB,
+	TH32_LDREXH,
+	TH32_STREXB,
+	TH32_STREXH,
+	TH32_LDREX,
+	TH32_STREXD,
+	TH32_LDREXD,
+	TH32_STREX,
+#define TH32_LDRSTREX_LAST TH32_STREX
+
+	TH32_PLD,
+	TH32_PLDW,
+	TH32_PLI,
+
+	TH32_STRB,
+	TH32_LDRB,
+	TH32_STRH,
+	TH32_LDRH,
+	TH32_STR,
+	TH32_LDR,
+	TH32_LDRSB,
+	TH32_LDRSH,
+	TH32_STRD,
+	TH32_LDRD,
+
+	TH32_SADD16,
+	TH32_SASX,
+	TH32_SSAX,
+	TH32_SSUB16,
+	TH32_SADD8,
+	TH32_SHADD16,
+	TH32_SHASX,
+	TH32_SHSAX,
+	TH32_SHSUB16,
+	TH32_SHADD8,
+	TH32_SHSUB8,
+	TH32_UADD16,
+	TH32_UASX,
+	TH32_USAX,
+	TH32_USUB16,
+	TH32_UADD8,
+	TH32_USAD8,
+	TH32_USUB8,
+	TH32_UHADD16,
+	TH32_UHASX,
+	TH32_UHSAX,
+	TH32_UHSUB16,
+	TH32_UHADD8,
+	TH32_UHSUB8,
+	TH32_REV,
+	TH32_REV16,
+	TH32_REVSH,
+	TH32_SEL,
+	TH32_CLZ,
+	TH32_RBIT,
+	TH32_SXTAB,
+	TH32_SXTAB16,
+	TH32_SXTAH,
+	TH32_UXTAB,
+	TH32_UXTAB16,
+	TH32_UXTAH,
+	TH32_USADA8,
+	TH32_SSUB8,
+
+	TH32_QADD16,
+	TH32_QASX,
+	TH32_QSAX,
+	TH32_QSUB16,
+	TH32_QADD8,
+	TH32_QSUB8,
+	TH32_UQADD16,
+	TH32_UQASX,
+	TH32_UQSAX,
+	TH32_UQSUB16,
+	TH32_UQADD8,
+	TH32_UQSUB8,
+	TH32_QADD,
+	TH32_QSUB,
+	TH32_QDADD,
+	TH32_QDSUB,
+
+	TH32_SSAT16,
+	TH32_USAT16,
+	TH32_SSAT,
+	TH32_USAT,
+
+	TH32_TST,
+	TH32_TEQ,
+	TH32_CMN,
+	TH32_CMP,
+	TH32_LSL,
+	TH32_LSR,
+	TH32_ASR,
+	TH32_ROR,
+	TH32_MVN,
+	TH32_AND,
+	TH32_BIC,
+	TH32_ORR,
+	TH32_ORN,
+	TH32_EOR,
+	TH32_PKHBT,
+	TH32_PKHTB,
+	TH32_ADD,
+	TH32_ADC,
+	TH32_SBC,
+	TH32_SUB,
+	TH32_RSB,
+
+	TH32_MUL,
+	TH32_SMUAD,
+	TH32_SMUADX,
+	TH32_SMULWB,
+	TH32_SMULWT,
+	TH32_SMUSD,
+	TH32_SMUSDX,
+	TH32_SMMUL,
+	TH32_SMMULR,
+	TH32_SMULBB,
+	TH32_SMULBT,
+	TH32_SMULTB,
+	TH32_SMULTT,
+	TH32_MLS,
+	TH32_MLA,
+	TH32_SMLAD,
+	TH32_SMLADX,
+	TH32_SMLAWB,
+	TH32_SMLAWT,
+	TH32_SMLSD,
+	TH32_SMLSDX,
+	TH32_SMMLA,
+	TH32_SMMLAR,
+	TH32_SMMLS,
+	TH32_SMMLSR,
+	TH32_SMLABB,
+	TH32_SMLABT,
+	TH32_SMLATB,
+	TH32_SMLATT,
+
+	TH32_SDIV,
+	TH32_UDIV,
+	TH32_SMULL,
+	TH32_UMULL,
+	TH32_SMLAL,
+	TH32_SMLALBB,
+	TH32_SMLALBT,
+	TH32_SMLALTB,
+	TH32_SMLALTT,
+	TH32_SMLALD,
+	TH32_SMLALDX,
+	TH32_SMLSLD,
+	TH32_SMLSLDX,
+	TH32_UMLAL,
+	TH32_UMAAL,
+
+
+  /* 8, 16 and 32-bit transfer between ARM core and extension registers */
+#define TH32_SIMDRT_FIRST TH32_VMOV_C2S
+  TH32_VMOV_C2S,
+  TH32_VMSR,
+  TH32_VMOV_C2SCALAR,
+  TH32_VDUP,
+  TH32_VMOV_S2C,
+  TH32_VMRS,
+  TH32_VMOV_SCALAR2C,
+#define TH32_SIMDRT_LAST TH32_VMOV_SCALAR2C
+
+
+   /* Vector floating point coprocessor (VFP) data processing instructions */
+#define TH32_FP_FIRST TH32_VMLA_F64
+   /* 3 registers */
+  TH32_VMLA_F64,
+  TH32_VMLS_F64,
+  TH32_VNMLA,
+  TH32_VNMLS,
+  TH32_VNMUL,
+  TH32_VMUL_F64,
+  TH32_VADD_F64,
+  TH32_VSUB_F64,
+  TH32_VDIV,
+  TH32_VFNMA,
+  TH32_VFNMS,
+  TH32_VFMA_F64,
+  TH32_VFMS_F64,
+
+   /* other data-processing instructions */
+   TH32_VMOV_FIMM,
+  TH32_VMOV_F,
+  TH32_VABS_F64,
+  TH32_VNEG_F64,
+  TH32_VSQRT,
+  TH32_VCMP,
+  TH32_VCMPE,
+
+#define TH32_FP_VCVT_FIRST TH32_VCVTB
+  TH32_VCVTB,
+  TH32_VCVTT,
+  TH32_VCVT_DS,
+  TH32_VCVT_I2F,
+  TH32_VCVT_X2F,
+  TH32_VCVT_F2X,
+  TH32_VCVT_F2I,
+  TH32_VCVTR_F2I,
+#define TH32_FP_VCVT_LAST TH32_VCVTR_F2I
+#define TH32_FP_LAST TH32_VCVTR_F2I
+
+  /* 64-bit transfers between ARM code and extension registers */
+  TH32_VMOV64_C2S,
+  TH32_VMOV64_C2D,
+
+   /* extension register load/store instructions */
+#define TH32_SIMD_LOADSTORE_FIRST TH32_VPUSH
+  TH32_VPUSH,
+  TH32_VPOP,
+  TH32_VSTR,
+  TH32_VLDR,
+  TH32_FSTMX,
+  TH32_VSTM,
+  TH32_FLDMX,
+  TH32_VLDM,
+#define TH32_SIMD_LOADSTORE_LAST TH32_VLDM
+
+	TH32_MRRC,
+	TH32_MRRC2,
+	TH32_MCRR,
+	TH32_MCRR2,
+	TH32_MRC,
+	TH32_MRC2,
+	TH32_MCR,
+	TH32_MCR2,
+	TH32_CDP,
+	TH32_CDP2,
+	TH32_LDC,
+	TH32_LDC2,
+	TH32_STC,
+	TH32_STC2,
+
+
+
+/* 16-bit thumb opcodes */
+#define FIRST_TH_OPC TH_CPS
+
+	TH_CPS,
+	TH_SETEND,
+
+	TH_NOP, /* 0 */
+	TH_YIELD, /* 1 */
+	TH_WFE, /* 3 */
+	TH_WFI, /* 2 */
+	TH_SEV, /* 4 */
+	TH_IT,
+
+	TH_SWI, /* 25 */
+	TH_BKPT, /* 26 */
+
+	TH_UXTB, /* 5 */
+	TH_UXTH, /* 6 */
+	TH_SXTB,
+	TH_SXTH,
+	TH_REV, /* 6a */
+	TH_REV16,
+	TH_REVSH,
+
+	TH_UDF, /* 21 */
+	TH_B, /* 22 : unconditional branch */
+	TH_B2, /* 22 : conditional branch */
+	TH_BX, /* 24 */
+	TH_BLX, /* 17b */
+	TH_CBZ,
+	TH_CBNZ,
+
+	TH_SUB_3R, /* 27 */
+	TH_ADD_3R, /* 28 */
+	TH_SUB_3I, /* 29 */
+	TH_ADD_3I, /* 30 */
+
+	TH_MOV_I, /* 31 */
+	TH_CMP_I, /* 32 */
+	TH_ADD_2I, /* 33 */
+
+	TH_MOVS,
+	TH_AND, /* 38 */
+	TH_EOR, /* 39 */
+	TH_LSL_R, /* 40 */
+	TH_LSR_R, /* 41 */
+	TH_ASR_R, /* 42 */
+	TH_ADC, /* 43 */
+	TH_SBC, /* 44 */
+	TH_ROR, /* 45 */
+	TH_TST, /* 46 */
+	TH_NEG, /* 47 */
+	TH_CMP_R, /* 48 */
+	TH_CMN, /* 49 */
+	TH_ORR, /* 50 */
+	TH_MUL, /* 51 */
+	TH_BIC, /* 52 */
+	TH_MVN, /* 53 */
+	TH_ADD_PC,
+
+	TH_ADD_2RH, /* 54 */
+	TH_CMP_RH, /* 55 */
+	TH_MOV_RH, /* 56 */
+	TH_SUB_2I, /* 34 */
+
+	TH_LSL_I, /* 35 */
+	TH_LSR_I, /* 36 */
+	TH_ASR_I, /* 37 */
+
+	TH_ADD_SP, /* 58 */
+
+	TH_ADD_SPI, /* 59 */
+	TH_SUB_SPI, /* 60 */
+
+	TH_STR_I, /* 61 */
+	TH_LDR_I, /* 62 */
+	TH_STRB_I, /* 63 */
+	TH_LDRB_I, /* 64 */
+
+	TH_STRH_I, /* 65 */
+	TH_LDRH_I, /* 66 */
+
+	TH_STRH_R, /* 67 */
+	TH_LDRH_R, /* 68 */
+	TH_LDRSB, /* 69 */
+	TH_LDRSH, /* 70 */
+
+	TH_STR_R, /* 71 */
+	TH_LDR_R, /* 72 */
+	TH_STRB_R, /* 73 */
+	TH_LDRB_R, /* 74 */
+
+	TH_LDR_PC, /* 75 */
+
+	TH_STR_SP, /* 76 */
+	TH_LDR_SP, /* 77 */
+
+	TH_STM, /* 78 */
+	TH_LDM, /* 79 */
+
+	TH_PUSH, /* 80 */
+	TH_POP, /* 81 */
+
+	/*! Pseudo op, used in the opcode table */
+	TH_UNDEF, /* 82 */
+	TH32_UNDEF,
+
+	TH_DATA
+	/*! Pseudo instruction, used to add calls during instrumentation */
+/*	TH_PSEUDO_CALL */
+} t_thumb_opcode;
+/* }}} */
+#endif
+#endif
+/* vim: set shiftwidth=2 foldmethod=marker : */

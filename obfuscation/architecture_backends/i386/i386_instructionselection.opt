@@ -1,0 +1,14 @@
+group "obfuscation" bool_option instruction_selection
+{
+  short="ois";
+  long="obfuscationInstructionSelection";
+  description="Instruction Selected";
+  default=off;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

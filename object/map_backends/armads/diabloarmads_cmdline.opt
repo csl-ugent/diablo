@@ -1,0 +1,6 @@
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}

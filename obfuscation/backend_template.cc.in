@@ -1,0 +1,14 @@
+#include <obfuscation/obfuscation_architecture_backend.h>
+#include <obfuscation/architecture_backends/${architecture}/${architecture}_architecture_backend.h>
+
+void InitArchitecture(void **dst) {
+  ${architecture_allcaps}ObfuscationArchitectureInitializer *obj = new ${architecture_allcaps}ObfuscationArchitectureInitializer();
+
+  if (dst)
+    *dst = obj;
+}
+
+void DestroyArchitecture(void **dst) {
+  if (dst)
+    delete static_cast<${architecture_allcaps}ObfuscationArchitectureInitializer *>(*dst);
+}

@@ -1,0 +1,2 @@
+/* Version number of package */
+#define DIABLOSMC_VERSION "@DIABLOSMC_VERSION_MAJOR@.@DIABLOSMC_VERSION_MINOR@.0"

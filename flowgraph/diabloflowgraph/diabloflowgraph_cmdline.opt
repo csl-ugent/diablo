@@ -1,0 +1,69 @@
+/* The options for diablo, use opt_gen to generate */
+
+hidden bool_option annotate_loops
+{
+   long="annotate_loops";
+   short="ale";
+   description="Annotate Edges with information about entry in and exit from Loops";
+   default=off;
+}
+
+group "Profile" bool_option profiled_layout
+{
+   long="profiled-layout";
+   short="pl";
+   description="adapt layout to produce as many hot address producers in one instruction as possible";
+   default=on;
+}
+
+group "Profile" string_option blockprofilefile
+{
+   long="blockprofilefile";
+   short="pb";
+   description="Name of the file containing the basic block execution counts of the original binary";
+}
+
+group "Profile" string_option postblockprofilefile
+{
+   long="postblockprofilefile";
+   short="ppb";
+   description="Name of the file containing the basic block execution counts of the rewritten binary";
+}
+
+group "Profile" string_option insprofilefile
+{
+   long="insprofilefile";
+   short="pi";
+   description="Name of the file containing the instruction execution counts";
+}
+
+group "Profile" bool_option rawprofiles
+{
+   long="rawprofiles";
+   short="pr";
+   description="Profiles are in raw format";
+   default=off;
+}
+
+string_option listfile
+{
+   long="listfile";
+   short="lf";
+   description="Name of the file to list the program";
+}
+
+version_option version
+{
+  long="version";
+  short="V";
+  description="Print the version of this library";
+}
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+
+

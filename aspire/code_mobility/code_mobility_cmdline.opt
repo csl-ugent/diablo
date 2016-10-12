@@ -1,0 +1,31 @@
+group "CodeMobility" string_option binder
+{
+   short="CMB";
+   long="code_mobility_binder";
+   default=NULL;
+   description="Path to the binder object.";
+}
+
+group "CodeMobility" string_option downloader
+{
+   short="CMD";
+   long="code_mobility_downloader";
+   default=NULL;
+   description="Path to the downloader object.";
+}
+
+group "CodeMobility" string_option lib_needed
+{
+   short="CML";
+   long= "code_mobility_lib_needed";
+   default=NULL;
+   description="A list of library names needed by the downloader object.";
+}
+
+group "CodeMobility" string_option output_dir
+{
+   short="CMO";
+   long= "code_mobility_output_dir";
+   default=".";
+   description="Name of the subdirectory in which to put the output (being the mobile blocks).";
+}

@@ -1,0 +1,64 @@
+hidden string_option tamperproof
+{
+   short="tp";
+   long="tamperproof";
+   default="none";
+   description="Add a tamperproofing method to the program"
+}
+
+hidden bool_option stegoLayout
+{
+   short="siL";
+   long= "stegoLayout";
+   default=off;
+   description="Hide Information in Code Layout";
+}
+
+hidden bool_option stegoScheduling
+{
+   short="siS";
+   long= "stegoScheduling";
+   default=off;
+   description="Hide Information in Instruction Scheduling";
+}
+
+hidden bool_option stegoInstruction
+{
+   short="siI";
+   long= "StegoInstruction";
+   default=on;
+   description="Steganography in Instruction Selection";
+}
+
+hidden string_option relayout_description
+{
+   short="rld";
+   long="layoutdescription";
+   description="name of the file describing the new layout";
+}
+
+
+group "Profile guided optimization" bool_option pre
+{
+   long="partial_redundancy_elimination";
+   short="pre";
+   description="apply partial redundancy elimination";
+   default=off;
+}
+
+
+group "Profile guided optimization" bool_option loop_invariant_code_motion
+{
+   long="loop_invariant_code_motion";
+   short="licm";
+   description="apply loop invariant code motion";
+   default=off;
+}
+
+hidden bool_option print_data_layout
+{
+   long="print_data_layout";
+   short="pdl";
+   description="print layout of data";
+   default=off;
+}

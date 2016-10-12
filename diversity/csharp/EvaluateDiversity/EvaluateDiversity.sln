@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EvaluateDiversity", "EvaluateDiversity\EvaluateDiversity.csproj", "{9A932668-99E8-4976-AA74-561EF93FE22B}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConsoleVersion", "ConsoleApplication1\ConsoleVersion.csproj", "{37E2ACF3-EA5E-4547-A8F3-A3EB5B85838E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9A932668-99E8-4976-AA74-561EF93FE22B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A932668-99E8-4976-AA74-561EF93FE22B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A932668-99E8-4976-AA74-561EF93FE22B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A932668-99E8-4976-AA74-561EF93FE22B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{37E2ACF3-EA5E-4547-A8F3-A3EB5B85838E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{37E2ACF3-EA5E-4547-A8F3-A3EB5B85838E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{37E2ACF3-EA5E-4547-A8F3-A3EB5B85838E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{37E2ACF3-EA5E-4547-A8F3-A3EB5B85838E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

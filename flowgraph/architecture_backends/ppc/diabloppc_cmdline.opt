@@ -1,0 +1,33 @@
+/* The options for diablo, use opt_gen to generate */
+
+/* hidden bool_option do_compute_savedchanged_regs
+{
+  long="do_compute_savedchanged_regs";
+  short="dcscr";
+  description="pseudo option: this option is typically unset by a frontend that does not want to compute changed registers - don't touch";
+  default=on;
+} */
+
+group "Control Flow Graph options"  bool_option patch_calls_to_weak_symbols
+{
+  long="patch_calls_to_weak_symbols";
+  short="pctws";
+  description="Remove during CFG construction the bbls leading to weak symbols call.";
+  default=on;
+}
+
+version_option version
+{
+  long="version";
+  short="V";
+  description="Print the version of this library";
+}
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+
+

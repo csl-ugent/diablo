@@ -1,0 +1,211 @@
+About the indices sent to the server. Initially, they are simple indices in a table, 0..table_size. Of course,
+this means that we can easily ask the server all fragments. Possibly, we can generate a set of (large) random numbers,
+send those to the server, and index the table using a perfect hash that maps each of those numbers to a unique entry in a (relatively) small table. Of course, then
+we would need to insert longer code fragments, that might need more free registers. Also a slowdown.
+
+Because of register constraints, we sometimes will need to prepend the mobile code (in the client) with code that restores registers. This inserted code is
+will be different for ARM and Thumb2, so, if there are two call sites for one mobile code fragment, there will be two different versions of the mobile code downloaded (they return
+the same code from the server, but the stubs will treat them differently).
+(This could probably be optimized further, such as by adding multiple int_32s, one of which jumps over the second instruction, but this initial design illustrates all required concepts)
+
+How to transform the calling code:
+  
+Suppose we have a function that calls mobile code:
+f:
+push    {r7, lr}
+add     r7, sp, #0
+mov.w   r0, #0
+bl      0 <f>  ; This is the call to a function that is made mobile
+mov     r3, r0
+mov     r0, r3
+pop     {r7, pc}
+=>
+
+The calling code needs to be transformed like this:
+
+global_mobileredirectiontable: ; This is a table, with an entry per mobile code fragment (can contain more entries if there are call sites to the same fragment in ARM and Thumb mode).
+; Initially, they are filled with pointers to the stub functions, and relocations are added so that the dynamic linker initially relocates this table to let all entries point to their rebased addresses
+.word   stub_bla                   ; idx 0
+.word   stub_spilledr7r8lr_armmode ; idx 1
+.word   stub_...
+...
+f:
+push    {r7, lr}    ; unmodified
+add     r7, sp, #0  ; unmodified
+mov.w   r0, #0      ; unmodified
+
+; Diablo replaces the BL instruction with this assembly snippet:
+PUSH     {r1,r2,lr} ; assume no register free. The set of free registers should be free along all call sites of the same index in the table. All those call sites should store the same set of registers! (But! different indices are needed for ARM and Thumb mode; see later)
+ADR      r1, global_mobileredirectiontable
+MOV      r2, #1     ; This is our index in the table, and we will also send this to the server
+LDR      r1, [r1, r2 LSL #2] ; Load into r1 the address where we will jump to: either a stub appropriate for this set of free registers, or to the mobile code
+BLX      r1         ; redirect control flow to the stub/mobile code
+
+; So, note that the the stub needs to take into account that r7,r8,lr need to be restored!
+
+; Code of the original function continues unmodified:
+mov     r3, r0     ; unmodified
+mov     r0, r3     ; unmodified
+pop     {r7, pc}   ; unmodified
+
+; The goal is that the mobile code, as in the program's memory, will look as follows:
+pop {r1,r2}      ; restore spilled registers, this code is injected by the stub
+... code blob... ; the actual mobile code
+binary_base_address:
+.word 0x0        ; here, the base address of the static program's representation in memory is stored. This overwritten inserted by the stub
+
+; In the above case, our stub is called stub_spilledr7r8lr_armmode, and is inserted by Diablo. It takes into account that r7 contains the table address, r8 the index, both are spilled, and these are called from ARM.
+; We call into generic stub code with that information.
+; This then looks as follows:
+stub_spilledr7r8lr_armmode:
+asm {
+  push {r0, ... r14} ; For now, spill all registers, but these should just be the registers clobbered by insert_stub_in_table_and_insert_unspilling_code.
+  
+  // r7 is the address in the table
+  // r8 is the index in the table
+  b insert_stub_in_table_and_insert_unspilling_code( r7, r8, stub_spilledr7r8lr_armmode, _asm_arm( pop { r7, r8 } ) )
+}  
+  
+; If we are to make the stubs threadsafe:
+pthread_mutex mutexes[number_of_global_mobileredirectiontable_entries];
+
+; in the initializer of the program, before any mobile code is executed:
+{
+  for (int i = 0; i < number_of_global_mobileredirectiontable_entries; i++)
+    pthread_mutex_init(&mutexes[i]);
+}
+
+; This generic stub code downloads and inserts the stubs in a thread-safe manner.
+void
+insert_stub_in_table_and_insert_unspilling_code( addres_in_global_table, index_in_table, address_of_current_stub,  int32 unspilling_code) {
+  pthread_mutex_lock(&mutexes[index_in_table]);
+  target_address = 0x0;
+
+  /* Check if another thread already downloaded and inserted this mobile code fragment */
+  if (global_mobileredirectiontable[index_in_table] == address_of_current_stub) {
+    blob = get_from_server(index_in_table);
+    target_address = malloc(2*pagesize + blob->size + 4); // Or get a clean block of the right size from our code cache
+    target_address = align(pagesize, target);             // For now, assume there are no code blocks being reused, otherwise we need to keep track of the blocks allocated here as well
+    target_address[0..4] = unspilling_code;               // This is the binary representation of code that restores registers: this be a nop (we could then even not emit this code at all), or Thumb code, or ARM code, depending on the call site's mode)
+    memcpy(target_address + 4, blob->data, blob->size);
+  
+    // Write the actual binary_base_address into the last 4 bytes of the blob
+    target_address[blob->size - 4,...blob->size] = diablo_inserted_binary_base_address_computation_stub();
+  
+    memprotect(target, blob->size + 4, PROT_READ | PROT_EXEC);
+
+    *addres_in_global_table = target_address; // Overwrite the address in the table with our mobile code block
+  }
+  /* in the else case, another thread already updated the table. We can just jump to that code now. */
+  pthread_mutex_unlock(&mutexes[r8]);
+
+  _asm(
+    pop  {r0, ... r14} ; Restore the registers
+  
+    BX    target_address // the stack layout right now is exactly the same as if it would be in the BLX r7 of the calling function
+ )
+}
+
+diablo_inserted_binary_base_address_computation_stub: ; returns the base address in r0
+  ADR r0, T_RELOCATBLE(first_section) ; will be PC-relative
+  BL lr
+  
+===========================================
+If we want to make the following code mobile:
+push    {r7, lr}
+sub     sp, #8
+add     r7, sp, #0
+str     r0, [r7, #4]
+ldr     r0, [r7, #4]
+bl      0 <g> ; Calls to a function in the statically available program code
+mov     r3, r0
+ADR     r0, hello_world_string ; In this example: a global variable, residing in the statically available program memory
+mov     r1, r3
+bl      0 <printf> ; Calls to a function in the statically available program code. should point to the PLT! It is at a fixed offset in the binary
+mov     r0, r3
+add.w   r7, r7, #8
+mov     sp, r7
+pop     {r7, pc}
+
+This we need to transform the BL(x)es and the ADRs to make it mobile:
+mobilecode:
+push    {r7, lr}     ; unmodified
+sub     sp, #8       ; unmodified
+add     r7, sp, #0   ; unmodified
+str     r0, [r7, #4] ; unmodified
+ldr     r0, [r7, #4] ; unmodified
+
+; Case 1: BL with no free registers. Diablo replaces the BL with:
+; Assume: no free registers, let's use r1, r2 and store them.
+; The problem is, if there are no free registers, we need to store and restore them. However, we will blx to a REGISTER containing the target address. But this register then is not free; how do we store it?
+; The trick: we create a temporary stack slot, into which we write the computed absolute address, and then pop the PC from that stack slot.
+PUSH    {r1}       ; just some register, don't care which. If it is a lower-numbered register than the first of the spilled registers, the pushes can be merged
+PUSH    {r1, r2}
+ADR     r1, binary_base_address
+LDR     r1, [r1]
+CONST   r2, #0x0    ; the offset, relative to the binary_base_address, of where we want to redirect the control flow to
+ADD     r1, r2, r1  ; we will redirect execution to the address stored in r1
+STR     r1, [SP + 8]
+POP     {r1, r2, pc}
+
+; Unmodified code from the original program
+mov     r3, r0   ; unmodified
+
+; Case 2: Rewriting the ADR address producer. Diablo replaces the ADR with the following code:
+PUSH {r1} ; No dirty hacks needed here. Also, r0 is actualy a free register here, because the ADR instruction is overwriting it
+ADR     r1, binary_base_address
+LDR     r1, [r1]
+CONST   r0, #0x0 ; the offset, relative to the binary_base_address, of where the hello_world_string string is
+ADD     r0, r0, r1
+POP     {r1}
+
+; Unmodified code from the original program
+mov     r1, r3 ; unmodified
+
+; Case 3: BL with at least a single free register. For example, a bl to a PLT entry. This is just the same as the previous call, but redirect to the PLT. For this example, assume we have one free register, r1
+; Chose r2 as other register, spill it
+PUSH    {r2}
+ADR     r1, binary_base_address
+LDR     r1, [r1]
+CONST   r2, #0x0 ; the offset, relative to the binary_base_address, of where we want to redirect the control flow to (printf@PLT)
+ADD     r1, r2, r1 ; we will redirect execution to r1
+POP     {r2}
+BLX     r1 ; because r1 is free
+
+; Unmodified code from the original program
+mov     r0, r3       ; unmodified
+add.w   r7, r7, #8   ; unmodified
+mov     sp, r7       ; unmodified
+pop     {r7, pc}     ; unmodified
+; This is inserted at the end of the blob by diablo, and will be overwritten by the stub
+binary_base_address:
+.word   0x0   ; This will contain the base address of the static binary in the memory, it is placed at the END of the blob sent from the server, so that we can immediately prepend the pop-instructions to this blob in the stub
+
+
+=====
+More complex example, where we need to call mobile code from the mobile code. Thus, suppose we have 
+bl      g ; Calls to a MOBILE function
+
+Suppose that there are no free registers. We need to ensure that we already have an index reserved in our table for this mobile code fragment.
+
+First, we use the technique described above to transform a BL to mobile code. Thus, this code fragment is transformed into
+PUSH     {r1,r2,lr} ; assume no register free. The set of free registers should be free along all call sites of the same index in the table. Otherwise, all those call sites should store the same registers
+ADR      r1, global_mobileredirectiontable
+MOV      r2, #1 ; This is our index
+LDR      r1, [r1, r2 LSL #2]
+BLX      r1
+
+; Now we need to make this code fragment mobile. The only part that needs to change is the ADR address producer. We apply the same principle as described above to make transform ADR for mobile code use:
+
+PUSH     {r1,r2,lr} ; From the first transformation above.
+
+; Because we stored r2 and r1 above, and have not used them yet ourselves, we now have 2 free registers to transform the ADR
+ADR     r1, binary_base_address
+LDR     r1, [r1]
+CONST   r2, #0x0 ; the offset, relative to the binary_base_address, of where the global_mobileredirectiontable table is
+ADD     r1, r2, r1
+; Now r2 contains the address of global_mobileredirectiontable, in this program's execution. The mobile code call can continue as it was written above.
+
+MOV      r2, #1 ; This is our index
+LDR      r1, [r1, r2 LSL #2]
+BLX      r1

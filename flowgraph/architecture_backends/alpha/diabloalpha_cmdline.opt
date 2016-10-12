@@ -1,0 +1,36 @@
+/* The options for diablo, use opt_gen to generate */
+
+hidden bool_option do_compute_savedchanged_regs
+{
+  long="do_compute_savedchanged_regs";
+  short="dcscr";
+  description="hackish option - don't touch";
+  default=on;
+}
+
+bool_option do_gpreset_removal
+{
+  long="do_gpreset_removal";
+  short="gp";
+  description="Remove useless gp register resets";
+  default=on;
+}
+
+bool_option do_nop_removal
+{
+  long="do_nop_removal";
+  short="nop";
+  description="Remove nop instructions";
+  default=off;
+}
+
+bool_option do_branch_conversion
+{
+  long="do_branch_conversion";
+  short="bc";
+  description="Convert indirect jumps to PC relative ones where possible";
+  default=on;
+}
+
+
+

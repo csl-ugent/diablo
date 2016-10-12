@@ -1,0 +1,3 @@
+To generate the Makefile for the binder object that will be linked in, run the generate.sh script. This script takes three arguments: the path to the compiler in the patched toolchain, the name for the binder object and the name for the downloader object.
+
+Example: ./generate.sh ~/diablo/toolchain-gcc-4.8.1-arm/bin/arm-diablo-linux-gnueabi-cc binder.o downloader.o

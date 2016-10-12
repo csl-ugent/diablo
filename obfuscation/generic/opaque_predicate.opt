@@ -1,0 +1,14 @@
+group "obfuscation" bool_option opaque_predicates
+{
+  short="oop";
+  long="obfuscationOpaquePredicates";
+  description="Insert opaque predicates";
+  default=off;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

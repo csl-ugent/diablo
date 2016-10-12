@@ -1,0 +1,29 @@
+group "DiabloSoftVM" string_option instructionselector_path
+{
+  short="isl";
+  long="instructionselector-path";
+  description="Specify the file path and name of the instruction selector library."
+}
+
+group "DiabloSoftVM" string_option extractor_output_file
+{
+  short="eof";
+  long="extractor-output-file";
+  description="Specify the file path and name of the JSON output filee."
+}
+
+group "DiabloSoftVM" bool_option generate_dots_softvm
+{
+	short="gendotsvm";
+	long="generate-dots-softvm";
+	default=off;
+	description="Generate dot-files for the SoftVM extracted chunks";
+}
+
+group "DiabloSoftVM" int_option diversity_seed
+{
+  short="svmseed";
+  long="softvm-diversity-seed";
+  default=0;
+  description="The seed passed to the X-translator for generating diversified SoftVM bytecode."
+}

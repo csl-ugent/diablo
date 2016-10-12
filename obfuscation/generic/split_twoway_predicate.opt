@@ -1,0 +1,14 @@
+group "obfuscation" bool_option twoway_predicates
+{
+  short="ostp";
+  long="obfuscationSplitTwoWayPredicates";
+  description="Split BBLs with two-way predicates";
+  default=off;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

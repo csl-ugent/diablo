@@ -1,0 +1,6 @@
+# @(#) $Revision: 1.2 $ $Source: /cvs/diablo/judy/JudySL/README,v $
+#
+# This tree contains sources for the JudySL*() functions.
+
+JudySL.c	source file
+Note: JudySL.h is no longer needed (May 2004)

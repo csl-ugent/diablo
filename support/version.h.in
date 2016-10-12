@@ -1,0 +1,15 @@
+#ifndef VERSION_H
+#define VERSION_H
+
+#define DIABLO_MAJOR_VERSION "1"
+#define DIABLO_MINOR_VERSION "1"
+
+#cmakedefine DIABLO_SVN_REVISION "@DIABLO_SVN_REVISION@"
+
+#ifndef DIABLO_SVN_REVISION
+#error "No SVN revision given when compiling Diablo."
+#endif
+
+#define DIABLO_VERSION_STRING "Diablo " DIABLO_MAJOR_VERSION "." DIABLO_MINOR_VERSION " (rev. " DIABLO_SVN_REVISION ")"
+
+#endif

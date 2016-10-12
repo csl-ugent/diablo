@@ -1,0 +1,14 @@
+group "obfuscation" string_option opaque_predicate_binary_directory
+{
+   short="dopbd";
+   long="opaque_predicate_binary_directory";
+   default=NULL;
+   description="If set, use this base path to point load opaque predicates from (do not modify the raw predicate files themselves without modifying Diablo's source!)";
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

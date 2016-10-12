@@ -1,0 +1,3 @@
+To generate the Makefile for the print object that will be linked in run the generate.sh script. This script takes three arguments: the path to the compiler in the patched toolchain (only GCC is supported), the name for the print object, and the architecture (either i486 or arm).
+
+Example: ./generate.sh ~/diablo/toolchain-gcc-4.8.1-i486/bin/i486-diablo-linux-gnu-cc printi486.o i486

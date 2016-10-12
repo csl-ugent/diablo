@@ -1,0 +1,3 @@
+This directory holds all flow graph handling code (disassembling, assembling,
+flowgraph construction and deconstruction, ...) for diablo (Diablo Is A Better
+Link-time Optimizer, see http://www.elis.ugent.be/diablo for more details).

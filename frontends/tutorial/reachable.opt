@@ -1,0 +1,12 @@
+group "File" required string_option input_name
+{
+   description="The binary to rewrite. This binary should be accompanied by a map file";
+}
+
+group "File" string_option output_name
+{
+   short="o";
+   long="output";
+   default="b.out";
+   description="sets the output filename";
+}

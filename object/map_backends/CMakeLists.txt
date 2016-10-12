@@ -1,0 +1,6 @@
+add_subdirectory(armads)
+add_subdirectory(binutils)
+add_subdirectory(tilinker)
+if(ObjectPECOFF)
+  add_subdirectory(msil)
+endif(ObjectPECOFF)

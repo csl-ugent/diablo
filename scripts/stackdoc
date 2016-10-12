@@ -1,0 +1,1 @@
+cat object/diabloobject/diabloobject_stack_machine.c | tr "\t" " " | grep "case *'.*' *: *\/\*" | sed "s/ *case *'\(.*\)' *: *\/\*\(.*\) *\*\//\1: \2/g" | sort -u

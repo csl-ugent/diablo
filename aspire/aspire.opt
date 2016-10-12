@@ -1,0 +1,79 @@
+group "Aspire" bool_option call_stack_checks
+{
+   short="CS";
+   long="call_stack_checks";
+   default=on;
+   description="Transform the binary with call stack checks.";
+}
+
+group "Aspire" bool_option code_guards
+{
+   short="CG";
+   long="code_guards";
+   default=on;
+   description="Transform the binary with code guards.";
+}
+
+group "Aspire" bool_option code_mobility
+{
+   short="CM";
+   long="code_mobility";
+   default=on;
+   description="Transform the binary to allow code mobility and generate mobile code.";
+}
+
+group "Aspire" bool_option obfuscations
+{
+   short="OBF";
+   long="obfuscations";
+   default=on;
+   description="Transform the binary with obfuscations.";
+}
+
+group "Aspire" bool_option remote_attestation
+{
+   short="RA";
+   long="remote_attestation";
+   default=on;
+   description="Transform the binary with remote attestation.";
+}
+
+group "Aspire" bool_option self_debugging
+{
+   short="SD";
+   long="self_debugging";
+   default=on;
+   description="Transform the binary with self-debugging.";
+}
+
+group "Aspire" bool_option softvm
+{
+   short="SV";
+   long="softvm";
+   default=on;
+   description="Transform the binary with softvm.";
+}
+
+group "Aspire" string_option actc_id
+{
+   short="id";
+   long="id";
+   default="DEADDEADDEADDEAD"
+   description="Specifies the ACTC unique ID.";
+}
+
+group "Aspire" bool_option no_sp_fork
+{
+	short="nsf";
+	long="nospfork";
+	default=off;
+	description="Don't fork before adding self-profiling support. For debugging purposes only.";
+}
+
+group "Aspire" bool_option softvm_only
+{
+   short="svmonly";
+   long="softvm-only";
+   default=off;
+   description="Only integrate SoftVM related stuff, no other obfuscations.";
+}

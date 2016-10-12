@@ -1,0 +1,58 @@
+group "Optimization and analysis" bool_option spill_code_removal
+{
+   short="Osp";
+   long= "spill_code_removal";
+   default=on;
+   description="Turn spill code removal on or off";
+}
+
+
+hidden int_option traceadr
+{
+   short="t";
+   long= "traceadr";
+   default=0;
+   description="trace address, if given, a bbl at this address is traced";
+}
+
+group "Profile guided optimization" bool_option pre
+{
+   long="partial_redundancy_elimination";
+   short="pre";
+   description="apply partial redundancy elimination";
+   default=off;
+}
+
+
+group "Profile guided optimization" bool_option loop_invariant_code_motion
+{
+   long="loop_invariant_code_motion";
+   short="licm";
+   description="apply loop invariant code motion";
+   default=off;
+}
+
+hidden bool_option print_data_layout
+{
+   long="print_data_layout";
+   short="pdl";
+   description="print layout of data apply loop invariant code motion";
+   default=off;
+}
+
+group "Binary rewriting" bool_option thumbtoarm
+{
+   long="thumbtoarm";
+   short="tta";
+   description="Convert a binary with Thumb code to an ARM only binary";
+   default=off;
+}
+
+hidden string_option tamperproof
+{
+   short="tp";
+   long="tamperproof";
+   default="none";
+   description="Add a tamperproofing method to the program"
+}
+

@@ -1,0 +1,8 @@
+/* special options when flowgraphing for ppc64 */
+
+hidden bool_option diabloflowgraphppc64_foo
+{
+  long="diabloflowgraphppc64_foo";
+  description="just to ensure the cmdline structures are generated";
+  default=on;
+}

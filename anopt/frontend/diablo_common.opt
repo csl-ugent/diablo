@@ -1,0 +1,278 @@
+required group "File" string_option objectfilename
+{
+   description="The binary to optimize. This binary should be accompanied by a map file";
+}
+
+group "File" bool_option read_debug_info
+{
+  short="g"
+  long="read-debug"
+  default=off;
+  description="Read the debug information from the object files and binary"
+}
+
+group "Debug" bool_option generate_dots
+{
+   short="D";
+   long="generate_dots";
+   default=off;
+   description="Turns printing of dot files on or off";
+}
+
+hidden bool_option read
+{
+  short="R";
+  long= "read";
+  default=on;
+  description="Turns reading of binaries on or off. Can be used for simply executing a binary";
+}
+
+group "File" string_option output_name
+{
+   short="o";
+   long="output";
+   default="b.out";
+   description="sets the output filename";
+}
+
+group "Optimization and analysis" bool_option constant_propagation
+{
+   short="Oc";
+   long= "constant_propagation";
+   default=on;
+   description="Turns constant propagation on or off";
+}
+
+group "Optimization and analysis" bool_option copy_propagation
+{
+   short="Ocp";
+   long= "copy_propagation";
+   default=on;
+   description="Turn copy propagation on or off";
+}
+
+group "Optimization and analysis" bool_option copy_analysis
+{
+   short="Oca";
+   long= "copy_analysis";
+   default=on;
+   description="Turn fixpoint copy_analysis on or off";
+}
+
+hidden string_option output_files
+{
+   short="Out";
+   long="output";
+   description="sets the output files, separated by ;";
+}
+
+hidden string_option input_files
+{
+   short="In";
+   long="input";
+   description="sets the input files, separated by ;";
+}
+
+hidden string_option host 
+{
+   short="H";
+   description="sets the host on which we will execute";
+}
+
+group "Phase control" bool_option optimize
+{
+   short="Z";
+   long= "optimize";
+   default=on;
+   description="Turn optimization on or off";
+}
+
+hidden string_option prepend
+{
+   long="prepend";
+   default="";
+   description="Prepends a string before all file names";
+}
+
+hidden bool_option exec
+{
+   long="exec";
+   short="e";
+   description="Execute the obtained binary";
+   default=off;
+}
+
+hidden string_option arguments 
+{
+   long="args";
+   short="A";
+   description="Arguments for an exec";
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}
+
+hidden bool_option annotate_loops
+{
+   long="annotate_loops";
+   short="ale";
+   description="Annotate Edges with information about entry in and exit from Loops";
+   default=off;
+}
+
+hidden bool_option restoreState
+{
+   short="rS";
+   long= "restoreState";
+   default=off;
+   description="Use information of previous run of Diablo";
+}
+
+group "Optimization and analysis" bool_option inlining
+{
+   short="Oi";
+   long= "inline";
+   default=on;
+   description="Turns inlining on or off";
+}
+
+
+group "Profile" bool_option profiled_layout
+{
+   long="profiled-layout";
+   short="pl";
+   description="adapt layout to produce as many hot address producers in one instruction as possible";
+   default=on;
+}
+
+group "Phase control" bool_option disassemble
+{
+   short="I";
+   long= "disassemble";
+   default=on;
+   description="Turns disassembly on or off";
+}
+
+group "Phase control" bool_option flowgraph
+{
+   default=on;
+   short="F";
+   long= "flowgraph";
+   description="Turns flowgraphing on or off";
+}
+
+group "Optimization and analysis" bool_option initcfgopt
+{
+   default=on;
+   short="Oif";
+   long= "initcfgopt";
+   description="Turns initial unreachable code elimination on or off";
+}
+
+group "Optimization and analysis" bool_option branch_elimination
+{
+   short="Obe";
+   long= "branch_elimination";
+   default=on;
+   description="Turn branch elimination on or off";
+}
+
+group "Optimization and analysis" bool_option stack
+{
+   short="Os";
+   long= "stack";
+   default=on;
+   description="Turn stack optimization on or off";
+}
+group "Optimization and analysis" bool_option  dominator
+{
+   short="Od";
+   long= "dominator_info";
+   default=off;
+   description="Turn dominator calculation on or off";
+}
+
+group "Optimization and analysis" bool_option factoring
+{
+   short="Of";
+   long= "factoring";
+   default=on;
+   description="Turns factoring on or off";
+}
+
+group "Optimization and analysis" bool_option bbl_factoring
+{
+   short="Ofb";
+   long= "bbl-factoring";
+   default=on;
+   description="Turns basic block factoring on or off";
+}
+
+group "Optimization and analysis" bool_option function_factoring
+{
+   short="Off";
+   long= "function-factoring";
+   default=on;
+   description="Turns function factoring on or off";
+}
+
+group "Optimization and analysis" bool_option liveness
+{
+   short="Ol";
+   long= "liveness";
+   default=on;
+   description="Turn liveness analysis on or off";
+}
+
+group "Optimization and analysis" bool_option remove_unconnected
+{
+   short="Or";
+   long= "remove_unconnected";
+   default=on;
+   description= "Turn removal of unconnected blocks on or off";
+}
+
+group "Optimization and analysis" bool_option  loadstorefwd
+{
+   short="Ols";
+   long= "loadstore";
+   default=on;
+   description="Turn load-store forwarding on or off";
+}
+
+group "Optimization and analysis" bool_option peephole
+{
+   short="Op";
+   long="peepholes";
+   default=on;
+   description="Turn peephole optimizations on or off";
+}
+
+hidden int_option traceadr
+{
+   short="t";
+   long= "traceadr";
+   default=0;
+   description="trace address, if given, a bbl at this address is traced";
+}
+
+bool_option mergebbls
+{
+   short="B";
+   long= "merge bbls";
+   default=on;
+   description="Turn merging of bbls on or off";
+}
+
+hidden bool_option saveState
+{
+   short="sS";
+   long= "saveState";
+   default=off;
+   description="Include information to enable a next run off Diablo";
+}
+

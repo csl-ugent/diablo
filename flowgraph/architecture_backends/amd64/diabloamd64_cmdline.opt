@@ -1,0 +1,9 @@
+/* The options for diablo, use opt_gen to generate */
+
+hidden bool_option do_compute_savedchanged_regs
+{
+  long="do_compute_savedchanged_regs";
+  short="dcscr";
+  description="hackish option - don't touch";
+  default=on;
+}

@@ -1,0 +1,669 @@
+/*
+ * Copyright 2001,2002: Bruno De Bus
+ *                      Bjorn De Sutter
+ *                      Dominique Chanet
+ *                      Ludo Van Put
+ *
+ *
+ * This file is part of Diablo (Diablo is a better link-time optimizer)
+ *
+ * Diablo is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * Diablo is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Diablo; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ */
+
+#ifndef I386_OPCODE_TYPEDEFS
+#define I386_OPCODE_TYPEDEFS
+typedef struct _t_i386_opcode_info t_i386_opcode_info;
+
+enum _t_i386_opcode {
+  LAST_OPC	  = -124,
+  I386_3DNOW_OPC  = -123,
+  GRP1a           = -122,
+  GRP1b           = -121,
+  GRP1c           = -120,
+  GRP1d           = -119,
+  GRP2a           = -118,
+  GRP2b           = -117,
+  GRP3a           = -116,
+  GRP3b           = -115,
+  GRP4a           = -114,
+  GRP4b           = -113,
+  GRP4c           = -112,
+  GRP4d           = -111,
+  GRP5a           = -110,
+  GRP5b           = -109,
+  GRP6a           = -108,
+  GRP6b           = -107,
+  GRP7a           = -106,
+  GRP7b           = -105,
+  GRP8a           = -104,
+  GRP12           = -103,
+  GRP13           = -102,
+  GRP14           = -101,
+  GRP15a          = -100,
+  GRP15a11        = -99,
+  GRP16           = -98,
+  PREFIX_GRP_1    = -97,
+  PREFIX_GRP_2    = -96,
+  PREFIX_GRP_3    = -95,
+  PREFIX_GRP_4    = -94,
+  PREFIX_GRP_5    = -93,
+  PREFIX_GRP_6    = -92,
+  PREFIX_GRP_7    = -91,
+  PREFIX_GRP_8    = -90,
+  PREFIX_GRP_9    = -89,
+  PREFIX_GRP_A    = -88,
+  PREFIX_GRP_B    = -87,
+  PREFIX_GRP_C    = -86,
+  PREFIX_GRP_D    = -85,
+  PREFIX_GRP_E    = -84,
+  PREFIX_GRP_F    = -83,
+  PREFIX_GRP_10   = -82,
+  PREFIX_GRP_11   = -81,
+  PREFIX_GRP_12   = -80,
+  PREFIX_GRP_13   = -79,
+  PREFIX_GRP_14   = -78,
+  PREFIX_GRP_15   = -77,
+  PREFIX_GRP_16   = -76,
+  PREFIX_GRP_17   = -75,
+  PREFIX_GRP_18   = -74,
+  PREFIX_GRP_19   = -73,
+  PREFIX_GRP_1A   = -72,
+  PREFIX_GRP_1B   = -71,
+  PREFIX_GRP_1C   = -70,
+  PREFIX_GRP_1D   = -69,
+  PREFIX_GRP_1E   = -68,
+  PREFIX_GRP_1F   = -67,
+  PREFIX_GRP_20   = -66,
+  PREFIX_GRP_21   = -65,
+  PREFIX_GRP_22   = -64,
+  PREFIX_GRP_23   = -63,
+  PREFIX_GRP_24   = -62,
+  PREFIX_GRP_25   = -61,
+  PREFIX_GRP_26   = -60,
+  PREFIX_GRP_27   = -59,
+  PREFIX_GRP_28   = -58,
+  PREFIX_GRP_29   = -57,
+  PREFIX_GRP_2A   = -56,
+  PREFIX_GRP_2B   = -55,
+  PREFIX_GRP_2C   = -54,
+  PREFIX_GRP_2D   = -53,
+  PREFIX_GRP_2E   = -52,
+  PREFIX_GRP_2F   = -51,
+  PREFIX_GRP_30   = -50,
+  PREFIX_GRP_31   = -49,
+  PREFIX_GRP_32   = -48,
+  PREFIX_GRP_33   = -47,
+  PREFIX_GRP_34   = -46,
+  PREFIX_GRP_35   = -45,
+  PREFIX_GRP_36   = -44,
+  PREFIX_GRP_37   = -43,
+  PREFIX_GRP_38   = -42,
+  PREFIX_GRP_39   = -41,
+  PREFIX_GRP_3A   = -40,
+  PREFIX_GRP_3B   = -39,
+  PREFIX_GRP_3C   = -38,
+  PREFIX_GRP_3D   = -37,
+  PREFIX_GRP_3E   = -36,
+  PREFIX_GRP_3F   = -35,
+  PREFIX_GRP_40   = -34,
+  PREFIX_GRP_41   = -33,
+  PREFIX_GRP_42   = -32,
+  PREFIX_GRP_43   = -31,
+  PREFIX_GRP_44   = -30,
+  PREFIX_GRP_45   = -29,
+  PREFIX_GRP_46   = -28,
+  PREFIX_GRP_47   = -27,
+  PREFIX_GRP_48   = -26,
+  PREFIX_GRP_49   = -25,
+  PREFIX_GRP_4A   = -24,
+  PREFIX_GRP_4B   = -23,
+  PREFIX_GRP_4C   = -22,
+  PREFIX_GRP_4D   = -21,
+  PREFIX_GRP_4E   = -20,
+  PREFIX_GRP_4F   = -19,
+  PREFIX_GRP_50   = -18,
+  PREFIX_GRP_51   = -17,
+  PREFIX_GRP_52   = -16,
+  PREFIX_GRP_53   = -15,
+  PREFIX_GRP_54   = -14,
+  PREFIX_GRP_55   = -13,
+  PREFIX_GRP_56   = -12,
+  PREFIX_GRP_57   = -11,
+  PREFIX_GRP_58   = -10,
+  PREFIX_GRP_59   = -9,
+  PREFIX_GRP_5A   = -8,
+  PREFIX_GRP_5B   = -7,
+  PREFIX_GRP_5C   = -6,
+  PREFIX_GRP_5D   = -5,
+  PREFIX_GRP_5E   = -4,
+  PREFIX_GRP_5F   = -3,
+  FPU_ESC         = -2,
+  TWOBYTE_ESC     = -1,
+  INVALID_OPC     =  0,
+  UNSUPPORTED_OPC =  1,
+  I386_DATA, 
+  I386_AAA,
+  I386_AAD,
+  I386_AAM,
+  I386_AAS,
+  I386_ADC,
+  I386_ADD,
+  I386_AND,
+  I386_ARPL,
+  I386_BOUND,
+  I386_BSF,
+  I386_BSR,
+  I386_BSWAP,
+  I386_BT,
+  I386_BTC,
+  I386_BTR,
+  I386_BTS,
+  I386_CALL,
+  I386_CALLF,
+  I386_CDQ,
+  I386_CLC,
+  I386_CLD,
+  I386_CLI,
+  I386_CLTS,
+  I386_CMC,
+  I386_CMOVcc,
+  I386_CMP,
+  I386_CMPSB,
+  I386_CMPSD,
+  I386_CMPXCHG,
+  I386_CPUID,
+  I386_CWDE,
+  I386_DAA,
+  I386_DAS,
+  I386_DEC,
+  I386_DIV,
+  I386_ENTER,
+  I386_F2XM1,
+  I386_FABS,
+  I386_FADD,
+  I386_FADDP,
+  I386_FBLD,
+  I386_FBSTP,
+  I386_FCHS,
+  I386_FCLEX,
+  I386_FCMOVcc,
+  I386_FCOM,
+  I386_FCOMI,
+  I386_FCOMIP,
+  I386_FCOMP,
+  I386_FCOMPP,
+  I386_FCOS,
+  I386_FDECSTP,
+  I386_FDIV,
+  I386_FDIVP,
+  I386_FDIVR,
+  I386_FDIVRP,
+  I386_FFREE,
+  I386_FIADD,
+  I386_FICOM,
+  I386_FICOMP,
+  I386_FIDIV,
+  I386_FIDIVR,
+  I386_FILD,
+  I386_FIMUL,
+  I386_FINCSTP,
+  I386_FINIT,
+  I386_FIST,
+  I386_FISTP,
+  I386_FISUB,
+  I386_FISUBR,
+  I386_FLD,
+  I386_FLD1,
+  I386_FLDCW,
+  I386_FLDENV,
+  I386_FLDL2E,
+  I386_FLDL2T,
+  I386_FLDLG2,
+  I386_FLDLN2,
+  I386_FLDPI,
+  I386_FLDZ,
+  I386_FMUL,
+  I386_FMULP,
+  I386_FNOP,
+  I386_FPATAN,
+  I386_FPREM,
+  I386_FPREM1,
+  I386_FPTAN,
+  I386_FRNDINT,
+  I386_FRSTOR,
+  I386_FSAVE,
+  I386_FSCALE,
+  I386_FSIN,
+  I386_FSINCOS,
+  I386_FSQRT,
+  I386_FST,
+  I386_FSTCW,
+  I386_FSTENV,
+  I386_FSTP,
+  I386_FSTSW,
+  I386_FSUB,
+  I386_FSUBP,
+  I386_FSUBR,
+  I386_FSUBRP,
+  I386_FTST,
+  I386_FUCOM,
+  I386_FUCOMI,
+  I386_FUCOMIP,
+  I386_FUCOMP,
+  I386_FUCOMPP,
+  I386_FXAM,
+  I386_FXCH,
+  I386_FXRSTOR,
+  I386_FXSAVE,
+  I386_FXTRACT,
+  I386_FYL2X,
+  I386_FYL2XP1,
+  I386_HLT,
+  I386_IDIV,
+  I386_IMUL,
+  I386_IMULexp1,
+  I386_IMULexp2,
+  I386_IN,
+  I386_INC,
+  I386_INSB,
+  I386_INSD,
+  I386_INT,
+  I386_INT3,
+  I386_INTO,
+  I386_INVD,
+  I386_INVLPG,
+  I386_IRET,
+  I386_JECXZ,
+  I386_JMP,
+  I386_JMPF,
+  I386_Jcc,
+  I386_LAHF,
+  I386_LAR,
+  I386_LDS,
+  I386_LEA,
+  I386_LEAVE,
+  I386_LES,
+  I386_LFS,
+  I386_LGDT,
+  I386_LGS,
+  I386_LIDT,
+  I386_LLDT,
+  I386_LMSW,
+  I386_LODSB,
+  I386_LODSD,
+  I386_LOOP,
+  I386_LOOPNZ,
+  I386_LOOPZ,
+  I386_LSL,
+  I386_LSS,
+  I386_LTR,
+  I386_MOV,
+  I386_MOVNTI,
+  I386_MOVSB,
+  I386_MOVSD,
+  I386_MOVSX,
+  I386_MOVZX,
+  I386_MUL,
+  I386_NEG,
+  I386_NOP,
+  I386_NOT,
+  I386_OR,
+  I386_OUT,
+  I386_OUTSB,
+  I386_OUTSD,
+  I386_POP,
+  I386_POPA,
+  I386_POPF,
+  I386_PUSH,
+  I386_PUSHA,
+  I386_PUSHF,
+  I386_RCL,
+  I386_RCR,
+  I386_RDMSR,
+  I386_RDPMC,
+  I386_RDTSC,
+  I386_RET,
+  I386_RETF,
+  I386_ROL,
+  I386_ROR,
+  I386_RSM,
+  I386_SAHF,
+  I386_SAR,
+  I386_SBB,
+  I386_SCASB,
+  I386_SCASD,
+  I386_SETcc,
+  I386_SGDT,
+  I386_SHL,
+  I386_SHLD,
+  I386_SHR,
+  I386_SHRD,
+  I386_SIDT,
+  I386_SLDT,
+  I386_SMSW,
+  I386_STC,
+  I386_STD,
+  I386_STI,
+  I386_STOSB,
+  I386_STOSD,
+  I386_STR,
+  I386_SUB,
+  I386_SYSENTER,
+  I386_SYSEXIT,
+  I386_TEST,
+  I386_UD2,
+  I386_VERR,
+  I386_VERW,
+  I386_WAIT,
+  I386_WBINVD,
+  I386_WRMSR,
+  I386_XADD,
+  I386_XCHG,
+  I386_XLAT,
+  I386_XOR,
+
+  I386_STMXCSR,
+  I386_LDMXCSR,
+
+  I386_MOVSD_SSE,  /* (SSE instruction) */
+  I386_MOVSS_SSE,  /* (SSE instruction) */
+  I386_MOVUPS,
+  I386_MOVUPD,
+
+  I386_CVTSI2SS,
+  I386_CVTSI2SD,
+
+  I386_CVTTSS2SI,
+  I386_CVTTSD2SI,
+
+  I386_COMISS,
+  I386_COMISD,
+
+  I386_UCOMISS,
+  I386_UCOMISD,
+
+  I386_XORPS,
+  I386_XORPD,
+
+  I386_PXOR,
+  I386_PXORD,
+  
+  I386_CVTSD2SS,
+  I386_CVTSD2SD,
+  I386_CVTSD2PD,
+  I386_CVTSD2PS,
+  
+  I386_MOVAPS,
+  I386_MOVAPD,
+
+  I386_EMMS,
+
+  I386_MAXPS,
+  I386_MAXSS,
+  I386_MAXPD,
+  I386_MAXSD,
+
+  I386_DIVPS,
+  I386_DIVSS,
+  I386_DIVPD,
+  I386_DIVSD,
+
+  I386_CMPPS_SSE,
+  I386_CMPSS_SSE,
+  I386_CMPPD_SSE,
+  I386_CMPSD_SSE,
+
+  I386_ANDNPS,
+  I386_ANDNPD,
+
+  I386_ANDPS,
+  I386_ANDPD,
+
+  I386_ORPS,
+  I386_ORPD,
+
+  I386_MOVQ,
+  I386_MOVDQA,
+  I386_MOVDQU,
+  I386_MOVD,
+  I386_MOVD2,
+
+  I386_MOVD3,
+  I386_MOVD4,
+  I386_MOVQ3,
+
+  I386_PUNPCKHBW,
+  I386_PUNPCKHBW2,
+
+  I386_PUNPCKLBW,
+  I386_PUNPCKLBW2,
+
+  I386_PUNPCKLWD,
+  I386_PUNPCKLWD2,
+
+  I386_PUNPCKHWD,
+  I386_PUNPCKHWD2,
+
+  I386_PSHUFLW,
+  I386_PSHUFHW,
+  I386_PSHUFW,
+  I386_PSHUFD,
+
+  I386_PSUBW,
+  I386_PSUBW2,
+
+  I386_PMULLW,
+  I386_PMULLW2,
+
+  I386_PMULHW,
+  I386_PMULHW2,
+
+  I386_PSLLW,
+  I386_PSLLW2,
+
+  I386_PADDW,
+  I386_PADDW2,
+
+  I386_PADDSW,
+  I386_PADDSW2,
+
+  I386_PADDD,
+  I386_PADDD2,
+
+  I386_PADDB,
+  I386_PADDB2,
+
+  I386_PREFETCH_NTA,
+  I386_PREFETCH_T0,
+  I386_PREFETCH_T1,
+  I386_PREFETCH_T2,
+
+  I386_MOVNTQ,
+  I386_MOVNTQD,
+
+  I386_SFENCE,
+  I386_LFENCE,
+  I386_MFENCE,
+
+  /* added for instrumentation code */
+  I386_PSEUDOCALL,
+  I386_PSEUDOSAVE,
+  I386_PSEUDOLOAD,
+
+  I386_PUNPCKLDQ,
+  I386_PUNPCKLDQ2,
+
+  I386_PUNPCKHDQ,
+  I386_PUNPCKHDQ2,
+
+  I386_PAND,
+  I386_PAND2,
+
+  I386_PMINUB,
+  I386_PMINUB2,
+
+  I386_PMAXUB,
+  I386_PMAXUB2,
+
+  I386_PANDN,
+  I386_PANDN2,
+
+  I386_PSRLQ,
+  I386_PSRLQ2,
+
+  I386_PSRLDQ,
+
+  I386_PSLLQ,
+  I386_PSLLQ2,
+
+  I386_PSLLDQ,
+
+  I386_POR,
+  I386_POR2,
+
+  I386_PMADDWD,
+  I386_PMADDWD2,
+
+  I386_PSRLD,
+  I386_PSRLD2,
+
+  I386_PSRLW,
+  I386_PSRLW2,
+
+  I386_PSRAW,
+  I386_PSRAW2,
+
+  I386_PSLLD,
+  I386_PSLLD2,
+
+  I386_PSRAD,
+  I386_PSRAD2,
+
+  I386_PCMPEQW,
+  I386_PCMPEQW2,
+
+  I386_PCMPEQB,
+  I386_PCMPEQB2,
+
+  I386_PACKUSWB,
+  I386_PACKUSWB2,
+
+  I386_PACKSSWB,
+  I386_PACKSSWB2,
+
+  I386_PACKSSDW,
+  I386_PACKSSDW2,
+
+  I386_PADDUSB,
+  I386_PADDUSB2,
+
+  I386_PADDUSW,
+  I386_PADDUSW2,
+
+  I386_PAVGB,
+  I386_PAVGB2,
+
+  I386_PAVGUSB,
+  I386_PFADD,
+  I386_PFMUL,
+  I386_PI2FD,
+  I386_PFACC,
+  I386_PFSUB,
+  I386_PFSUBR,
+  I386_PF2ID,
+  I386_PSWAPD,
+  I386_PFPNACC,
+  
+  I386_MOVLPS, /* TODO: something strange in appendix */
+  I386_MOVLPD,
+  I386_MOVDDUP,
+  I386_MOVSLDUP,
+  
+  I386_PSUBSW,
+  I386_PSUBSW2,
+
+  I386_PSUBD,
+  I386_PSUBD2,
+
+  I386_PSUBB,
+  I386_PSUBB2,
+
+  I386_PSHUFPS,
+  I386_PSHUFPD,
+
+  I386_ADDSD,
+  I386_ADDSS,
+  I386_ADDPS,
+  I386_ADDPD,
+
+  I386_MULSD,
+  I386_MULSS,
+  I386_MULPS,
+  I386_MULPD,
+
+  I386_SQRTSD,
+  I386_SQRTSS,
+  I386_SQRTPS,
+  I386_SQRTPD,
+
+  I386_SUBSD,
+  I386_SUBSS,
+  I386_SUBPS,
+  I386_SUBPD,
+
+  I386_MOVHPS, 
+  I386_MOVHPD,
+  I386_MOVSHDUP,
+
+  I386_PSUBUSB,
+  I386_PSUBUSB2,
+
+  I386_PSUBUSW,
+  I386_PSUBUSW2,
+
+  I386_CLFLUSH,
+
+  MAX_I386_OPCODE        /* always keep this entry last */
+};
+
+typedef enum _t_i386_opcode t_i386_opcode;
+
+#endif
+
+#ifdef DIABLOI386_TYPES
+#ifndef I386_OPCODE_TYPES
+#define I386_OPCODE_TYPES
+
+#include <diabloi386.h>
+
+typedef t_uint32 (*I386DisassembleFunction) (t_i386_ins *, t_uint8* codep, t_uint32 modrm, t_uint32 sib);
+struct _t_i386_opcode_info {
+  t_string textual;
+  int type;
+  /* condition flags used by this instruction */
+  t_regset cf_used;
+  /* condition flags defined by this instruction */
+  t_regset cf_defined;
+  int fpstack_pops;
+  int fpstack_pushes;
+  t_uint32 fixedops;
+};
+
+extern t_i386_opcode_info i386_opcode_table[];
+void I386InitOpcodeTable(void);
+
+#endif
+#endif

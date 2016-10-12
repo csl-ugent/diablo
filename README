@@ -1,0 +1,43 @@
+Diablo (Diablo Is A Better Link-time Optimizer) is a retargetable link-time
+binary rewriting framework. While our focus has been mostly on program
+compaction and software protection, binary rewriting has a much broader range of
+applications: speed optimizations, power consumption optimizations, size
+optimizations, watermarking, instrumentation, etc.
+
+A good binary rewriting framework (one like Diablo :-)) is also very useful for
+program analysis and understanding. For instance, Diablo can print out the
+control flow graph for all functions in a program, annotated with for example
+liveness information.
+
+Lately Diablo has been used in the ASPIRE project to develop a number of
+software protection techniques, the code of which can be found in the aspire
+subdirectory.
+
+Diablo is licensed under the GPLv2 license:
+
+    Copyright (C) 2016  The Diablo Team
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+The full license can be found in the COPYING file.
+
+Diablo furthermore links against (and this repository contains their code for the ease of building Diablo):
+* Judy for sparse dynamic arrays (in the judy/ subdirectory)
+* Jansson for working with JSON data (in the jansson-2.6 subdirectory)
+which each is copyrighted by their respective authors, and each fall under their own licenses as mentioned in their respective headers and LICENSE file.
+
+We also have a website:
+
+    http://diablo.elis.ugent.be/

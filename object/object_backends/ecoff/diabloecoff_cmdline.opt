@@ -1,0 +1,22 @@
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}
+
+version_option version
+{
+   long="version";
+   short="V";
+   description="Print the version of this library";
+}
+
+bool_option elf_verbose_write
+{
+   short="ecvw";
+   long="ecoff-verbose-write";
+   default=off;
+   description="Dump extra information about the writing of ecoff files";
+}
+

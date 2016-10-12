@@ -1,0 +1,54 @@
+string_option outname
+{
+	short = "o";
+        desc= "Sets the output filename prefix. The files <outfile>_table.h and <outfile>_struct.h are generated";
+	default="options";
+}
+
+string_option arrayname
+{
+	short = "a";
+        desc= "Sets the name of the array."; 
+	default="options";
+}
+
+string_option listname
+{
+	short = "l";
+        desc= "Sets the name of the option list."; 
+	default="option_list";
+}
+
+string_option funname
+{
+	short = "f";
+        desc= "Sets the name of the functions."; 
+	default="Options";
+}
+
+usage_option help
+{
+	short = "h";
+	long = "help";
+	desc= "Generate this help message";
+}
+
+string_option relpath
+{
+	short = "r";
+	long="relative_path";
+	default=".";
+        desc="Sets the relative path to util_options.h";
+}
+
+file_option inname
+{
+	desc="The input file, defaults to stdin if not set";
+}
+
+bool_option diablosupport
+{
+	short = "d";
+	default=off;
+	desc="Include diablosupport.h instead of opt_gen_handler.h";
+}

@@ -1,0 +1,22 @@
+group "obfuscation" bool_option new_target_infinite_loop
+{
+  short="ntil";
+  long="newTargetInfiniteLoop";
+  description="When chosing a fake target, insert an infinite loop. Used as fallback when no other option is enables";
+  default=off;
+}
+
+group "obfuscation" bool_option new_target_in_same_function
+{
+  short="ntisf";
+  long="newTargetInSameFunction";
+  description="When chosing a fake target, redirect control flow to an existing BBL in the same function";
+  default=on;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

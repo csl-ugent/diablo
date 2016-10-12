@@ -1,0 +1,74 @@
+/* The options for diablosupport, use opt_gen to generate */
+
+hidden int_option debugcounter
+{
+   short="c";
+   long= "debugcount";
+   default=0;
+   description="debug counter. only useful for debugging diablo's own analyses";
+}
+
+count_option verbose
+{
+  short="v";
+  long= "verbose";
+  default=0;
+  description="selects verbose execution (Increases verbose-level, can be used multiple times)";
+}
+
+string_option prepend
+{
+  long="prepend";
+  default="";
+  description="Prepends a string before all file names";
+}
+
+string_option prepend_abs_path
+{
+  long="prepend-absolute-path";
+  default="";
+  description="Prepends a string before all absolute path names";
+}
+
+bool_option enable_transformation_log
+{
+  long="log-transformations";
+  description="Log the applied transformations to a file";
+  default=off;
+}
+
+string_option transformation_log_path
+{
+  long="transformation-log-path";
+  default="./transformations-log/";
+  description="Directory in which logs and dumps related to the applied transformations will be saved. The directories will be (partially) cleaned by Diablo.";
+}
+
+bool_option enable_transformation_dumps
+{
+  long="dump-transformations";
+  description="Log the applied transformations verbosely (dumping graphs, etc.) to subdirectories of the path specified with --transformation-log-path";
+  default=off;
+}
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+
+version_option version
+{
+  long="version";
+  short="V";
+  description="Print the version of this library";
+}
+
+bool_option revision
+{
+  short="V";
+  long="revision";
+  default=off;
+  description="Print the Diablo revision information";
+}

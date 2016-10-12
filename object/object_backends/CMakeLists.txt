@@ -1,0 +1,5 @@
+add_subdirectory(elf)
+add_subdirectory(ticoff)
+if(ObjectPECOFF)
+  add_subdirectory(pecoff)
+endif(ObjectPECOFF)

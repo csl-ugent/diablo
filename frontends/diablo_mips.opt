@@ -1,0 +1,117 @@
+hidden string_option relayout_description
+{
+   short="rld";
+   long="layoutdescription";
+   description="name of the file describing the new layout";
+}
+
+group "File" hidden file_option linkerscript
+{
+   short="T";
+   long= "linker_script";
+   description="the linker script to use. if none is given, the default linker script for this architecture will be used";
+}
+
+group "File" hidden path_option linkerscriptprefix
+{
+   short="P";
+   long="script_prefix";
+   description="the path to the directory that holds the linker descriptions"; 
+}
+
+hidden file_option layoutscript
+{
+   short="Tl";
+   long= "layout_script";
+   description="the layout script to use. if none is given, the default layout script embedded in the linker script will be used";
+}
+
+hidden bool_option  ud_analysis
+{
+   short="U";
+   long= "ud_analysis";
+   default=off;
+   description="Turn ud_analysis on or off";
+}
+
+group "Debug" count_option verbose
+{
+   short="v";
+   long= "verbose";
+   default=0;
+   description="selects verbose execution (Increases verbose-level, can be used multiple times)";
+}
+
+hidden bool_option stegoEncode
+{
+   short="sE";
+   long= "stegoEncode";
+   default=off;
+   description="Hide information in produced binary";
+}
+
+hidden string_option stegoCollectStatistics
+{
+   short="sC";
+   long= "stegoCollectStatistics";
+   default="";
+   description="Collects Statistical Information fromt the Binary";
+}
+
+hidden bool_option stegoDecode
+{
+   short="sD";
+   long= "stegoDecode";
+   default=off;
+   description="Extract hidden information from binary";
+}
+
+hidden string_option stegoFile
+{
+   short="sF";
+   long="stegoFile";
+   default="";
+   description="File to write or read by steganography"
+}
+
+hidden string_option watermark
+{
+   short="wm";
+   long="watermark";
+   default="none";
+   description="Add a watermark to the program"
+}
+
+group "Profile guided optimization" bool_option pre
+{
+   long="partial_redundancy_elimination";
+   short="pre";
+   description="apply partial redundancy elimination";
+   default=off;
+}
+
+
+group "Profile guided optimization" bool_option loop_invariant_code_motion
+{
+   long="loop_invariant_code_motion";
+   short="licm";
+   description="apply loop invariant code motion";
+   default=off;
+}
+
+hidden bool_option print_data_layout
+{
+   long="print_data_layout";
+   short="pdl";
+   description="print layout of data apply loop invariant code motion";
+   default=off;
+}
+
+hidden string_option tamperproof
+{
+   short="tp";
+   long="tamperproof";
+   default="none";
+   description="Add a tamperproofing method to the program"
+}
+

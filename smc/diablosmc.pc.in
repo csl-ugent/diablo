@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: Diablo Smc
+Description: Provides smc structures (functions,bbls,...) and functionality (constructions,,...) for Diablo (Diablo Is A Better Link-time Optimizer)
+Version: @VERSION@
+Libs: -L${libdir} -ldiablosmc_@ADDREXT@ @FLOWGRAPH_LIBS@
+Cflags: -I${includedir} @FLOWGRAPH_CFLAGS@ 
+
+

@@ -1,0 +1,130 @@
+/* Anopt... {{{ */
+group "Optimization and analysis" bool_option inlining
+{
+   short="Oi";
+   long= "inline";
+   default=on;
+   description="Turns inlining on or off";
+}
+
+group "Optimization and analysis" bool_option branch_elimination
+{
+   short="Obe";
+   long= "branch_elimination";
+   default=on;
+   description="Turn branch elimination on or off";
+}
+
+group "Optimization and analysis" bool_option stack
+{
+   short="Os";
+   long= "stack";
+   default=on;
+   description="Turn stack optimization on or off";
+}
+
+group "Optimization and analysis" bool_option factoring
+{
+   short="Of";
+   long= "factoring";
+   default=on;
+   description="Turns factoring on or off";
+}
+
+group "Optimization and analysis" bool_option bbl_factoring
+{
+   short="Ofb";
+   long= "bbl-factoring";
+   default=on;
+   description="Turns basic block factoring on or off";
+}
+
+group "Optimization and analysis" bool_option function_factoring
+{
+   short="Off";
+   long= "function-factoring";
+   default=on;
+   description="Turns function factoring on or off";
+}
+
+group "Optimization and analysis" bool_option liveness
+{
+   short="Ol";
+   long= "liveness";
+   default=on;
+   description="Turn liveness analysis on or off";
+}
+
+group "Optimization and analysis" bool_option  loadstorefwd
+{
+   short="Ols";
+   long= "loadstore";
+   default=on;
+   description="Turn load-store forwarding on or off";
+}
+
+group "Optimization and analysis" bool_option peephole
+{
+   short="Op";
+   long="peepholes";
+   default=on;
+   description="Turn peephole optimizations on or off";
+}
+
+hidden int_option traceadr
+{
+   short="t";
+   long= "traceadr";
+   default=0;
+   description="trace address, if given, a bbl at this address is traced";
+}
+
+bool_option mergebbls
+{
+   short="B";
+   long= "merge bbls";
+   default=on;
+   description="Turn merging of bbls on or off";
+}
+
+/* }}} */
+
+
+group "File" string_option output_name
+{
+   short="o";
+   long="output";
+   default="b.out";
+   description="sets the output filename";
+}
+
+group "Optimization and analysis" bool_option remove_unconnected
+{
+   short="Or";
+   long= "remove_unconnected";
+   default=on;
+   description= "Turn removal of unconnected blocks on or off";
+}
+
+group "Optimization and analysis" bool_option initcfgopt
+{
+   default=on;
+   short="Oif";
+   long= "initcfgopt";
+   description="Turns initial unreachable code elimination on or off";
+}
+
+
+group "File" string_option objectfilename
+{
+   description="The binary to optimize. This binary should be accompanied by a map file";
+}
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+
+/* vim: set foldmethod=marker : */

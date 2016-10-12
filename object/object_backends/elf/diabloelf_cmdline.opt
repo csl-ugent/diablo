@@ -1,0 +1,15 @@
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}
+
+bool_option elf_verbose_write
+{
+   short="evw";
+   long="elf-verbose-write";
+   default=off;
+   description="Dump extra information about the writing of elf files";
+}
+

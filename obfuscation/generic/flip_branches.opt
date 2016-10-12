@@ -1,0 +1,14 @@
+group "obfuscation" bool_option flip_branches
+{
+  short="ofb";
+  long="obfuscationFlipBrabcges";
+  description="Flip branches";
+  default=off;
+}
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}

@@ -1,0 +1,15 @@
+hidden int_option traceadr
+{
+   short="t";
+   long= "traceadr";
+   default=0;
+   description="trace address, if given, a bbl at this address is traced";
+}
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+

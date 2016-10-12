@@ -1,0 +1,10 @@
+Hallo String
+Hallo 10
+Hallo 10 20
+Hallo 2 0.30 BRRRRR
+Long Long 1: 1, string: BRRRRR
+Hallo @b
+Hallo @
+Hallo <replaced by the modifier x (arg = a)> <replaced by the modifier x (arg = b)>
+Hallo <replaced by the modifier x (arg = a)> <replaced by the modifier x (arg = b)>
+FATAL: Hallo <replaced by the modifier x (arg = a)> <replaced by the modifier x (arg = b)>

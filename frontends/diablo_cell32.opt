@@ -1,0 +1,6 @@
+group "File" required string_option program_description
+{
+   description="A description of the binaries to optimize. This is a required input.";
+}
+
+/* vim: set foldmethod=marker : */

@@ -1,0 +1,70 @@
+%define	name	@PACKAGE@
+%define	version	@VERSION@
+%define release 1
+%define prefix  /usr
+
+Summary: diablo_object
+Name: %{name}
+Version: %{version}
+Release: %{release}
+Copyright: GPL
+Group: System Environment/Libraries
+Source: http://www.elis.ugent.be/diablo/download/diablo_object-%{version}.tar.gz
+BuildRoot: %{_tmppath}/%{name}-buildroot 
+Packager: Bruno De Bus <bdebus@elis.ugent.be>
+URL: http://www.elis.ugent.be/diablo
+
+%description
+
+
+
+%package opt32
+Summary: diablo_object optimized for 32-bit architectures
+Group: System Environment/Libraries
+%description opt32
+diablo_object optimized for 32-bit architectures
+
+
+%package opt64
+Summary: diablo_object optimized for 64-bit architectures
+Group: System Environment/Libraries
+%description opt64
+diablo_object optimized for 64-bit architectures
+
+
+%prep
+rm -rf $RPM_BUILD_ROOT
+
+%setup -q
+
+%build
+./configure --prefix=%{prefix} --disable-bit32
+make RPM_OPT_FLAGS="$RPM_OPT_FLAGS"
+./configure --prefix=%{prefix} --disable-bit64
+make RPM_OPT_FLAGS="$RPM_OPT_FLAGS"
+./configure --prefix=%{prefix}
+make RPM_OPT_FLAGS="$RPM_OPT_FLAGS"
+###########################################################################
+
+%install
+make DESTDIR=$RPM_BUILD_ROOT install
+cp   diabloobject/libdiabloobject_opt32.a  $RPM_BUILD_ROOT/%{_libdir}/libdiabloobject_opt32.a
+cp   diabloobject/libdiabloobject_opt64.a  $RPM_BUILD_ROOT/%{_libdir}/libdiabloobject_opt64.a
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%post
+/sbin/ldconfig
+
+%postun
+/sbin/ldconfig
+
+%files
+%defattr(-,root,root) 
+%doc AUTHORS COPYING ChangeLog INSTALL NEWS README
+%{_libdir}/libdiabloobject_opt32.a
+%{_libdir}/libdiabloobject_opt64.a
+%{_libdir}/libdiabloobject_generic.a
+%{_includedir}/*
+	
+%changelog

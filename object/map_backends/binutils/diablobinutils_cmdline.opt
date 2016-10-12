@@ -1,0 +1,14 @@
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}
+
+bool_option binutils_verbose_map
+{
+   short="bvm";
+   long="binutils-verbose-map";
+   default=off;
+   description="Dump extra information about the binutils map file";
+}

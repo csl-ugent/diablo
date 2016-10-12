@@ -1,0 +1,573 @@
+Creating simple hash table
+Done
+Inserting elements
+   Insert: Search
+   Insert: seek
+   Insert: and
+   Insert: know
+   Insert: how
+   Insert: this
+   Insert: foul
+   Insert: murder
+   Insert: comes
+   Insert: -----
+   Insert: Who
+   Insert: seeks
+   Insert: and
+   Insert: will
+   Insert: not
+   Insert: take
+   Insert: when
+   Insert: once
+   Insert: 'tis
+   Insert: offer'd
+   Insert: Shall
+   Insert: never
+   Insert: find
+   Insert: it
+   Insert: more
+   Insert: -----
+   Insert: Search
+   Insert: seek
+   Insert: and
+   Insert: know
+   Insert: how
+   Insert: this
+   Insert: foul
+   Insert: murder
+   Insert: comes
+   Lookup: comes
+   Verify: comes
+   Lookup: murder
+   Verify: murder
+   Lookup: foul
+   Verify: foul
+   Lookup: this
+   Verify: this
+   Lookup: how
+   Verify: how
+   Lookup: know
+   Verify: know
+   Lookup: and
+   Verify: and
+   Lookup: seek
+   Verify: seek
+   Lookup: Search
+   Verify: Search
+   Lookup: -----
+   Verify: -----
+   Lookup: more
+   Verify: more
+   Lookup: it
+   Verify: it
+   Lookup: find
+   Verify: find
+   Lookup: never
+   Verify: never
+   Lookup: Shall
+   Verify: Shall
+   Lookup: offer'd
+   Verify: offer'd
+   Lookup: 'tis
+   Verify: 'tis
+   Lookup: once
+   Verify: once
+   Lookup: when
+   Verify: when
+   Lookup: take
+   Verify: take
+   Lookup: not
+   Verify: not
+   Lookup: will
+   Verify: will
+   Lookup: and
+   Verify: and
+   Lookup: seeks
+   Verify: seeks
+   Lookup: Who
+   Verify: Who
+   Lookup: -----
+   Verify: -----
+   Lookup: comes
+   Verify: comes
+   Lookup: murder
+   Verify: murder
+   Lookup: foul
+   Verify: foul
+   Lookup: this
+   Verify: this
+   Lookup: how
+   Verify: how
+   Lookup: know
+   Verify: know
+   Lookup: and
+   Verify: and
+   Lookup: seek
+   Verify: seek
+   Lookup: Search
+   Verify: Search
+p->string=offer'd
+p->string='tis
+p->string=when
+p->string=-----
+p->string=-----
+p->string=comes
+p->string=comes
+p->string=foul
+p->string=foul
+p->string=and
+p->string=and
+p->string=and
+p->string=more
+p->string=never
+p->string=once
+p->string=not
+p->string=will
+p->string=Who
+p->string=murder
+p->string=murder
+p->string=this
+p->string=this
+p->string=how
+p->string=how
+p->string=seek
+p->string=seek
+p->string=it
+p->string=find
+p->string=Shall
+p->string=take
+p->string=seeks
+p->string=know
+p->string=know
+p->string=Search
+p->string=Search
+Prepending elements
+Creating simple hash table
+Done
+Inserting elements
+   Prepend: Search
+   Prepend: seek
+   Prepend: and
+   Prepend: know
+   Prepend: how
+   Prepend: this
+   Prepend: foul
+   Prepend: murder
+   Prepend: comes
+   Prepend: -----
+   Prepend: Who
+   Prepend: seeks
+   Prepend: and
+   Prepend: will
+   Prepend: not
+   Prepend: take
+   Prepend: when
+   Prepend: once
+   Prepend: 'tis
+   Prepend: offer'd
+   Prepend: Shall
+   Prepend: never
+   Prepend: find
+   Prepend: it
+   Prepend: more
+   Prepend: -----
+   Prepend: Search
+   Prepend: seek
+   Prepend: and
+   Prepend: know
+   Prepend: how
+   Prepend: this
+   Prepend: foul
+   Prepend: murder
+   Prepend: comes
+   Lookup: comes
+   Verify: comes
+   Lookup: murder
+   Verify: murder
+   Lookup: foul
+   Verify: foul
+   Lookup: this
+   Verify: this
+   Lookup: how
+   Verify: how
+   Lookup: know
+   Verify: know
+   Lookup: and
+   Verify: and
+   Lookup: seek
+   Verify: seek
+   Lookup: Search
+   Verify: Search
+   Lookup: -----
+   Verify: -----
+   Lookup: more
+   Verify: more
+   Lookup: it
+   Verify: it
+   Lookup: find
+   Verify: find
+   Lookup: never
+   Verify: never
+   Lookup: Shall
+   Verify: Shall
+   Lookup: offer'd
+   Verify: offer'd
+   Lookup: 'tis
+   Verify: 'tis
+   Lookup: once
+   Verify: once
+   Lookup: when
+   Verify: when
+   Lookup: take
+   Verify: take
+   Lookup: not
+   Verify: not
+   Lookup: will
+   Verify: will
+   Lookup: and
+   Verify: and
+   Lookup: seeks
+   Verify: seeks
+   Lookup: Who
+   Verify: Who
+   Lookup: -----
+   Verify: -----
+   Lookup: comes
+   Verify: comes
+   Lookup: murder
+   Verify: murder
+   Lookup: foul
+   Verify: foul
+   Lookup: this
+   Verify: this
+   Lookup: how
+   Verify: how
+   Lookup: know
+   Verify: know
+   Lookup: and
+   Verify: and
+   Lookup: seek
+   Verify: seek
+   Lookup: Search
+   Verify: Search
+p->string=offer'd
+p->string='tis
+p->string=when
+p->string=-----
+p->string=-----
+p->string=comes
+p->string=comes
+p->string=foul
+p->string=foul
+p->string=and
+p->string=and
+p->string=and
+p->string=more
+p->string=never
+p->string=once
+p->string=not
+p->string=will
+p->string=Who
+p->string=murder
+p->string=murder
+p->string=this
+p->string=this
+p->string=how
+p->string=how
+p->string=seek
+p->string=seek
+p->string=it
+p->string=find
+p->string=Shall
+p->string=take
+p->string=seeks
+p->string=know
+p->string=know
+p->string=Search
+p->string=Search
+Creating displaced hash table
+Done
+Inserting elements
+   Insert: Search
+   Insert: seek
+   Insert: and
+   Insert: know
+   Insert: how
+   Insert: this
+   Insert: foul
+   Insert: murder
+   Insert: comes
+   Insert: -----
+   Insert: Who
+   Insert: seeks
+   Insert: and
+   Insert: will
+   Insert: not
+   Insert: take
+   Insert: when
+   Insert: once
+   Insert: 'tis
+   Insert: offer'd
+   Insert: Shall
+   Insert: never
+   Insert: find
+   Insert: it
+   Insert: more
+   Insert: -----
+   Insert: Search
+   Insert: seek
+   Insert: and
+   Insert: know
+   Insert: how
+   Insert: this
+   Insert: foul
+   Insert: murder
+   Insert: comes
+   Lookup: comes
+   Verify: comes
+   Lookup: murder
+   Verify: murder
+   Lookup: foul
+   Verify: foul
+   Lookup: this
+   Verify: this
+   Lookup: how
+   Verify: how
+   Lookup: know
+   Verify: know
+   Lookup: and
+   Verify: and
+   Lookup: seek
+   Verify: seek
+   Lookup: Search
+   Verify: Search
+   Lookup: -----
+   Verify: -----
+   Lookup: more
+   Verify: more
+   Lookup: it
+   Verify: it
+   Lookup: find
+   Verify: find
+   Lookup: never
+   Verify: never
+   Lookup: Shall
+   Verify: Shall
+   Lookup: offer'd
+   Verify: offer'd
+   Lookup: 'tis
+   Verify: 'tis
+   Lookup: once
+   Verify: once
+   Lookup: when
+   Verify: when
+   Lookup: take
+   Verify: take
+   Lookup: not
+   Verify: not
+   Lookup: will
+   Verify: will
+   Lookup: and
+   Verify: and
+   Lookup: seeks
+   Verify: seeks
+   Lookup: Who
+   Verify: Who
+   Lookup: -----
+   Verify: -----
+   Lookup: comes
+   Verify: comes
+   Lookup: murder
+   Verify: murder
+   Lookup: foul
+   Verify: foul
+   Lookup: this
+   Verify: this
+   Lookup: how
+   Verify: how
+   Lookup: know
+   Verify: know
+   Lookup: and
+   Verify: and
+   Lookup: seek
+   Verify: seek
+   Lookup: Search
+   Verify: Search
+p->string=offer'd
+p->string='tis
+p->string=when
+p->string=-----
+p->string=-----
+p->string=comes
+p->string=comes
+p->string=foul
+p->string=foul
+p->string=and
+p->string=and
+p->string=and
+p->string=more
+p->string=never
+p->string=once
+p->string=not
+p->string=will
+p->string=Who
+p->string=murder
+p->string=murder
+p->string=this
+p->string=this
+p->string=how
+p->string=how
+p->string=seek
+p->string=seek
+p->string=it
+p->string=find
+p->string=Shall
+p->string=take
+p->string=seeks
+p->string=know
+p->string=know
+p->string=Search
+p->string=Search
+Creating displaced hash table
+Done
+Prepend elements
+   Prepend: Search
+   Prepend: seek
+   Prepend: and
+   Prepend: know
+   Prepend: how
+   Prepend: this
+   Prepend: foul
+   Prepend: murder
+   Prepend: comes
+   Prepend: -----
+   Prepend: Who
+   Prepend: seeks
+   Prepend: and
+   Prepend: will
+   Prepend: not
+   Prepend: take
+   Prepend: when
+   Prepend: once
+   Prepend: 'tis
+   Prepend: offer'd
+   Prepend: Shall
+   Prepend: never
+   Prepend: find
+   Prepend: it
+   Prepend: more
+   Prepend: -----
+   Prepend: Search
+   Prepend: seek
+   Prepend: and
+   Prepend: know
+   Prepend: how
+   Prepend: this
+   Prepend: foul
+   Prepend: murder
+   Prepend: comes
+   Lookup: comes
+   Verify: comes
+   Lookup: murder
+   Verify: murder
+   Lookup: foul
+   Verify: foul
+   Lookup: this
+   Verify: this
+   Lookup: how
+   Verify: how
+   Lookup: know
+   Verify: know
+   Lookup: and
+   Verify: and
+   Lookup: seek
+   Verify: seek
+   Lookup: Search
+   Verify: Search
+   Lookup: -----
+   Verify: -----
+   Lookup: more
+   Verify: more
+   Lookup: it
+   Verify: it
+   Lookup: find
+   Verify: find
+   Lookup: never
+   Verify: never
+   Lookup: Shall
+   Verify: Shall
+   Lookup: offer'd
+   Verify: offer'd
+   Lookup: 'tis
+   Verify: 'tis
+   Lookup: once
+   Verify: once
+   Lookup: when
+   Verify: when
+   Lookup: take
+   Verify: take
+   Lookup: not
+   Verify: not
+   Lookup: will
+   Verify: will
+   Lookup: and
+   Verify: and
+   Lookup: seeks
+   Verify: seeks
+   Lookup: Who
+   Verify: Who
+   Lookup: -----
+   Verify: -----
+   Lookup: comes
+   Verify: comes
+   Lookup: murder
+   Verify: murder
+   Lookup: foul
+   Verify: foul
+   Lookup: this
+   Verify: this
+   Lookup: how
+   Verify: how
+   Lookup: know
+   Verify: know
+   Lookup: and
+   Verify: and
+   Lookup: seek
+   Verify: seek
+   Lookup: Search
+   Verify: Search
+p->string=offer'd
+p->string='tis
+p->string=when
+p->string=-----
+p->string=-----
+p->string=comes
+p->string=comes
+p->string=foul
+p->string=foul
+p->string=and
+p->string=and
+p->string=and
+p->string=more
+p->string=never
+p->string=once
+p->string=not
+p->string=will
+p->string=Who
+p->string=murder
+p->string=murder
+p->string=this
+p->string=this
+p->string=how
+p->string=how
+p->string=seek
+p->string=seek
+p->string=it
+p->string=find
+p->string=Shall
+p->string=take
+p->string=seeks
+p->string=know
+p->string=know
+p->string=Search
+p->string=Search

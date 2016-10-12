@@ -1,0 +1,14 @@
+DIFF: Local abs symbol main.c to none
+DIFF: Local original section symbol  to section .text
+DIFF: Local original section symbol  to section .data
+DIFF: Local original section symbol  to section .bss
+DIFF: Local original section symbol  to section .rodata
+DIFF: Local symbol $a to section .text
+DIFF: Local symbol .LC0 to section .rodata
+DIFF: Global function symbol main to section .text
+DIFF: Global undefined symbol putc to undefined
+DIFF: Global undefined symbol exit to undefined
+DIFF: Local symbol $compiler to section .text
+DIFF: Reloc From type = RT_SECTION .text (+ 0x16 ) To symbol .LC0 ( Local ) Type= LOCAL_SYMBOL Refers TO_SECTION .rodata  Offset=  0x0
+DIFF: Reloc From type = RT_SECTION .text (+ 0x42 ) To symbol putc ( Global ) Type= UNDEFINED_SYMBOL Refers TO_UNDEFINED  Offset=  0x0
+DIFF: Reloc From type = RT_SECTION .text (+ 0x54 ) To symbol exit ( Global ) Type= UNDEFINED_SYMBOL Refers TO_UNDEFINED  Offset=  0x0

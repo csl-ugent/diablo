@@ -1,0 +1,8 @@
+/* The options for diablo, use opt_gen to generate */
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+

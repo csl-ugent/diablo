@@ -1,0 +1,8 @@
+group "File" bool_option read_debug_info
+{
+  short="g";
+  long="read-debug";
+  default=off;
+  description="Read the debug information from the object files and binary";
+}
+

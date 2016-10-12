@@ -1,0 +1,16 @@
+/* The options for diablo, use opt_gen to generate */
+
+usage_option help
+{
+   long="help";
+   short="h";
+   description="Print this help message";
+}
+
+version_option version
+{
+  long="version";
+  short="V";
+  description="Print the version of this library";
+}
+

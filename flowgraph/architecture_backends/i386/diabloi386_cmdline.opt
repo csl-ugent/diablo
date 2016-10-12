@@ -1,0 +1,16 @@
+/* The options for diabloi386, use opt_gen to generate */
+
+usage_option help
+{
+  long="help";
+  short="h";
+  description="Print this help message";
+}
+
+group "i386" int_option orderseed
+{
+  short="os";
+  long="orderseed";
+  default=0;
+  description="order seed. If different from 0, used to seed the random number generator to randomize the order in which instruction chains and data are placed in the binary.";
+}
