@@ -1,0 +1,9 @@
+CC = TEMPLATE_CC
+OBJ = TEMPLATE_OBJNAME
+ALL_CFLAGS = -fPIC -o $(OBJ) TEMPLATE_FLAGS $(CFLAGS)
+
+$(OBJ): print.c
+	$(CC) $(ALL_CFLAGS) -c print.c
+
+clean:
+	-rm -f $(OBJ)
