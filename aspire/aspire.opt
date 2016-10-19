@@ -1,3 +1,11 @@
+group "Aspire" bool_option control_flow_tagging
+{
+   short="CFT";
+   long="control_flow_tagging";
+   default=off;
+   description="Transform the binary with control flow tagging";
+}
+
 group "Aspire" bool_option call_stack_checks
 {
    short="CS";

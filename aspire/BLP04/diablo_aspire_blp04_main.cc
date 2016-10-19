@@ -199,6 +199,10 @@ main (int argc, char **argv)
     RegisterAnnotationInfoFactory(attestator_token, new AttestatorAnnotationInfoFactory());
     ReadAnnotationsFromJSON(global_options.annotation_file, annotations);
 
+    /* CF Tagging might be requested, but it's not present in this version of Diablo */
+    if (aspire_options.control_flow_tagging)
+      WARNING(("CF Tagging was requested but is not present in this version of Diablo!"));
+
     /* Find out whether code mobility is needed and initialize it if necessary */
     unique_ptr<CodeMobilityTransformer> cm_transformer;
     aspire_options.code_mobility = aspire_options.code_mobility && AnnotationContainsToken(annotations, codemobility_token);
