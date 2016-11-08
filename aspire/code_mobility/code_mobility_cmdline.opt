@@ -29,3 +29,11 @@ group "CodeMobility" string_option output_dir
    default=".";
    description="Name of the subdirectory in which to put the output (being the mobile blocks).";
 }
+
+group "Aspire" int_option code_mobility_diversity_seed
+{
+   short="CMDS";
+   long="code_mobility_diversity_seed";
+   default=0;
+   description="The seed to diversify code mobility blocks.";
+}

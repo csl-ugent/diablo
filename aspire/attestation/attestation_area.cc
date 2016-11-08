@@ -33,6 +33,18 @@ void Area::CalculateChecksum(void* base, AttestBlockFun* fun, uint32_t nonce) co
   }
 }
 
+void Area::PrintMetric(FILE* fp) const
+{
+  const t_uint32 nr_of_blocks = blocks.size();
+  uint32_t nr_of_guarded_bytes = 0;
+  for(const auto& block : blocks)
+  {
+    nr_of_guarded_bytes += AddressExtractUint32(block.size);
+  }
+
+  fprintf(fp, "%u,%u,%u,%u\n", region_idx, nr_of_blocks * (uint32_t)(sizeof(t_uint64) + sizeof(t_uint32)), nr_of_blocks, nr_of_guarded_bytes);
+}
+
 void Area::WriteAreaToADS(t_section* ads, t_uint16 id) const
 {
   const t_uint32 nr_of_blocks = blocks.size();

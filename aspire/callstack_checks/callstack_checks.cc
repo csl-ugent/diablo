@@ -17,7 +17,7 @@
 
 using namespace std;
 
-FILE* L_CALLCHECKS = nullptr;
+LogFile* L_CALLCHECKS = nullptr;
 static t_randomnumbergenerator* rng_csc = nullptr;
 
 // TODO: merge with similar ARM opaque predicates to split at dead places

@@ -17,11 +17,34 @@ static inline t_uint32 NewDiabloPhase(t_const_string name)      {diablo_phases[+
 static inline void ResetDiabloPhase()                     {diablo_phase = 0;}
 
 extern t_uint64 current_transformation_number;
-#define LOG(fp, ...) do { if (fp) { FileIo(fp, ##__VA_ARGS__); } } while(0)
-#define INIT_LOGGING(fp,filename) do { if (diablosupport_options.enable_transformation_log && !fp) fp=fopen(filename,"w"); } while (0)
-/* this should be improved to automatically avoid that a file might be closed twice */
-#define ATTACH_LOGGING(fp1,fp2) do {fp1 = fp2;} while (0)
-#define FINI_LOGGING(fp) do { if (fp) fclose(fp); fp = NULL;} while (0)
+
+struct LogFile
+{
+  FILE* fp;
+  t_uint32 reference_count;
+};
+
+
+#define LOG(lf, ...) do { if (lf) { FileIo(lf->fp, ##__VA_ARGS__); } } while(0)
+#define INIT_LOGGING(lf,filename) do { if (diablosupport_options.enable_transformation_log && !lf)\
+  {\
+    lf = (LogFile*) Malloc(sizeof(LogFile));\
+    lf->fp = fopen(filename,"w");\
+    lf->reference_count = 1;\
+  }\
+} while (0)
+#define ATTACH_LOGGING(lf1,lf2) do {lf1 = lf2; if (lf1) lf1->reference_count++;} while (0)
+#define FINI_LOGGING(lf) do { if (lf)\
+  {\
+    lf->reference_count--;\
+    if (lf->reference_count == 0)\
+    {\
+      fclose(lf->fp);\
+      Free(lf);\
+    }\
+    lf = NULL;\
+  }\
+} while (0)
 
 void StartTransformation(); /* Create/Initialize the logging directory for logging the next transformation */
 t_const_string GetCurrentTransformationDirectory();

@@ -14,7 +14,7 @@ void AfterLayoutBroker(t_cfg * cfg)
   AspireSoftVMExport(cfg, &chunks);
 }
 
-FILE* L_SOFTVM = NULL;
+LogFile* L_SOFTVM = NULL;
 
 /* MAIN */
 int

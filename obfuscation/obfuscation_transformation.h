@@ -15,9 +15,9 @@ extern "C" {
 #include <diabloflowgraph.h>
 }
 
-extern FILE * L_OBF_OP;
-extern FILE * L_OBF_FLAT;
-extern FILE * L_OBF_BF;
+extern LogFile * L_OBF_OP;
+extern LogFile * L_OBF_FLAT;
+extern LogFile * L_OBF_BF;
 
 struct BBLObfuscationTransformation : public BBLTransformation {
   BBLObfuscationTransformation();

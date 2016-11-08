@@ -16,6 +16,6 @@ public:
   virtual bool canTransform(const t_bbl* bbl) const;
 };
 
-extern FILE* L_OBF_OOP;
+extern LogFile* L_OBF_OOP;
 
 #endif /* GEN_OPAQUE_PREDICATE_TRANSFORMATION_H */

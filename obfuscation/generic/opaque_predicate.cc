@@ -8,7 +8,7 @@
 #include "opaque_predicate.h"
 #include "opaque_predicate_opt.h"
 
-FILE* L_OBF_OOP = NULL;
+LogFile* L_OBF_OOP = NULL;
 
 OpaquePredicateTransformation::OpaquePredicateTransformation() {
   AddOptionsListInitializer(obfuscation_opaque_predicate_option_list); OpaquePredicateOptInit();

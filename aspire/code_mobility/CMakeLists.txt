@@ -8,4 +8,5 @@ target_link_libraries(CodeMobility
   PUBLIC DiabloAnnotations
   PUBLIC AnoptARM
   PUBLIC Transformer
+  PRIVATE DiabloObfuscationBase
 )

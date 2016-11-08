@@ -8,7 +8,7 @@ using namespace std;
 
 AbstractTransformer::AbstractTransformer(t_object* obj, t_const_string output_name, t_const_string log_suffix, t_bool srt,
     t_const_string non, t_const_string trl, t_uint32 edge_flag)
-  : obj(obj), adr_size(AddressSizeInBytes(OBJECT_ADDRESS_SIZE(obj))), transform_index(0), transformed_hell_edge_flag(edge_flag),
+  : obj(obj), output_name(output_name), adr_size(AddressSizeInBytes(OBJECT_ADDRESS_SIZE(obj))), transform_index(0), transformed_hell_edge_flag(edge_flag),
   transformed_reloc_label(trl), L_TRANSFORMS(NULL), new_obj_name(non), address_producer_table(srt ? RelocTableNew(NULL) : OBJECT_RELOC_TABLE(obj)),
   separate_reloc_table(srt)
 {

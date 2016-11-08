@@ -47,7 +47,7 @@ extern "C" {
 
 using namespace std;
 
-FILE* L_OBF_FF = NULL;
+LogFile* L_OBF_FF = NULL;
 
 /* TODO: more_switch for double switch blocks! */
 

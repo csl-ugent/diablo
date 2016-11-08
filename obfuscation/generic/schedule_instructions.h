@@ -28,6 +28,6 @@ public:
   virtual bool transformationIsAvailableInRandomizedList() { return false; }
 };
 
-extern FILE* L_OBF_SI;
+extern LogFile* L_OBF_SI;
 
 #endif /* GEN_SCHEDULE_INSTRUCTIONS_H */

@@ -9,6 +9,7 @@ using namespace Attestation;
 using namespace std;
 
 t_const_string AttestationAnnotationInfo::AID_string = NULL;
+t_const_string AttestationAnnotationInfo::output_name = NULL;
 
 static void AddAttestation(t_cfg* cfg)
 {
@@ -29,6 +30,12 @@ static void AddAttestation(t_cfg* cfg)
   tmp_modify[16] = '\0';
   t_uint64 higher_AID = strtoull(tmp_modify, NULL, 16);
   tmp_modify[16] = overwritten;
+
+  /* Create a file to contain metrics and print its header */
+  t_const_string fname = StringConcat2(AttestationAnnotationInfo::output_name, ".attestation_metrics");
+  FILE* f_metric = fopen(fname, "w+");
+  Free(fname);
+  fprintf(f_metric, "#region_idx,nr_of_bytes_in_ads,nr_of_blocks,nr_of_guarded_bytes\n");
 
   /* For every attestator find the symbols and fill in the ADS */
   t_uint64 attestator_id = 0;
@@ -127,6 +134,9 @@ static void AddAttestation(t_cfg* cfg)
         const t_uint32 index = info->index;
         Area& area = areas[index];
 
+        /* Set the region_idx of the area */
+        area.region_idx = region->idx;
+
         /* If the area isn't alive at the moment, initialize a new block */
         if (area.alive == NO)
         {
@@ -178,6 +188,7 @@ static void AddAttestation(t_cfg* cfg)
         auto annot = attestation_annots[iii];
         annot->successfully_applied = TRUE;/* If the area is not empty, the annotation was successfully applied */
         area.WriteAreaToADS(ads, id);
+        area.PrintMetric(f_metric);
 
         /* Check if this are has to be attested at startup */
         if (dynamic_cast<RemoteAttestationAnnotationInfo*>(annot) != NULL)
@@ -209,6 +220,7 @@ static void AddAttestation(t_cfg* cfg)
     fwrite(SECTION_DATA(ads), sizeof(char), SECTION_CSIZE(ads), fp);
     fclose(fp);
   }
+  fclose(f_metric);
 
   STATUS(STOP, ("Adding Attestation"));
 }
@@ -257,10 +269,11 @@ static void setFalse(t_bool* b)
   *b = FALSE;
 }
 
-void AttestationInit(t_object* obj, t_const_string AID_string)
+void AttestationInit(t_object* obj, t_const_string AID_string, t_const_string output_name)
 {
   /* Initialize global variables and install broker calls */
   AttestationAnnotationInfo::AID_string = AID_string;
+  AttestationAnnotationInfo::output_name = output_name;
   DiabloBrokerCallInstall("AfterCodeLayoutFixed", "t_cfg* cfg", (void*)AddAttestation, FALSE);
   DiabloBrokerCallInstall("AfterObjectAssembled", "t_object* obj", (void*)Attestator::CalculateChecksums, FALSE);
   DiabloBrokerCallInstall("DetermineAddressProducersOptimization", "t_bool* optimize", (void*)setFalse, TRUE);

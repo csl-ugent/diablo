@@ -55,7 +55,7 @@ public:
   virtual bool transformationIsAvailableInRandomizedList() { return false; }
 };
 
-extern FILE* L_OBF_BF;
+extern LogFile* L_OBF_BF;
 
 // TODO: we should not SplitCallWithBranchFunctionsTransformation calls to global_var-using return functions
 

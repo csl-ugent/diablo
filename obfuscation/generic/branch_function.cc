@@ -12,7 +12,7 @@ extern "C" {
 #include <diabloanopt.h>
 }
 
-FILE* L_OBF_BF = NULL;
+LogFile* L_OBF_BF = NULL;
 
 /* TODO: factor out into a Policy */
 

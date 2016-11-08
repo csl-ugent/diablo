@@ -52,6 +52,6 @@ void BblKillSoftVM(t_bbl *bbl);
 #define SVM "[SoftVM] "
 #define SOFTVM_VERBOSITY_LEVEL 0
 
-extern FILE *L_SOFTVM;
+extern LogFile *L_SOFTVM;
 
 #endif

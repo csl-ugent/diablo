@@ -95,7 +95,7 @@ void AfterLayoutBroker(t_cfg * cfg)
   AspireSoftVMPreFini();
 }
 
-FILE* L_SOFTVM = NULL;
+LogFile* L_SOFTVM = NULL;
 
 int
 main (int argc, char **argv)
@@ -333,7 +333,7 @@ main (int argc, char **argv)
             || (aspire_options.code_guards && AnnotationContainsToken(annotations, codeguard_token)))
         {
           NewDiabloPhase("Attestation");
-          AttestationInit(obj, aspire_options.actc_id);
+          AttestationInit(obj, aspire_options.actc_id, global_options.output_name);
         }
 
         bool vm_present = SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), "vmExecute") != NULL;
@@ -444,7 +444,7 @@ main (int argc, char **argv)
 
           if (aspire_options.obfuscations)
           {
-            FILE* L_OBF = NULL;
+            LogFile* L_OBF = NULL;
             t_const_string logging_obf_filename = StringConcat2 (global_options.output_name, ".diablo.obfuscation.log");
             INIT_LOGGING(L_OBF, logging_obf_filename);
             Free(logging_obf_filename);
@@ -461,6 +461,9 @@ main (int argc, char **argv)
             CfgPatchToSingleEntryFunctions (cfg);
             LOG(L_OBF,("END OF OBFUSCATION LOG\n"));
             FINI_LOGGING(L_OBF);
+            FINI_LOGGING(L_OBF_BF);
+            FINI_LOGGING(L_OBF_FF);
+            FINI_LOGGING(L_OBF_OOP);
           }
 
           if (aspire_options.code_mobility)

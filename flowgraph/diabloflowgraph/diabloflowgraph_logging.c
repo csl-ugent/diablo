@@ -13,7 +13,7 @@ void AddTransformedBblToLog(t_const_string transformation, t_bbl* bbl)
   t_function* fun = BBL_FUNCTION(bbl);
 
   BBL_FOREACH_INS(bbl, ins) {
-    LOG(affected_code, "%s,%s,0x%x,%s:%i\n", transformation, fun ? FUNCTION_NAME(fun) : "(null)", INS_CADDRESS(ins), INS_SRC_FILE(ins), INS_SRC_LINE(ins));
+    FileIo(affected_code, "%s,%s,0x%x,%s:%i\n", transformation, fun ? FUNCTION_NAME(fun) : "(null)", INS_CADDRESS(ins), INS_SRC_FILE(ins), INS_SRC_LINE(ins));
   }
 
   Free(filename);

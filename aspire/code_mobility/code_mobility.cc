@@ -1,6 +1,9 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 #include "code_mobility.h"
+#include <obfuscation/obfuscation_transformation.h>
+
+#include <map>
 
 #define CODE_MOBILITY_OBJECT_NAME_PREFIX "mobile_dump_"
 #define EF_CODE_MOBILITY_HELL_EDGE (1<<20) /* Flag to signify this edge was created as a result of code mobility tranformations */
@@ -295,12 +298,78 @@ void CodeMobilityTransformer::FinalizeTransform ()
   if (strcmp(code_mobility_options.output_dir, ".") != 0)
     DirMake(code_mobility_options.output_dir, FALSE);
 
-  /* Make sure the chains for the mobile blocks are laid oud randomly instead of optimized, this avoids troubles */
-  diabloarm_options.orderseed = 10;
+  /* Datastructures for metrics */
+  struct Metric
+  {
+    uint32_t nr_of_mobile_blocks;
+    uint32_t nr_of_mobile_bytes;
+  };
+  map<uint32_t, Metric> metrics;
+
+  /* Create a file to contain metrics and print its header */
+  t_const_string fname = StringConcat2(this->output_name, ".code_mobility_metrics");
+  FILE* f_metric = fopen(fname, "w+");
+  Free(fname);
+  fprintf(f_metric, "#region_idx,nr_of_mobile_blocks,nr_of_mobile_bytes\n");
+
+  /* To diversify blocks we use layout randomization. Even if blocks aren't diversified we want to make
+   * sure the chains for the mobile blocks are laid oud randomly instead of optimized, this avoids troubles.
+   */
+  t_randomnumbergenerator *rng_cm_master = nullptr;
+  t_randomnumbergenerator *rng_opaquepredicate;
+  t_randomnumbergenerator *rng_apply_chance;
+  if (code_mobility_options.code_mobility_diversity_seed)
+  {
+    diabloarm_options.orderseed = code_mobility_options.code_mobility_diversity_seed;
+    rng_cm_master = RNGCreateBySeed(code_mobility_options.code_mobility_diversity_seed, "cm_diversity_master");
+    rng_opaquepredicate = RNGCreateChild(rng_cm_master, "opaquepredicate");
+    rng_apply_chance = RNGCreateChild(rng_cm_master, "apply_chance");
+    RNGSetRange(rng_apply_chance, 0, 100);
+    SetAllObfuscationsEnabled(true);
+  }
+  else
+    diabloarm_options.orderseed = 10;
 
   DiabloBrokerCallInstall("AfterChainsOrdered", "t_cfg *, t_chain_holder *" , (void*)AfterChainsOrdered, FALSE);
   for(t_object* new_obj : new_objs)
   {
+    /* Get the associated region */
+    Region *region = NULL;
+    const CodeMobilityAnnotationInfo *info;
+    BBL_FOREACH_CODEMOBILITY_REGION(CFG_ENTRY(OBJECT_CFG(new_obj))->entry_bbl, region, info)
+      break;
+    Metric& metric = metrics[region->idx];
+
+    /* If requested, diversify the mobile block using obfuscations */
+    if (code_mobility_options.code_mobility_diversity_seed)
+    {
+      t_bbl* bbl;
+      BblVector bbls;
+      t_cfg* cfg = OBJECT_CFG(new_obj);
+      CfgComputeLiveness(cfg, CONTEXT_SENSITIVE);
+      CFG_FOREACH_BBL(cfg, bbl)
+        bbls.push_back(bbl);
+
+      for (auto bbl : bbls)
+      {
+        if (RNGGenerate(rng_apply_chance) < 75)
+        {
+          BBLObfuscationTransformation* obfuscator = GetRandomTypedTransformationForType<BBLObfuscationTransformation>("opaquepredicate", rng_opaquepredicate);
+          ASSERT(obfuscator, ("Did not find any obfuscator for type '%s'", "opaquepredicate"));
+
+          if (obfuscator->canTransform(bbl))
+          {
+            VERBOSE(1, ("Applying '%s' to @eiB", obfuscator->name(), bbl));
+            obfuscator->doTransform(bbl, rng_opaquepredicate);
+          }
+          else
+          {
+            VERBOSE(1, ("WARNING: tried applying '%s' to @eiB, but FAILED", obfuscator->name(), bbl));
+          }
+        }
+      }
+    }
+
     ObjectDeflowgraph(new_obj);
     ObjectRebuildSectionsFromSubsections (new_obj);
     ObjectAssemble(new_obj);
@@ -311,6 +380,7 @@ void CodeMobilityTransformer::FinalizeTransform ()
     /* Write out the code section and possible RODATA sections */
     t_section* text_subsec = OBJECT_CODE(new_obj)[0];
     fwrite(SECTION_DATA(text_subsec), 1, SECTION_CSIZE(text_subsec), fp);
+    uint32_t block_size = SECTION_CSIZE(text_subsec);
     if ((OBJECT_NRODATAS(new_obj) > 0) && (SECTION_SUBSEC_FIRST(OBJECT_RODATA(new_obj)[0]) != NULL))
     {
       /* We also create file containing its metadata (names and offsets of subsections) */
@@ -322,6 +392,7 @@ void CodeMobilityTransformer::FinalizeTransform ()
       {
         t_section* sec = OBJECT_RODATA(new_obj)[iii];
         fwrite(SECTION_DATA(sec), 1, SECTION_CSIZE(sec), fp);
+        block_size += SECTION_CSIZE(sec);
 
         t_section* subsec;
         SECTION_FOREACH_SUBSECTION(sec, subsec)
@@ -338,12 +409,30 @@ void CodeMobilityTransformer::FinalizeTransform ()
     }
 
     fclose(fp);
+
+    /* Update the metric info */
+    metric.nr_of_mobile_blocks++;
+    metric.nr_of_mobile_bytes += block_size;
   }
+
+  /* Write out the metrics */
+  for (auto pair : metrics)
+  {
+    fprintf(f_metric, "%u,%u,%u\n", pair.first, pair.second.nr_of_mobile_blocks, pair.second.nr_of_mobile_bytes);
+  }
+  fclose(f_metric);
 
   if(separate_reloc_table)
   {
     RelocTableFree(address_producer_table);
     separate_reloc_table = FALSE;
+  }
+
+  if (rng_cm_master)
+  {
+    RNGDestroy(rng_cm_master);
+    RNGDestroy(rng_apply_chance);
+    RNGDestroy(rng_opaquepredicate);
   }
 }
 

@@ -177,7 +177,7 @@ always_true (t_bbl * bbl1, t_bbl * bbl2)
 }
 
 
-FILE* L_OBF_OP=NULL;
+LogFile* L_OBF_OP=NULL;
 int
 main (int argc, char **argv)
 {
@@ -214,7 +214,7 @@ main (int argc, char **argv)
 
   t_string logging_filename = StringConcat2 (global_options.output_name, ".diablo.obfuscation.log");
 
-  FILE* L_OBF = NULL;
+  LogFile* L_OBF = NULL;
   INIT_LOGGING(L_OBF,logging_filename);
   ATTACH_LOGGING(L_OBF_BF, L_OBF);
   ATTACH_LOGGING(L_OBF_FF, L_OBF);
@@ -420,6 +420,9 @@ main (int argc, char **argv)
 
   LOG(L_OBF,("END OF OBFUSCATION LOG\n"));
   FINI_LOGGING(L_OBF);
+  FINI_LOGGING(L_OBF_BF);
+  FINI_LOGGING(L_OBF_FF);
+  FINI_LOGGING(L_OBF_OOP);
 
   //scanf("%s", NULL);
 

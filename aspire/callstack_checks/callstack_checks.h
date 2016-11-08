@@ -55,6 +55,6 @@ struct CallStackCheckAnnotationInfoFactory
 
 void ApplyCallStackChecks(t_cfg* cfg);
 
-extern FILE* L_CALLCHECKS;
+extern LogFile* L_CALLCHECKS;
 
 #endif /* DIABLO_CALLSTACKS_H */

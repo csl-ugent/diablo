@@ -15,6 +15,7 @@ struct AttestationAnnotationInfo
 {
   t_uint32 index;/* The index of the area associated to the info */
   static t_const_string AID_string;
+  static t_const_string output_name;
   std::set<Attestator*> attestators;/* The attestators for this region */
 
   AttestationAnnotationInfo() {}

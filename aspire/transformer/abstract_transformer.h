@@ -21,6 +21,7 @@ class AbstractTransformer
   protected:
     t_object* obj;/* The object to transform */
     t_cfg* cfg;/* Its CFG */
+    t_const_string output_name;
     const t_uint32 adr_size;/* The address size of the object */
     t_regset possible;/* All general purpose registers that can be used in transformations */
     t_section* binary_base_sec;/* The section that we consider to be the binary base of the object (usually first .text section */
@@ -28,7 +29,7 @@ class AbstractTransformer
     t_uint32 transform_index;/* The number of transformed functions */
     const t_uint32 transformed_hell_edge_flag;/* Flag to signify this edge was created as a result of a transformation */
     t_const_string transformed_reloc_label;/* The label given to a relocation generated during a transformation */
-    FILE* L_TRANSFORMS;/* The handle for the transformation log */
+    LogFile* L_TRANSFORMS;/* The handle for the transformation log */
 
     /* Variables used when splitting off functions into new objects (with new CFGs) */
     t_cfg* new_cfg;

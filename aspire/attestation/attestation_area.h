@@ -38,6 +38,7 @@ namespace Attestation
 
   public:
     t_tristate alive;
+    uint32_t region_idx;
 
     /* Constructor */
     Area() : alive(NO) {}
@@ -51,6 +52,9 @@ namespace Attestation
 
     /* Check whether the area is empty */
     bool empty() const { return (blocks.size() == 0); }
+
+    /* Function to print metric information about Area */
+    void PrintMetric(FILE* fp) const;
 
     /* This function will append the necessary information for the area to the ADS */
     void WriteAreaToADS(t_section* ads, t_uint16 id) const;

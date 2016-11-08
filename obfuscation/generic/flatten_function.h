@@ -82,6 +82,6 @@ public:
   virtual void doTransformRegion(const std::vector<std::pair<t_bbl*, AnnotationIntOptions>>& bbls, t_randomnumbergenerator * rng);
 };
 
-extern FILE* L_OBF_FF;
+extern LogFile* L_OBF_FF;
 
 #endif /* FLATTEN_TRANSFORMATION_H */
