@@ -193,10 +193,16 @@ main (int argc, char **argv)
     RegisterAnnotationInfoFactory(softvm_token, new SoftVMAnnotationInfoFactory());
     RegisterAnnotationInfoFactory(obfuscations_token, new ObfuscationAnnotationInfoFactory());
     RegisterAnnotationInfoFactory(codemobility_token, new CodeMobilityAnnotationInfoFactory());
-    RegisterAnnotationInfoFactory(remoteattestation_token, new RemoteAttestationAnnotationInfoFactory());
     RegisterAnnotationInfoFactory(callcheck_token, new CallStackCheckAnnotationInfoFactory());
-    RegisterAnnotationInfoFactory(codeguard_token, new CodeGuardAnnotationInfoFactory());
-    RegisterAnnotationInfoFactory(attestator_token, new AttestatorAnnotationInfoFactory());
+    /* Only parse attestation annotations of a certain type when their Diablo option is enabled. Otherwise,
+     * parsing the annotations will add all these regions to the area's to be attested (without their code
+     * or ADSes actually being linked in) */
+    if (aspire_options.remote_attestation)
+      RegisterAnnotationInfoFactory(remoteattestation_token, new RemoteAttestationAnnotationInfoFactory());
+    if (aspire_options.code_guards) {
+      RegisterAnnotationInfoFactory(codeguard_token, new CodeGuardAnnotationInfoFactory());
+      RegisterAnnotationInfoFactory(attestator_token, new AttestatorAnnotationInfoFactory());
+    }
     ReadAnnotationsFromJSON(global_options.annotation_file, annotations);
 
     /* CF Tagging might be requested, but it's not present in this version of Diablo */
