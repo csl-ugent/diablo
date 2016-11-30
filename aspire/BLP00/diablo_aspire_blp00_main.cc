@@ -57,6 +57,10 @@ main (int argc, char **argv)
     if(diabloobject_options.read_debug_info)
       DwarfFlowgraphInit();
 
+    Annotations annotations;
+    if (global_options.annotation_file)
+        ReadAnnotationsFromJSON(global_options.annotation_file, annotations);
+
     if (global_options.self_profiling)
       SelfProfilingInit(obj, global_options.self_profiling);
 
@@ -78,8 +82,6 @@ main (int argc, char **argv)
 
         t_const_string initial_dot_path = "./diablo-selfprofiler-dots-before";
         t_const_string final_dot_path = "./diablo-selfprofiler-dots-after";
-
-        Annotations annotations;
 
         vector<string> reachable_vector;
 
@@ -124,6 +126,8 @@ main (int argc, char **argv)
         CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);
 
         while (ArmKillUselessInstructions (cfg));
+
+        RegionsInit(annotations, cfg);
 
         /* generate dot file if requested */
         if (global_options.generate_dots)
@@ -211,9 +215,8 @@ main (int argc, char **argv)
         CfgComputeStaticComplexity(cfg);
         CfgComputeDynamicComplexity(cfg);
 
-        // TODO: re-enable these once we do not remove 'empty' regions (with protection annotations that we do not support in a specific diablo frontend, in this frontend we support none...)
-        //LogRegionsStaticComplexity(static_regions_compl_file, cfg);
-        //LogRegionsDynamicComplexity(dynamic_regions_compl_file, cfg);
+        LogRegionsStaticComplexity(static_regions_compl_file, cfg);
+        LogRegionsDynamicComplexity(dynamic_regions_compl_file, cfg);
         Free(static_regions_compl_file);
         Free(dynamic_regions_compl_file);
 
