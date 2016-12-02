@@ -30,6 +30,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 # Allow Diablo binaries to find the shared libraries also built from the source, when installed somewhere else
 SET(CMAKE_SKIP_RPATH TRUE)
 APPEND_CMAKE_INSTALL_RPATH("../lib32")
+APPEND_CMAKE_INSTALL_RPATH("../lib")
 APPEND_CMAKE_INSTALL_RPATH("judy")
 APPEND_CMAKE_INSTALL_RPATH("../judy")
 
@@ -114,6 +115,19 @@ INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-i386 DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-extractor DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-obfuscator DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-selfprofiling DESTINATION bin)
+
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binary_profile_to_plaintext.py DESTINATION bin)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/reverse-translate.py DESTINATION bin/scripts/profiles)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/listfile.py DESTINATION bin/scripts/profiles)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binutils.py DESTINATION bin/scripts/profiles)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/profile.py DESTINATION bin/scripts/profiles)
+
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binary_profile_to_plaintext.py DESTINATION bin)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binary_profile_to_plaintext.py DESTINATION bin/scripts/profiles)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/reverse-translate.py DESTINATION bin/scripts/profiles)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/listfile.py DESTINATION bin/scripts/profiles)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binutils.py DESTINATION bin/scripts/profiles)
+INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/profile.py DESTINATION bin/scripts/profiles)
 
 # uninstall target
 configure_file(
