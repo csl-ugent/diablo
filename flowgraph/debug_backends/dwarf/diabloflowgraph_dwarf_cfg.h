@@ -14,6 +14,7 @@ void CfgAssociateLineInfoWithIns(t_cfg *cfg, DwarfSections *dwarf_sections, Dwar
 void CfgFileNameCacheFree();
 
 /* DYNAMIC MEMBERS */
-INS_DYNAMIC_MEMBER_GLOBAL_BODY(lineinfo, LINEINFO, Lineinfo, t_ins_line_info *, {*valp=NULL;}, {delete *valp;}, { *valp = new InsLineInfo(*((InsLineInfo *)global_hack_dup_orig)); });
+extern bool disable_dwarf_dup;
+INS_DYNAMIC_MEMBER_GLOBAL_BODY(lineinfo, LINEINFO, Lineinfo, t_ins_line_info *, {*valp=NULL;}, {if (*valp) delete *valp;}, { if (!disable_dwarf_dup) *valp = new InsLineInfo(*((InsLineInfo *)global_hack_dup_orig)); });
 
 #endif /* DIABLOFLOWGRAPH_DWARF_CFG_H */

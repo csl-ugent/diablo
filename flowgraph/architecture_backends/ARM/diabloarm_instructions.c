@@ -313,11 +313,16 @@ void ArmInsMakeCondBranchAndLink(t_arm_ins * ins, t_uint32 cond)
 
 void ArmInsMakeCondBranchLinkAndExchange(t_arm_ins * ins, t_uint32 cond, t_reg reg_b)
 {
-  ArmInsMakeCondBranchAndLink(ins, cond);
-
+  /* Make a branch, link and exchange */
+  ARM_INS_SET_TYPE(ins, IT_BRANCH);
   ARM_INS_SET_OPCODE(ins, ARM_BLX);
+  ARM_INS_SET_REGA(ins, ARM_REG_NONE);
   ARM_INS_SET_REGB(ins, reg_b);
-  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & (~ FL_IMMED) ); /* Ensure FL_IMMED is off */
+  ARM_INS_SET_REGC(ins, ARM_REG_NONE);
+  ARM_INS_SET_IMMEDIATE(ins, G_T_UINT32(BBL_CADDRESS(ARM_INS_BBL(ins))) - (G_T_UINT32(BBL_CADDRESS(ARM_INS_BBL(ins))) + BBL_NINS(ARM_INS_BBL(ins)) * 4 - 4) - 8);
+  ARM_INS_SET_ATTRIB(ins, ARM_INS_ATTRIB(ins) | IF_PCDEF);
+  ARM_INS_SET_CSIZE(ins, AddressNew32(4));
+  ArmInsDefault(ins, cond);
 }
 
 /* }}} */

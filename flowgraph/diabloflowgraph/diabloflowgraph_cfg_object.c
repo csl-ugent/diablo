@@ -731,6 +731,7 @@ void ObjectDeflowgraph (t_object * obj)
 
   ComputeCodeSizeGain(obj);
 
+  DiabloBrokerCall ("DisableDwarfMemberDuplication");
   OBJECT_FOREACH_CODE_SECTION(obj, sec, tel)
   {
     SectionFiniDeflowgraph (sec);

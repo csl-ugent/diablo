@@ -10,6 +10,7 @@ static t_object* dwarf_object;
 static DwarfInfo dwarf_info;
 static bool is_lineinfo = false;
 static t_cfg* dwarf_cfg;
+bool disable_dwarf_dup = false;
 
 static void InitializeDwarf(t_object* obj)
 {
@@ -51,10 +52,16 @@ static void FinalizeDwarf()
     InsFiniLineinfo(dwarf_cfg);
 }
 
+static void DisableDwarfMemberDuplication()
+{
+  disable_dwarf_dup = true;
+}
+
 void DwarfFlowgraphInit()
 {
   /* Some DWARF-related broker calls */
   DiabloBrokerCallInstall("ObjectFlowgraphBefore", "t_object *", (void*)InitializeDwarf, FALSE);
   DiabloBrokerCallInstall("ObjectFlowgraphAfter", "t_object *", (void*)AssociateDwarfWithCfg, FALSE);
   DiabloBrokerCallInstall("AfterDeflowgraph", "", (void*)FinalizeDwarf, FALSE);
+  DiabloBrokerCallInstall("DisableDwarfMemberDuplication", "", (void*)DisableDwarfMemberDuplication, FALSE);
 }

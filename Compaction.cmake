@@ -17,6 +17,7 @@ if (CompactionI386)
     ${common_link_libraries}
     PRIVATE I386_Opt
   )
+  INSTALL(TARGETS diablo-i386 DESTINATION bin)
 endif()
 
 if (CompactionARM)
@@ -27,4 +28,5 @@ if (CompactionARM)
     ${common_link_libraries}
     PRIVATE ARM_Opt
   )
+  INSTALL(TARGETS diablo-arm DESTINATION bin)
 endif()

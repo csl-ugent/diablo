@@ -1209,9 +1209,10 @@ RealOptimizeAddressProducersForChain (t_bbl *chain, t_bool optimize, t_bool do_l
                   i_bbl = BBL_NEXT_IN_CHAIN(i_bbl);
                   while (i_bbl)
                     {
-                      if (BBL_ALIGNMENT(i_bbl)>4)
+                      t_address al = BBL_ALIGNMENT(i_bbl);
+                      if (al>4)
                         {
-                          range -= BBL_ALIGNMENT(i_bbl) - 4;
+                          range -= al - 4;
                         }
                       if (i_bbl==data) break;
                       i_bbl = BBL_NEXT_IN_CHAIN(i_bbl);
@@ -1223,9 +1224,10 @@ RealOptimizeAddressProducersForChain (t_bbl *chain, t_bool optimize, t_bool do_l
                   i_bbl = BBL_PREV_IN_CHAIN(i_bbl);
                   while (i_bbl)
                     {
-                      if (BBL_ALIGNMENT(i_bbl)>4)
+                            t_address al = BBL_ALIGNMENT(i_bbl);
+                      if (al>4)
                         {
-                          range -= BBL_ALIGNMENT(i_bbl) - 4;
+                          range -= al - 4;
                         }
                       if (i_bbl==data) break;
                       i_bbl = BBL_PREV_IN_CHAIN(i_bbl);
@@ -1399,19 +1401,23 @@ RealOptimizeAddressProducersForChain (t_bbl *chain, t_bool optimize, t_bool do_l
 	    offset<max_offset;
 	    data2=ArmInsNextInChain(data2), offset=data2?G_T_UINT32(AddressSub(ARM_INS_CADDRESS(data2),ARM_INS_CADDRESS(ins))):max_offset)
 	{
+                t_address al = 0xdead;
 	  if (data2!=data1)
-	    if (data2 == T_ARM_INS(BBL_INS_FIRST(ARM_INS_BBL(data2))))
-	      if (BBL_ALIGNMENT(ARM_INS_BBL(data2))>slack_for_alignment)
+	    if (data2 == T_ARM_INS(BBL_INS_FIRST(ARM_INS_BBL(data2)))) {
+              al = BBL_ALIGNMENT(ARM_INS_BBL(data2));
+	      if (al>slack_for_alignment)
 		{
 		  /* we need to make sure that we reduce the search window because alignment might suddenly add more bytes in between blocks */
 		  max_offset+=slack_for_alignment;
-		  slack_for_alignment = BBL_ALIGNMENT(ARM_INS_BBL(data2));
+		  slack_for_alignment = al;
 		  max_offset-=slack_for_alignment;
 		}
+            }
 	  
           if (data2!=data1)
-             if (ARM_INS_OPCODE(data2)==ARM_DATA)
-               if (BBL_ALIGNMENT(INS_BBL(T_INS(data2)))>=4)
+             if (ARM_INS_OPCODE(data2)==ARM_DATA) {
+                     if (al == 0xdead) al = BBL_ALIGNMENT(ARM_INS_BBL(data2));
+               if (al>=4)
                  if (ARM_INS_REFERS_TO(data2))
                    if (!(ARM_INS_ATTRIB(data2) & IF_ADDRESS_POOL_ENTRY))
                      if (!RelocCmp(RELOC_REF_RELOC(ARM_INS_REFERS_TO (data1)),
@@ -1430,6 +1436,7 @@ RealOptimizeAddressProducersForChain (t_bbl *chain, t_bool optimize, t_bool do_l
                            ARM_INS_SET_ATTRIB(ins,  ARM_INS_ATTRIB(ins) & ~IF_ADDRESS_PRODUCER);
                            break;
                          }
+             }
 	}
 	if (!ok &&
             !(ARM_INS_FLAGS(ins) & FL_THUMB))
@@ -1448,14 +1455,16 @@ RealOptimizeAddressProducersForChain (t_bbl *chain, t_bool optimize, t_bool do_l
               data2=ArmInsPrevInChain(data2), offset=data2?G_T_UINT32(AddressSub(ARM_INS_CADDRESS(ins),ARM_INS_CADDRESS(data2))):max_offset)
           {
 	    if (data2!=data1)
-	      if (data2 == T_ARM_INS(BBL_INS_FIRST(ARM_INS_BBL(data2))))
-		if (BBL_ALIGNMENT(ARM_INS_BBL(data2))>slack_for_alignment)
+	      if (data2 == T_ARM_INS(BBL_INS_FIRST(ARM_INS_BBL(data2)))) {
+                      t_address al = BBL_ALIGNMENT(ARM_INS_BBL(data2));
+		if (al>slack_for_alignment)
 		  {
 		    /* we need to make sure that we reduce the search window because alignment might suddenly add more bytes in between blocks */
 		    max_offset+=slack_for_alignment;
-		    slack_for_alignment = BBL_ALIGNMENT(ARM_INS_BBL(data2));
+		    slack_for_alignment = al;
 		    max_offset-=slack_for_alignment;
 		  }
+                }
 
             if (data2!=data1)
               if (ARM_INS_OPCODE(data2)==ARM_DATA)

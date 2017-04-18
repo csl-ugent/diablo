@@ -10,6 +10,7 @@ add_subdirectory(diablosoftvm)
 add_subdirectory(callstack_checks)
 add_subdirectory(code_mobility)
 add_subdirectory(attestation)
+add_subdirectory(self_debugging)
 add_subdirectory(transformer)
 add_subdirectory(reaction_mechanisms)
 
@@ -35,6 +36,7 @@ target_include_current_directories(diablo-selfprofiling)
 target_link_libraries(diablo-selfprofiling
   ${common_link_libraries}
 )
+INSTALL(TARGETS diablo-selfprofiling DESTINATION bin)
 
 # 1. EXTRACTOR
 # ------------
@@ -44,6 +46,7 @@ target_link_libraries(diablo-extractor
   ${common_link_libraries}
   PRIVATE DiabloSoftVM
 )
+INSTALL(TARGETS diablo-extractor DESTINATION bin)
 
 # 4. OBFUSCATOR
 # -------------
@@ -58,6 +61,11 @@ set(obfuscation_link_libraries
 )
 
 add_executable (diablo-obfuscator ${CMAKE_CURRENT_SOURCE_DIR}/BLP04/diablo_aspire_blp04_main.cc  ${Aspire_CC} ${backend_file})
+if (SELF_DEBUGGING)
+  target_compile_definitions(diablo-obfuscator
+    PRIVATE SELF_DEBUGGING
+  )
+endif()
 target_include_current_directories(diablo-obfuscator)
 target_link_libraries(diablo-obfuscator
   ${common_link_libraries}
@@ -65,6 +73,8 @@ target_link_libraries(diablo-obfuscator
   PRIVATE DiabloSoftVM
   ${obfuscation_link_libraries}
   PRIVATE Attestation
+  PRIVATE SelfDebugging
   PRIVATE CallStackChecks
   PRIVATE ReactionMechanisms
 )
+INSTALL(TARGETS diablo-obfuscator DESTINATION bin)

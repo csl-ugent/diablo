@@ -364,7 +364,9 @@ SectionPutAtAddress (t_section * sec, t_uint64 start, const t_layout_rule * r,
       VERBOSE(0, ("subsection %s address 0x%llx old @G", SECTION_NAME(sub), secaddr, SECTION_OLD_ADDRESS(sub)));
       #endif
     }
-    secaddr += AddressExtractUint64 (SECTION_CSIZE(sec));
+
+    if (SECTION_TYPE(sec) != ATTRIB_SECTION)
+      secaddr += AddressExtractUint64 (SECTION_CSIZE(sec));
   }
 
   /* If endaddr is equal to start we have a special type of section that has no

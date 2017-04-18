@@ -1,6 +1,7 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 #include "reaction_mechanisms.h"
+#include <self_debugging_json.h>
 
 #define MAX_INSERTIONS_PER_FUNCTION 1
 #define PERCENT_NORMAL 1
@@ -59,6 +60,18 @@ void AddReactions(t_object* obj)
 
       /* Consider the BBL */
       BblMark(bbl);
+
+      /* Don't add reaction mechanisms in regions protected with self-debugging */
+      bool in_sd_region = false;
+      Region* region;
+      const SelfDebuggingAnnotationInfo* info;
+      BBL_FOREACH_SELFDEBUGGING_REGION(bbl, region, info)
+      {
+        in_sd_region = true;
+        break;
+      }
+      if (in_sd_region)
+        continue;
 
       t_ins* ins;
       BBL_FOREACH_INS(bbl, ins)

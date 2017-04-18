@@ -8,6 +8,7 @@ target_link_libraries(CallStackChecks
   PUBLIC DiabloAnnotations
   PUBLIC AnoptARM
   PRIVATE CodeMobility
+  PRIVATE SelfDebugging
   PUBLIC Transformer
   PRIVATE DiabloSoftVM
 )

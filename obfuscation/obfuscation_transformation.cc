@@ -448,7 +448,8 @@ void ObjectObfuscate(t_const_string filename, t_object* obj)
   CFG_FOREACH_FUN(cfg, fun) {
     if (FUNCTION_BBL_FIRST(fun) && !FUNCTION_IS_HELL(fun) && BBL_PRED_FIRST(FUNCTION_BBL_FIRST(fun))) {
       FunctionUnmarkAllBbls(fun);
-      FunctionPropagateConstantsAfterIterativeSolution(fun,CONTEXT_SENSITIVE);
+      /* JENS: this should not be needed (see AF code in bookkeeping) */
+      //FunctionPropagateConstantsAfterIterativeSolution(fun,CONTEXT_SENSITIVE);
     }
   }
 
@@ -586,4 +587,7 @@ void ObjectObfuscate(t_const_string filename, t_object* obj)
   RNGDestroy(rng_bbl);
   RNGDestroy(rng_fun);
   RNGDestroy(rng_obfuscation);
+
+  FreeConstantInformation (cfg);
+  ConstantPropagationFini(cfg);
 }

@@ -26,13 +26,13 @@ include_directories(${diablo_configs_dir})
 
 # Set the output directory for executables
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
 
 # Allow Diablo binaries to find the shared libraries also built from the source, when installed somewhere else
 SET(CMAKE_SKIP_RPATH TRUE)
 APPEND_CMAKE_INSTALL_RPATH("../lib32")
 APPEND_CMAKE_INSTALL_RPATH("../lib")
-APPEND_CMAKE_INSTALL_RPATH("judy")
-APPEND_CMAKE_INSTALL_RPATH("../judy")
+APPEND_CMAKE_INSTALL_RPATH("./lib")
 
 # Generate a compilation database
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -44,6 +44,11 @@ set(CMAKE_C_FLAGS "-std=gnu99 ${CMAKE_C_FLAGS}")
 # Some common C/C++ options
 if (HAS_FLAG_STRICT_ALIASING)
   set(COMMON_FLAGS "-fno-strict-aliasing ${COMMON_FLAGS}")
+endif()
+
+option(Profiling "Compile with profiling (GNU gprof) enabled. Run gprof in the directory from which Diablo is run, not the build directory." OFF)
+if (Profiling)
+  set(COMMON_FLAGS "-pg ${COMMON_FLAGS}")
 endif()
 
 # Optional option. If adding ASAN is supported by the compiler, add it as a CMake option
@@ -94,33 +99,10 @@ add_subdirectory(aspire)
 add_subdirectory(jansson-2.6)
 add_subdirectory(annotations)
 
-# The interesting stuff goes here
-# ===============================
-
-# Offer the user the choice of overriding the installation directories
-set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
-set(INSTALL_BIN_DIR bin CACHE PATH "Installation directory for executables")
-set(INSTALL_INCLUDE_DIR include CACHE PATH "Installation directory for header files")
-set(INSTALL_CMAKE_DIR ${DEF_INSTALL_CMAKE_DIR} CACHE PATH "Installation directory for CMake files")
-
-# Export the package for use from the build-tree
-# (this registers the build-tree with a global CMake-registry)
-export(PACKAGE diablo)
 include(Compaction.cmake)
 
-# Make install
-# ============
-INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-arm DESTINATION bin)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-i386 DESTINATION bin)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-extractor DESTINATION bin)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-obfuscator DESTINATION bin)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/diablo-selfprofiling DESTINATION bin)
-
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binary_profile_to_plaintext.py DESTINATION bin)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/reverse-translate.py DESTINATION bin/scripts/profiles)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/listfile.py DESTINATION bin/scripts/profiles)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binutils.py DESTINATION bin/scripts/profiles)
-INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/profile.py DESTINATION bin/scripts/profiles)
+# Some common install configuration
+INSTALL(DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} DESTINATION .)
 
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binary_profile_to_plaintext.py DESTINATION bin)
 INSTALL(PROGRAMS ${CMAKE_CURRENT_SOURCE_DIR}/self-profiling/binary_profile_to_plaintext.py DESTINATION bin/scripts/profiles)
@@ -183,3 +165,6 @@ else(DPKG_PROGRAM)
         "${CPACK_PACKAGE_NAME_LOWERCASE}_${PACKAGE_VERSION}_${CMAKE_SYSTEM_NAME}")
 endif(DPKG_PROGRAM)
 INCLUDE(CPack)
+
+# Export the package for use from the build-tree (this registers the build-tree with a global CMake-registry)
+export(PACKAGE diablo)

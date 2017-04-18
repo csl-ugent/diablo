@@ -63,7 +63,14 @@ macro(set_defined_from_config defined config)
 endmacro()
 
 macro(bison_and_flex_ext script base)
-  bison_target(${script}_parser ${base}_parser.y ${CMAKE_CURRENT_BINARY_DIR}/${script}_parser.c)
+  # The 'VERBOSE' tells Bison to write a report of the grammar and parser (this fixes a dependency issue with newer versions of CMake).
+  # Depending on the CMake version this option takes a report file argument, or knows the right name by default. We don't specify the
+  # report file if we don't have to, because this would result in a duplicate make recipe and assorted warnings.
+  if (${CMAKE_VERSION} VERSION_LESS "3.4")
+    bison_target(${script}_parser ${base}_parser.y ${CMAKE_CURRENT_BINARY_DIR}/${script}_parser.c VERBOSE "${CMAKE_CURRENT_BINARY_DIR}/${script}_tables.output")
+  else()
+    bison_target(${script}_parser ${base}_parser.y ${CMAKE_CURRENT_BINARY_DIR}/${script}_parser.c VERBOSE)
+  endif()
   flex_target(${script}_lexer ${base}_lexer.l ${CMAKE_CURRENT_BINARY_DIR}/${script}_lexer.c)
   add_flex_bison_dependency(${script}_lexer ${script}_parser)
 

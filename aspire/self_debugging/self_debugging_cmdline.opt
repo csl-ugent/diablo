@@ -1,0 +1,8 @@
+group "SelfDebugging" string_option debugger
+{
+   short="SDD";
+   long="self_debugging_debugger";
+   default=NULL;
+   description="Path to the debugger object.";
+}
+

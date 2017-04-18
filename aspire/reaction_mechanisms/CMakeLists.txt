@@ -8,4 +8,5 @@ target_include_current_directories(ReactionMechanisms)
 target_link_libraries(ReactionMechanisms
   PUBLIC DiabloAnnotations
   PUBLIC FlowgraphARM
+  PRIVATE SelfDebugging
 )

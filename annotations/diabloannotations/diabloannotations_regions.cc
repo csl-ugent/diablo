@@ -494,7 +494,10 @@ OrderedFunctionSet RegionGetAllFunctions(const Region* region)
   OrderedFunctionSet functions;
   t_bbl* bbl;
   REGION_FOREACH_BBL(region, bbl)
-    functions.insert(BBL_FUNCTION(bbl));
+  {
+    if (!IS_DATABBL(bbl))
+      functions.insert(BBL_FUNCTION(bbl));
+  }
 
   return functions;
 }

@@ -127,6 +127,7 @@ struct _t_section_group
 #define DIABLOOBJECT_SECTION_FUNCTIONS
 t_section *SectionCreateForObject (t_object *, char, t_section *, t_address, t_const_string);
 t_section *SectionGetFromObjectByAddress (const t_object *, t_address);
+t_section *SubsectionGetFromObjectByAddress (const t_object * obj, t_address address);
 t_section *SectionGetFromObjectByName (const t_object *, t_const_string);
 t_section *SectionGetFromObjectByIndex (const t_object *, t_int32);
 void SectionLinkToParent(t_section* sec, t_section* parent);

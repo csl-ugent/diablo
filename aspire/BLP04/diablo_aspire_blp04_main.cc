@@ -14,6 +14,12 @@
 #include <diablosoftvm.h>
 #include <code_mobility.h>
 #include <reaction_mechanisms.h>
+#ifdef SELF_DEBUGGING
+#include <self_debugging.h>
+#else
+#include <self_debugging_cmdline.h>
+#include <self_debugging_json.h>
+#endif
 
 using namespace std;
 
@@ -29,11 +35,11 @@ void DisableMisbehavingProtectionCombinations(t_cfg* cfg) {
     Region *region;
 
     bool conflict_bf = false;
-  /* Disable branch_function + { code_mobility}
+  /* Disable branch_function + { code_mobility, anti_debugging }
      call checks and code mobility are disabled in the call check's InsertCheckInFunction */
     BBL_FOREACH_REGION(bbl, region) {
       for (auto request: region->requests) {
-        if (dynamic_cast<CodeMobilityAnnotationInfo*>(request)) {
+        if (dynamic_cast<CodeMobilityAnnotationInfo*>(request) || dynamic_cast<SelfDebuggingAnnotationInfo*>(request)) {
           if (region->annotation->annotation_content)
             VERBOSE(1, ("Conflict resolution: this BBL cannot have branch functions (annotation: '%s')", region->annotation->annotation_content->c_str()));
           else
@@ -54,10 +60,10 @@ void DisableMisbehavingProtectionCombinations(t_cfg* cfg) {
             ASSERT(bf_request, ("Annotation claimed it was a branch function or flatten function, but could not cast to ObfuscationAnnotationInfo*!"));
 
             if (region->annotation->annotation_content)
-              VERBOSE(0, ("Conflict resolution: disabled branch/flatten function for a region that contained both branch functions and code mobility (annotation: '%s')",
+              VERBOSE(0, ("Conflict resolution: disabled branch/flatten function for a region that contained both branch functions and code mobility/self-debugging (annotation: '%s')",
                           region->annotation->annotation_content->c_str()));
             else
-              VERBOSE(0, ("Conflict resolution: disabled branch/flatten function for a region that contained both branch functions and code mobility (annotation: null)"));
+              VERBOSE(0, ("Conflict resolution: disabled branch/flatten function for a region that contained both branch functions and code mobility/self-debugging (annotation: null)"));
 
             bf_request->enable = false;
           }
@@ -134,6 +140,12 @@ main (int argc, char **argv)
   DiabloSoftVMVerify ();
   OptionDefaults (diablosoftvm_option_list);
 
+  SelfDebuggingInit ();
+  OptionParseCommandLine (self_debugging_option_list, argc, argv, FALSE);
+  OptionGetEnvironment (self_debugging_option_list);
+  SelfDebuggingVerify ();
+  OptionDefaults (self_debugging_option_list);
+
   /* Do the options for the obfuscation backend */
   void *obf_arch_obj = NULL;
   InitArchitecture(&obf_arch_obj);
@@ -193,13 +205,15 @@ main (int argc, char **argv)
     RegisterAnnotationInfoFactory(softvm_token, new SoftVMAnnotationInfoFactory());
     RegisterAnnotationInfoFactory(obfuscations_token, new ObfuscationAnnotationInfoFactory());
     RegisterAnnotationInfoFactory(codemobility_token, new CodeMobilityAnnotationInfoFactory());
+    RegisterAnnotationInfoFactory(selfdebugging_token, new SelfDebuggingAnnotationInfoFactory());
     RegisterAnnotationInfoFactory(callcheck_token, new CallStackCheckAnnotationInfoFactory());
     /* Only parse attestation annotations of a certain type when their Diablo option is enabled. Otherwise,
      * parsing the annotations will add all these regions to the area's to be attested (without their code
      * or ADSes actually being linked in) */
     if (aspire_options.remote_attestation)
       RegisterAnnotationInfoFactory(remoteattestation_token, new RemoteAttestationAnnotationInfoFactory());
-    if (aspire_options.code_guards) {
+    if (aspire_options.code_guards)
+    {
       RegisterAnnotationInfoFactory(codeguard_token, new CodeGuardAnnotationInfoFactory());
       RegisterAnnotationInfoFactory(attestator_token, new AttestatorAnnotationInfoFactory());
     }
@@ -218,6 +232,19 @@ main (int argc, char **argv)
 
     if (global_options.self_profiling)
       SelfProfilingInit(obj, global_options.self_profiling);
+
+    /* Find out whether self-debugging is needed and initialize it if necessary */
+#ifdef SELF_DEBUGGING
+    unique_ptr<SelfDebuggingTransformer> sd_transformer;
+#endif
+    aspire_options.self_debugging = aspire_options.self_debugging && AnnotationContainsToken(annotations, selfdebugging_token);
+	
+    if (aspire_options.self_debugging)
+#ifdef SELF_DEBUGGING
+      sd_transformer.reset(new SelfDebuggingTransformer(obj, global_options.output_name));
+#else
+      WARNING(("Self-debugging was requested but is not present in this version of Diablo!"));
+#endif
 
     RelocTableRemoveConstantRelocs(OBJECT_RELOC_TABLE(obj));
 
@@ -286,6 +313,11 @@ main (int argc, char **argv)
 
         if (aspire_options.code_mobility)
           cm_transformer->AddForceReachables(reachable_vector);
+
+#ifdef SELF_DEBUGGING
+        if (aspire_options.self_debugging)
+          sd_transformer->AddForceReachables(reachable_vector);
+#endif
 
         AddReactionForceReachables(obj, reachable_vector);
 
@@ -472,6 +504,14 @@ main (int argc, char **argv)
             FINI_LOGGING(L_OBF_OOP);
           }
 
+#if SELF_DEBUGGING
+          if (aspire_options.self_debugging)
+          {
+            NewDiabloPhase("Self-Debugging");
+            sd_transformer->TransformObject();
+          }
+#endif
+
           if (aspire_options.code_mobility)
           {
             NewDiabloPhase("Code Mobility");
@@ -650,6 +690,7 @@ main (int argc, char **argv)
   DiabloSoftVMFini();
   ObfuscationOptFini();
   CodeMobilityFini();
+  SelfDebuggingFini();
 
   DestroyArchitecture(&obf_arch_obj);
 

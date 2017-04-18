@@ -7,6 +7,7 @@
 
 #include "callstack_checks.h"
 #include <code_mobility.h>
+#include <self_debugging_json.h>
 #include <diablosoftvm.h>
 
 #define CALL_STACK_CHECK_DEBUG 0
@@ -373,6 +374,12 @@ bool InsertCheckInFunction(t_function* fun) {
     }
 #endif
     correct_callee_lr_bbl = CFG_EDGE_TAIL(corresponding);
+    const SelfDebuggingAnnotationInfo* info3;
+    BBL_FOREACH_SELFDEBUGGING_REGION(correct_callee_lr_bbl, region, info3)
+    {
+      VERBOSE(0, ("Function returns to a region that is slated to be moved to the debugger context. No call stack checks inserted!"));
+      return false;
+    }
 
     predecessors++;
     predecessor = head;
