@@ -6,6 +6,8 @@
 /* C-standard headers */
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 /* Linux-specific headers */
 #include <pthread.h>
@@ -41,5 +43,8 @@ void DIABLO_Mobility_Init () __attribute__((constructor(101)));
 
 t_address DIABLO_Mobility_Resolve (uint32_t index);
 void binder_softvm(uint32_t index, char** retVmImage, uint32_t* retSizeVmImage);
+
+void EraseMobileBlock (uint32_t index, bool code);
+void EraseAllMobileBlocks ();
 
 #endif

@@ -66,7 +66,7 @@ static void InsertMobileBlock (MobileEntry* entry, uint32_t index, bool code)
 }
 
 /* This function will return a MobileEntry for a mobile block (that will be downloaded if it's not present yet */
-static MobileEntry* GetMobileBlock(uint32_t index, bool code)
+MobileEntry* RealGetMobileBlock(uint32_t index, bool code)
 {
   MobileEntry* entry = &DIABLO_Mobility_global_mobile_redirection_table[index];
   pthread_mutex_lock(&(entry->mutex));
@@ -82,6 +82,17 @@ static MobileEntry* GetMobileBlock(uint32_t index, bool code)
   return entry;
 }
 
+/* Wrapper function that aligns the stack on 8-byte boundary */
+__attribute__ ((naked)) MobileEntry* GetMobileBlock(uint32_t index, bool code)
+{
+  __asm("push {fp, lr}");
+  __asm("mov fp, sp");
+  __asm("and sp, #-8");
+  RealGetMobileBlock(index, code);
+  __asm("mov sp, fp");
+  __asm("pop {fp, pc}");
+}
+
 t_address DIABLO_Mobility_Resolve (uint32_t index)
 {
   MobileEntry* entry = GetMobileBlock(index, true);
@@ -95,4 +106,55 @@ void binder_softvm(uint32_t index, char** retVmImage, uint32_t* retSizeVmImage)
   /* Fill in return values */
   *retVmImage = entry->addr;
   *retSizeVmImage = entry->len;
+}
+
+void EraseAllMobileBlocks()
+{
+  uint32_t i;
+
+  for (i = 0; i < DIABLO_Mobility_GMRT_size; i++) {
+    EraseMobileBlock(i, true); // TODO how can I get if it is code or data?
+  }
+}
+
+void EraseMobileBlock (uint32_t index, bool code)
+{
+//  printf("EraseMobileBlock(%x, %d)\n", index, code);
+
+  MobileEntry* entry = &DIABLO_Mobility_global_mobile_redirection_table[index];
+  pthread_mutex_lock(&(entry->mutex));
+
+  if (code)
+  {
+//    printf("entry->addr: %x\n", (unsigned int)entry->addr);
+//    printf("entry->downloaded: %x\n", (unsigned int)entry->downloaded);
+//    printf("entry->len: %d\n", entry->len);
+
+    if (entry->downloaded != 0) {
+//      printf("downloaded != 0 branch\n");
+      /* release the previously allocated block */
+      //free(entry->addr);
+
+      /* reset the len attribute */
+      entry->len = 0;
+
+      /* restore the initial stub */
+      entry->addr = entry->downloaded;
+
+      /* reset the 'block downloaded' flag so that next access to the
+       * block will trigger a new download process */
+      entry->downloaded = 0;
+    }
+  }
+  else
+  {
+//    printf("downloaded == 0 branch\n");
+    //free(entry->addr);
+
+    entry->downloaded = 0;
+    entry->len = 0;
+    entry->addr = 0;
+  }
+
+  pthread_mutex_unlock(&(entry->mutex));
 }

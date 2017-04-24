@@ -31,7 +31,6 @@ t_bbl* CodeMobilityTransformer::CreateGMRTStub (t_bbl* entry_bbl)
    * POP {[LIVE_REGS], lr, pc}
    */
 
-  /* When pushing registers we need to take care the number of registers pushed is even, so the stack stays eight-byte aligned when we do a bl */
   /* Find all live registers to be pushed: integers, floating point, and check if any status flag is live */
   t_regset regs_live = RegsetIntersect(CFG_DESCRIPTION(cfg)->callee_may_change, BblRegsLiveBefore(entry_bbl));
   t_regset int_to_push = RegsetIntersect(possible, regs_live);
@@ -43,8 +42,6 @@ t_bbl* CodeMobilityTransformer::CreateGMRTStub (t_bbl* entry_bbl)
   /* Get all the integer registers we'll push */
   RegsetSetAddReg(int_to_push, ARM_REG_R14);
   RegsetSetAddReg(int_to_push, ARM_REG_R15);
-  t_uint32 nr_of_regs_pushed = RegsetCountRegs(int_to_push);
-  t_bool aligned = (nr_of_regs_pushed % 2) == 0;
   t_uint32 regs = RegsetToUint32(int_to_push);
 
   /* Make an entrypoint BBL */
@@ -59,8 +56,6 @@ t_bbl* CodeMobilityTransformer::CreateGMRTStub (t_bbl* entry_bbl)
   }
   ArmMakeInsForBbl(Mov, Append, ins, entrypoint, FALSE, ARM_REG_R0, ARM_REG_NONE, 0, ARM_CONDITION_AL);
   ArmMakeConstantProducer(ins, gmrt_index);  /* Create an instruction to produce the index into the GMRT */
-  if (!aligned)
-    ArmMakeInsForBbl(Sub, Append, ins, entrypoint, FALSE, ARM_REG_R13, ARM_REG_R13, ARM_REG_NONE, adr_size, ARM_CONDITION_AL);
   ArmMakeInsForBbl(CondBranchAndLink, Append, ins, entrypoint, FALSE, ARM_CONDITION_AL);
 
   /* Make new function */
@@ -72,8 +67,6 @@ t_bbl* CodeMobilityTransformer::CreateGMRTStub (t_bbl* entry_bbl)
   t_bbl* second = BblNew(cfg);
   BblInsertInFunction(second, fun);
 
-  if (!aligned)
-    ArmMakeInsForBbl(Add, Append, ins, second, FALSE, ARM_REG_R13, ARM_REG_R13, ARM_REG_NONE, adr_size, ARM_CONDITION_AL);/* Reclaim the stack space */
   if (save_cond)
   {
     ArmMakeInsForBbl(Pop, Append, ins, second, FALSE, (1 << ARM_REG_R1) | (1 << ARM_REG_R2), ARM_CONDITION_AL, FALSE);
