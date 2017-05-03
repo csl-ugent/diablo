@@ -22,24 +22,18 @@ t_bbl* CodeMobilityTransformer::CreateGMRTStub (t_bbl* entry_bbl)
 
   /* We will generate the following code:
    * POP {r0, r1} (calls/jumps coming from places containing no dead registers will land on this)
-   * PUSH {[LIVE_REGS], lr, pc} (save all live in registers, together with lr and pc)
-   * [MRS VMRS PUSH {r1, r2}] (save all status flag registers)
+   * PUSH {r0, lr, pc} (save the register(s) we'll overwrite, together with lr and pc)
    * MOV r0, #index
    * BL Resolve
-   * [MSR VMSR POP {r1, r2}] (restore all status flag registers)
    * STR r0, [SP, PC_OFFSET] (change the saved PC so we'll return to the address of the loaded mobile code)
-   * POP {[LIVE_REGS], lr, pc}
+   * POP {r0, lr, pc}
    */
 
-  /* Find all live registers to be pushed: integers, floating point, and check if any status flag is live */
-  t_regset regs_live = RegsetIntersect(CFG_DESCRIPTION(cfg)->callee_may_change, BblRegsLiveBefore(entry_bbl));
-  t_regset int_to_push = RegsetIntersect(possible, regs_live);
-  t_regset flt_to_push = RegsetIntersect(CFG_DESCRIPTION(cfg)->flt_registers, regs_live);
-  t_regset cond_to_push = RegsetIntersect(CFG_DESCRIPTION(cfg)->cond_registers, regs_live);
-  t_bool save_cond = !RegsetIsEmpty(cond_to_push);
   t_uint32 gmrt_index = transform_index - 1;/* Index has already been incremented so we subtract 1 */
 
   /* Get all the integer registers we'll push */
+  t_regset int_to_push = RegsetNew();
+  RegsetSetAddReg(int_to_push, ARM_REG_R0);
   RegsetSetAddReg(int_to_push, ARM_REG_R14);
   RegsetSetAddReg(int_to_push, ARM_REG_R15);
   t_uint32 regs = RegsetToUint32(int_to_push);
@@ -48,12 +42,6 @@ t_bbl* CodeMobilityTransformer::CreateGMRTStub (t_bbl* entry_bbl)
   t_bbl* entrypoint = BblNew(cfg);
   ArmMakeInsForBbl(Pop, Append, ins, entrypoint, FALSE, (1 << ARM_REG_R0) | (1 << ARM_REG_R1), ARM_CONDITION_AL, FALSE);
   ArmMakeInsForBbl(Push, Append, ins, entrypoint, FALSE, regs, ARM_CONDITION_AL, FALSE);
-  if (save_cond)
-  {
-    ArmMakeInsForBbl(Mrs, Append, ins, entrypoint, FALSE, ARM_REG_R1, ARM_CONDITION_AL);
-    ArmMakeInsForBbl(Vmrs, Append, ins, entrypoint, FALSE, ARM_REG_R2, ARM_CONDITION_AL);
-    ArmMakeInsForBbl(Push, Append, ins, entrypoint, FALSE, (1 << ARM_REG_R1) | (1 << ARM_REG_R2), ARM_CONDITION_AL, FALSE);
-  }
   ArmMakeInsForBbl(Mov, Append, ins, entrypoint, FALSE, ARM_REG_R0, ARM_REG_NONE, 0, ARM_CONDITION_AL);
   ArmMakeConstantProducer(ins, gmrt_index);  /* Create an instruction to produce the index into the GMRT */
   ArmMakeInsForBbl(CondBranchAndLink, Append, ins, entrypoint, FALSE, ARM_CONDITION_AL);
@@ -67,12 +55,6 @@ t_bbl* CodeMobilityTransformer::CreateGMRTStub (t_bbl* entry_bbl)
   t_bbl* second = BblNew(cfg);
   BblInsertInFunction(second, fun);
 
-  if (save_cond)
-  {
-    ArmMakeInsForBbl(Pop, Append, ins, second, FALSE, (1 << ARM_REG_R1) | (1 << ARM_REG_R2), ARM_CONDITION_AL, FALSE);
-    ArmMakeInsForBbl(Vmsr, Append, ins, second, FALSE, ARM_REG_R2, ARM_CONDITION_AL);
-    ArmMakeInsForBbl(Msr, Append, ins, second, FALSE, ARM_REG_R1, ARM_CONDITION_AL, TRUE);
-  }
   ArmMakeInsForBbl(Str, Append, ins, second, FALSE, ARM_REG_R0, ARM_REG_R13, ARM_REG_NONE,
     adr_size * (RegsetCountRegs(int_to_push) - 1) /* immediate */, ARM_CONDITION_AL, TRUE /* pre */, TRUE /* up */, FALSE /* wb */);
   ArmMakeInsForBbl(Pop, Append, ins, second, FALSE, regs, ARM_CONDITION_AL, FALSE);

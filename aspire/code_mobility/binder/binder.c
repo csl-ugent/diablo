@@ -66,7 +66,7 @@ static void InsertMobileBlock (MobileEntry* entry, uint32_t index, bool code)
 }
 
 /* This function will return a MobileEntry for a mobile block (that will be downloaded if it's not present yet */
-MobileEntry* RealGetMobileBlock(uint32_t index, bool code)
+MobileEntry* GetMobileBlock(uint32_t index, bool code)
 {
   MobileEntry* entry = &DIABLO_Mobility_global_mobile_redirection_table[index];
   pthread_mutex_lock(&(entry->mutex));
@@ -82,21 +82,25 @@ MobileEntry* RealGetMobileBlock(uint32_t index, bool code)
   return entry;
 }
 
-/* Wrapper function that aligns the stack on 8-byte boundary */
-__attribute__ ((naked)) MobileEntry* GetMobileBlock(uint32_t index, bool code)
-{
-  __asm("push {fp, lr}");
-  __asm("mov fp, sp");
-  __asm("and sp, #-8");
-  RealGetMobileBlock(index, code);
-  __asm("mov sp, fp");
-  __asm("pop {fp, pc}");
-}
-
-t_address DIABLO_Mobility_Resolve (uint32_t index)
+t_address Resolve (uint32_t index)
 {
   MobileEntry* entry = GetMobileBlock(index, true);
   return entry->addr;
+}
+
+/* Wrapper function that aligns the stack on 8-byte boundary */
+__attribute__ ((naked)) t_address DIABLO_Mobility_Resolve (uint32_t index)
+{
+  __asm("push {r1, r2, r3, r4, r5, fp, ip, lr}");
+  __asm("mrs r4, CPSR");
+  __asm("vmrs r5, FPSCR");
+  __asm("mov fp, sp");
+  __asm("and sp, #-8");
+  Resolve(index);
+  __asm("mov sp, fp");
+  __asm("vmsr FPSCR, r5");
+  __asm("msr CPSR, r4");
+  __asm("pop {r1, r2, r3, r4, r5, fp, ip, pc}");
 }
 
 void binder_softvm(uint32_t index, char** retVmImage, uint32_t* retSizeVmImage)

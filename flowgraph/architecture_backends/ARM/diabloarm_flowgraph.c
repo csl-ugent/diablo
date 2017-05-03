@@ -742,6 +742,49 @@ static t_bool ArmCountEntriesInSwitchTable(t_bbl * branch_bbl, t_uint32 * nr_ent
   return FALSE;
 }
 
+bool ArmFindDefinitionOfRegister(t_arm_ins * start, t_reg reg, t_uint32 * immvalue) {
+  t_uint32 counter = 0;
+  t_bbl *to_bbl = ARM_INS_BBL(start);
+  t_bbl *from_bbl = BBL_PREV(to_bbl);
+
+  while (counter < 10) {
+    counter++;
+
+    t_arm_ins *ins_last = T_ARM_INS(BBL_INS_LAST(from_bbl));
+    if (!ArmInsIsUnconditionalBranch(ins_last)) {
+      from_bbl = BBL_PREV(from_bbl);
+      continue;
+    }
+
+    t_address target = AddressAddUint32(ARM_INS_CADDRESS(ins_last),
+                                        ARM_INS_IMMEDIATE(ins_last) + ((ARM_INS_FLAGS(ins_last) & FL_THUMB)?4:8));
+
+    if (AddressIsEq(target,ARM_INS_CADDRESS(T_ARM_INS(BBL_INS_FIRST(to_bbl))))) {
+      // found the BBL branching to the destination
+      t_arm_ins *ins;
+      BBL_FOREACH_ARM_INS_R(from_bbl, ins) {
+        if (RegsetIn(INS_REGS_DEF(T_INS(ins)), reg)) {
+          if ((ARM_INS_OPCODE(ins) == ARM_MOV && ARM_INS_FLAGS(ins) & FL_IMMED)
+              || (ARM_INS_OPCODE(ins) == ARM_MOVW && ARM_INS_FLAGS(ins) & FL_IMMEDW)) {
+            *immvalue = ARM_INS_IMMEDIATE(ins);
+            return TRUE;
+          }
+          else
+            return FALSE;
+        }
+      }
+
+      to_bbl = from_bbl;
+      from_bbl = BBL_PREV(from_bbl);
+    }
+    else {
+      from_bbl = BBL_PREV(from_bbl);
+    }
+  }
+
+  return FALSE;
+}
+
 #define UPPERBOUND_VERBOSITY 3
 static t_bool ArmFindSwitchTableUpperBoundCmp(t_cfg *cfg, t_bbl *bbl, t_reg cmp_reg, t_uint32 *upper_bound, t_bbl * branch_bbl, t_arm_ins * start_ins)
 {
@@ -1065,12 +1108,13 @@ static t_bool ArmFindSwitchTableUpperBoundCmp(t_cfg *cfg, t_bbl *bbl, t_reg cmp_
         else
         {
           VERBOSE(UPPERBOUND_VERBOSITY, ("A or C is the compare register cmp_reg R%d", cmp_reg));
-          if (ARM_INS_OPCODE(ins)!=ARM_STR && ARM_INS_OPCODE(ins)!=ARM_CMP)
+          if (ARM_INS_OPCODE(ins)!=ARM_STR && ARM_INS_OPCODE(ins)!=ARM_CMP
+              && ARM_INS_OPCODE(ins)!=ARM_STRB)
           {
             if (seen_other_conditional_instructions_since_last_branch || (last_branch_ins && ARM_INS_CONDITION(ins)!=ARM_INS_CONDITION(last_branch_ins)))
             {
               if (!detected_size)
-                FATAL(("Strange switch!"));
+                FATAL(("Strange switch! @iB", bbl));
               else
                 break;
             }
@@ -1153,9 +1197,12 @@ static t_bool ArmFindSwitchTableUpperBoundCmp(t_cfg *cfg, t_bbl *bbl, t_reg cmp_
       }
       else
       {
-        if (!detected_size)
+        if (!detected_size) {
+          if (ArmFindDefinitionOfRegister(found_cmp_ins, ARM_INS_REGC(found_cmp_ins), upper_bound)) {
+            valid_upper_bound_by_cmp = TRUE;
+          } else
           FATAL(("Cannot find PC-relative ldr loading upper bound of switch table for cmp in @ieB",ARM_INS_BBL(found_cmp_ins)));
-        else
+        } else
           valid_upper_bound_by_cmp = FALSE;
       }
     }
