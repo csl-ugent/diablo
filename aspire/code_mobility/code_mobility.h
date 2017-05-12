@@ -27,6 +27,7 @@ class CodeMobilityTransformer : public GMRTTransformer
 {
   private:
     t_symbol* resolve_sym;/* The symbol of the resolve routine */
+    static const t_uint32 binder_version = 1;
 
     /*** FUNCTIONS ***/
     /* Helper functions */

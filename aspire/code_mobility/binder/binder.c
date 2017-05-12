@@ -8,6 +8,7 @@
 uint32_t DIABLO_Mobility_binary[1] __attribute__((section (".data.binary"))) = { 42 };
 MobileEntry DIABLO_Mobility_global_mobile_redirection_table[1] __attribute__((section (".data.gmrt"))) = {{ (t_address) sizeof DIABLO_Mobility_global_mobile_redirection_table[0] }};
 uint32_t DIABLO_Mobility_GMRT_size = 1;
+uint32_t DIABLO_Mobility_version __attribute__((section (".data.version")))= 1;
 
 __attribute__ ((noinline)) static void RealInit ()
 {

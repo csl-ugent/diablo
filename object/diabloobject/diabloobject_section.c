@@ -258,104 +258,12 @@ SectionGetFromObjectByAddress (const t_object * obj, t_address address)
 t_section *
 SubsectionGetFromObjectByAddress (const t_object * obj, t_address address)
 {
-  t_object *tmp2, *tmp;
-
-  for (tmp2 = OBJECT_MAPPED_FIRST(obj); tmp2 != NULL; tmp2 = OBJECT_NEXT(tmp2))
+  t_object *tmp, *tmp2;
+  OBJECT_FOREACH_SUBOBJECT(obj, tmp, tmp2)
   {
-    for (tmp = tmp2; tmp != NULL; tmp = OBJECT_EQUAL(tmp))
-    {
-      t_uint32 tel;
-
-      for (tel = 0; tel < OBJECT_NCODES(tmp); tel++)
-      {
-        if (AddressIsGe (address, SECTION_CADDRESS(OBJECT_CODE(tmp)[tel])))
-          if (AddressIsLt
-              (address,
-               AddressAdd (SECTION_CSIZE(OBJECT_CODE(tmp)[tel]),
-                           SECTION_CADDRESS(OBJECT_CODE(tmp)[tel]))))
-          {
-            printf ("Possible %s %s\n", OBJECT_NAME(tmp),
-                    SECTION_NAME(OBJECT_CODE(tmp)[tel]));
-            return OBJECT_CODE(tmp)[tel];
-          }
-      }
-
-      for (tel = 0; tel < OBJECT_NDATAS(tmp); tel++)
-        if (AddressIsGe (address, SECTION_CADDRESS(OBJECT_DATA(tmp)[tel])))
-          if (AddressIsLt
-              (address,
-               AddressAdd (SECTION_CSIZE(OBJECT_DATA(tmp)[tel]),
-                           SECTION_CADDRESS(OBJECT_DATA(tmp)[tel]))))
-          {
-            printf ("Possible %s %s\n", OBJECT_NAME(tmp),
-                    SECTION_NAME(OBJECT_DATA(tmp)[tel]));
-            return OBJECT_DATA(tmp)[tel];
-          }
-
-      for (tel = 0; tel < OBJECT_NNOTES(tmp); tel++)
-        if (AddressIsGe (address, SECTION_CADDRESS(OBJECT_NOTE(tmp)[tel])))
-          if (AddressIsLt
-              (address,
-               AddressAdd (SECTION_CSIZE(OBJECT_NOTE(tmp)[tel]),
-                           SECTION_CADDRESS(OBJECT_NOTE(tmp)[tel]))))
-          {
-            printf ("Possible %s %s\n", OBJECT_NAME(tmp),
-                    SECTION_NAME(OBJECT_NOTE(tmp)[tel]));
-            return OBJECT_NOTE(tmp)[tel];
-          }
-
-      for (tel = 0; tel < OBJECT_NRODATAS(tmp); tel++)
-        if (AddressIsGe (address, SECTION_CADDRESS(OBJECT_RODATA(tmp)[tel])))
-          if (AddressIsLt
-              (address,
-               AddressAdd (SECTION_CSIZE(OBJECT_RODATA(tmp)[tel]),
-                           SECTION_CADDRESS(OBJECT_RODATA(tmp)[tel]))))
-          {
-            printf ("Possible %s %s\n", OBJECT_NAME(tmp),
-                    SECTION_NAME(OBJECT_RODATA(tmp)[tel]));
-            return OBJECT_RODATA(tmp)[tel];
-          }
-
-      for (tel = 0; tel < OBJECT_NBSSS(tmp); tel++)
-      {
-        VERBOSE(0, ("@G\n", SECTION_CADDRESS(OBJECT_BSS(tmp)[tel])));
-        if (AddressIsGe (address, SECTION_CADDRESS(OBJECT_BSS(tmp)[tel])))
-          if (AddressIsLt
-              (address,
-               AddressAdd (SECTION_CSIZE(OBJECT_BSS(tmp)[tel]),
-                           SECTION_CADDRESS(OBJECT_BSS(tmp)[tel]))))
-          {
-            printf ("Possible %s %s\n", OBJECT_NAME(tmp),
-                    SECTION_NAME(OBJECT_BSS(tmp)[tel]));
-            return OBJECT_BSS(tmp)[tel];
-          }
-      }
-
-      for (tel = 0; tel < OBJECT_NDEBUGS(tmp); tel++)
-        if (AddressIsGe (address, SECTION_CADDRESS(OBJECT_DEBUG(tmp)[tel])))
-          if (AddressIsLt
-              (address,
-               AddressAdd (SECTION_CSIZE(OBJECT_DEBUG(tmp)[tel]),
-                           SECTION_CADDRESS(OBJECT_DEBUG(tmp)[tel]))))
-          {
-            printf ("Possible %s %s\n", OBJECT_NAME(tmp),
-                    SECTION_NAME(OBJECT_DEBUG(tmp)[tel]));
-            return OBJECT_DEBUG(tmp)[tel];
-          }
-
-      for (tel = 0; tel < OBJECT_NATTRIBS(tmp); tel++)
-        if (AddressIsGe (address, SECTION_CADDRESS(OBJECT_ATTRIB(tmp)[tel])))
-          if (AddressIsLt
-              (address,
-               AddressAdd (SECTION_CSIZE(OBJECT_ATTRIB(tmp)[tel]),
-                           SECTION_CADDRESS(OBJECT_ATTRIB(tmp)[tel]))))
-          {
-            printf ("Possible %s %s\n", OBJECT_NAME(tmp),
-                    SECTION_NAME(OBJECT_ATTRIB(tmp)[tel]));
-            return OBJECT_ATTRIB(tmp)[tel];
-          }
-
-    }
+    t_section* sec = SectionGetFromObjectByAddress(tmp, address);
+    if (sec)
+      return sec;
   }
   return NULL;
 }

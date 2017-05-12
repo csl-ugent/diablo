@@ -33,6 +33,7 @@ typedef struct
 extern uint32_t DIABLO_Mobility_binary[];
 extern MobileEntry DIABLO_Mobility_global_mobile_redirection_table[];
 extern uint32_t DIABLO_Mobility_GMRT_size;
+extern uint32_t DIABLO_Mobility_version;
 #pragma GCC visibility pop
 
 #ifdef LINKIN_AFTER

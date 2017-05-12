@@ -79,6 +79,11 @@ CodeMobilityTransformer::CodeMobilityTransformer (t_object* obj, t_const_string 
   resolve_sym = SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), GMRT_IDENTIFIER_PREFIX "Resolve");
   ASSERT(resolve_sym, ("Didn't find the symbols present in the binder object! Are you sure it was linked in?"));
 
+  /* Check whether we are dealing with the right binder version */
+  t_symbol* version_sym = SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), GMRT_IDENTIFIER_PREFIX "version");
+  t_uint32 version = SectionGetData32 (T_SECTION(SYMBOL_BASE(version_sym)), SYMBOL_OFFSET_FROM_START(version_sym));
+  ASSERT(version == binder_version, ("The binder version is %d, but Diablo expected version %d.", version, binder_version));
+
   LOG(L_TRANSFORMS, "START OF CODE MOBILITY LOG\n");
 }
 
