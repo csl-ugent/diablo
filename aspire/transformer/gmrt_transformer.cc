@@ -102,6 +102,9 @@ t_bool GMRTTransformer::CanTransformFunction (t_function* fun) const
   if (FUNCTION_IS_HELL(fun))
     return log_and_return_false("it's a hell function");
 
+  if (FUNCTION_CFG(fun) != cfg)
+    return log_and_return_false("it has already been transformed");
+
   if (FUNCTION_NAME(fun))
   {
     t_const_string reason = "this function plays a part in accessing the transformed code and thus can't be transformed itself";

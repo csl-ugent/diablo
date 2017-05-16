@@ -544,9 +544,12 @@ void AbstractTransformer::TransformFunction (t_function* fun, t_bool split_funct
     if (split_function_from_cfg)
     {
       /* Move BBL to new CFG */
-      CfgUnlinkNodeFromGraph(cfg, bbl);
-      CfgInsertNodeInGraph(new_cfg, bbl);
-      BBL_SET_CFG(bbl, new_cfg);
+      if (BBL_CFG(bbl) != new_cfg)
+      {
+        CfgUnlinkNodeFromGraph(cfg, bbl);
+        CfgInsertNodeInGraph(new_cfg, bbl);
+        BBL_SET_CFG(bbl, new_cfg);
+      }
 
       /* Move all instructions of the BBL to new CFG */
       t_ins* ins;
@@ -564,13 +567,16 @@ void AbstractTransformer::TransformFunction (t_function* fun, t_bool split_funct
           switch_bbl = TRUE;
 
         /* Move edge to new CFG */
-        CfgUnlinkEdgeFromGraph(cfg, edge);
-        CfgInsertEdgeInGraph(new_cfg, edge);
-        CFG_EDGE_SET_CFG(edge, new_cfg);
+        if (CFG_EDGE_CFG(edge) != new_cfg)
+        {
+          CfgUnlinkEdgeFromGraph(cfg, edge);
+          CfgInsertEdgeInGraph(new_cfg, edge);
+          CFG_EDGE_SET_CFG(edge, new_cfg);
+        }
 
         /* If the edge has a corresponding, move it as well */
         t_cfg_edge* corr = CFG_EDGE_CORR(edge);
-        if(corr)
+        if(corr && CFG_EDGE_CFG(corr) != new_cfg)
         {
           /* Move corr to new CFG */
           CfgUnlinkEdgeFromGraph(cfg, corr);
