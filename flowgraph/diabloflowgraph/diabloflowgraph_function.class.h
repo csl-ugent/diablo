@@ -80,6 +80,8 @@ MEMBER(t_uint32,size,SIZE)
  * here TODO */
 MEMBER(t_uint32,min_dfs,MIN_DFS)
 MEMBER(t_bool,behaves,BEHAVES)
+/* An id that uniquely identifies each function, and can be used to order functions */
+MEMBER(t_uint32, id, ID)
 
 /*!
  * \brief Create dummy exit blocks for a function
@@ -209,7 +211,9 @@ CONSTRUCTOR({  /* insert the function in the dll */
   FunctionInsertInCfg (cfg, ret);
   FUNCTION_SET_RET_REGS(ret, CFG_DESCRIPTION(cfg)->return_regs);
   FUNCTION_SET_ARG_REGS(ret, CFG_DESCRIPTION(cfg)->argument_regs);
-  FUNCTION_SET_BEHAVES(ret, TRUE);})
+  FUNCTION_SET_BEHAVES(ret, TRUE);
+  FUNCTION_SET_ID(ret, function_global_id++);
+})
 DESTRUCTOR({ FunctionUnlinkFromCfg ((t_CLASS *)to_free); if (FUNCTION_NAME(to_free)) Free(FUNCTION_NAME(to_free));  FunctionFreeMarkedSpace((t_CLASS *)to_free); })
 DIABLO_CLASS_END
 

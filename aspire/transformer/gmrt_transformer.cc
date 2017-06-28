@@ -470,7 +470,8 @@ void GMRTTransformer::TransformOutgoingEdgeImpl (t_bbl* bbl, t_cfg_edge* edge, t
     {
       /* Create new hell edge for target and adjust existing edge to go to hell */
       t_cfg_edge* ip = CfgEdgeCreate (target_cfg, CFG_HELL_NODE(target_cfg), T_BBL(CFG_EDGE_TAIL(edge)), ET_IPJUMP);
-      CfgEdgeCreateCompensating(target_cfg, ip);
+      if (FunctionGetExitBlock(BBL_FUNCTION(T_BBL(CFG_EDGE_TAIL(edge)))))/* Only create a compensating if possible */
+          CfgEdgeCreateCompensating(target_cfg, ip);
       CFG_EDGE_SET_FLAGS(ip, CFG_EDGE_FLAGS(ip) | transformed_hell_edge_flag);
       CfgEdgeChangeTail (edge, CFG_HELL_NODE(new_cfg));
       CFG_EDGE_SET_FLAGS(edge, CFG_EDGE_FLAGS(edge) | transformed_hell_edge_flag);
@@ -502,7 +503,8 @@ void GMRTTransformer::TransformOutgoingEdgeImpl (t_bbl* bbl, t_cfg_edge* edge, t
     {
       /* Create new hell edge for target and adjust existing edge to go to hell */
       t_cfg_edge* ip = CfgEdgeCreate (target_cfg, CFG_HELL_NODE(target_cfg), T_BBL(CFG_EDGE_TAIL(edge)), ET_IPJUMP);
-      CfgEdgeCreateCompensating(target_cfg, ip);
+      if (FunctionGetExitBlock(BBL_FUNCTION(T_BBL(CFG_EDGE_TAIL(edge)))))/* Only create a compensating if possible */
+        CfgEdgeCreateCompensating(target_cfg, ip);
       CFG_EDGE_SET_FLAGS(ip, CFG_EDGE_FLAGS(ip) | transformed_hell_edge_flag);
       CfgEdgeChangeTail (edge, CFG_HELL_NODE(new_cfg));
       CFG_EDGE_SET_CAT(edge, ET_IPJUMP);

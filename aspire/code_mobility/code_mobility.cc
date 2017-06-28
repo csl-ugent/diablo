@@ -326,7 +326,6 @@ void CodeMobilityTransformer::FinalizeTransform ()
       t_bbl* bbl;
       BblVector bbls;
       t_cfg* cfg = OBJECT_CFG(new_obj);
-      CfgComputeLiveness(cfg, CONTEXT_SENSITIVE);
       CFG_FOREACH_BBL(cfg, bbl)
         bbls.push_back(bbl);
 

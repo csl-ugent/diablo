@@ -133,6 +133,90 @@ t_uint64 NrExternalCallTargets(const BblSet& bbls, bool dynamic_coverage) {
   return functions_seen.size();
 }
 
+/* See comment about cyclomatic_complexity in EdgesInBbls: we count such function call targets here */
+/* The set of BBLs to compute metrics on can be a set of unconnected components, this number of components is used in computing the cyclomatic complexity.
+   We compute this based on the edges given (such that they can be filtered/extended appropriately for executed / external code
+   NOTE: this considers the CFG as undirected. */
+t_uint64 NrConnectedComponents(const BblSet& bbls, vector<t_cfg_edge*> edges, bool dynamic_coverage) {
+    if (bbls.empty())
+        return 0;
+
+    t_uint64 nr_components = 0;
+
+    BblSet global_bbls_to_visit = bbls;
+    set<t_cfg_edge*> edges_set;
+    BblSet visited;
+
+    for (auto edge: edges)
+        edges_set.insert(edge);
+
+    while (global_bbls_to_visit.size() > 0) {
+        t_bbl* bbl_start = *global_bbls_to_visit.begin();
+        global_bbls_to_visit.erase(global_bbls_to_visit.begin());
+
+        if (dynamic_coverage && BBL_EXEC_COUNT(bbl_start) == 0)
+            continue;
+
+        nr_components++;
+
+        /* Add all BBLs that are reachable from the first BBL from global_bbls_to_visit to the visited set, and remove them from global_bbls_to_visit */
+        vector<t_bbl*> to_visit_component;
+
+        to_visit_component.push_back(bbl_start);
+
+        while (to_visit_component.size() > 0) {
+            t_cfg_edge* edge;
+
+            t_bbl* bbl = to_visit_component.back();
+            to_visit_component.pop_back();
+
+            BBL_FOREACH_SUCC_EDGE(bbl, edge) {
+                if (edges_set.find(edge) == edges_set.end()) /* This is not an edge we are allowed to consider, this should also include the corresponding edges */
+                    continue;
+
+                t_bbl* tail = CFG_EDGE_TAIL(edge);
+
+                if (visited.find(tail) != visited.end())
+                    continue;
+
+                if (BBL_IS_HELL(tail))
+                    continue;
+
+                if (dynamic_coverage && CFG_EDGE_EXEC_COUNT(edge) == 0)
+                    continue;
+
+                visited.insert(tail);
+                to_visit_component.push_back(tail);
+
+                global_bbls_to_visit.erase(tail);
+            }
+            BBL_FOREACH_PRED_EDGE(bbl, edge) {
+                if (edges_set.find(edge) == edges_set.end()) /* This is not an edge we are allowed to consider, this should also include the corresponding edges */
+                    continue;
+
+                t_bbl* head = CFG_EDGE_HEAD(edge);
+
+                if (BBL_IS_HELL(head))
+                    continue;
+
+                if (visited.find(head) != visited.end())
+                    continue;
+
+                if (dynamic_coverage && CFG_EDGE_EXEC_COUNT(edge) == 0)
+                    continue;
+
+                visited.insert(head);
+                to_visit_component.push_back(head);
+
+                global_bbls_to_visit.erase(head);
+            }
+
+        }
+    }
+
+    return nr_components;
+}
+
 /* For both static and dynamic */
 static void PrintComplexityMetricsHeaderBase(FILE* f, t_const_string prefix)
 {
@@ -214,7 +298,7 @@ StaticComplexity BblsComputeStaticComplexity(const BblSet& bbls) {
     }
   }
 
-  complexity.metrics.cyclomatic_complexity = complexity.counts.nr_edges - (bbls.size()+NrExternalCallTargets(bbls, false /* dynamic_coverage */)) + 2;
+  complexity.metrics.cyclomatic_complexity = complexity.counts.nr_edges - (bbls.size()+NrExternalCallTargets(bbls, false /* dynamic_coverage */)) + 2 * NrConnectedComponents(bbls, edges_restricted, false /* dynamic_coverage */);
 
   return complexity;
 }
@@ -267,7 +351,7 @@ DynamicComplexity BblsComputeDynamicComplexity(const BblSet& bbls) {
     }
   }
 
-  complexity.metrics.cyclomatic_complexity = complexity.dynamic_size.nr_edges - (bbls.size()+NrExternalCallTargets(bbls, false /* dynamic_coverage */)) + 2;
+  complexity.metrics.cyclomatic_complexity = complexity.dynamic_size.nr_edges - (bbls.size()+NrExternalCallTargets(bbls, true /* dynamic_coverage */)) + 2 * NrConnectedComponents(bbls, edges_restricted, true /* dynamic_coverage */);
 
   return complexity;
 }

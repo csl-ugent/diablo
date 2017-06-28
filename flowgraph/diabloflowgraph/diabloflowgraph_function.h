@@ -149,4 +149,5 @@ void FunctionDrawGraphAnnotated (
 #endif
 /* }}} */
 #endif
+extern t_uint32 function_global_id;
 /* vim: set shiftwidth=2 expandtab cinoptions=p5,t0,(0, foldmethod=marker tw=80 cindent: */

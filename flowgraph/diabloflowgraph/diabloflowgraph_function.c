@@ -14,6 +14,12 @@
 #define EDGE_CALLFT_COLOR "green"
 #define EDGE_CALLFT_HEAD  "onormal"
 
+/* This counter is increased every time a new function is created and serves to
+ * give every function a unique ID, allowing t_function's to be ordered in a way that is
+ * not address-dependent.
+ */
+t_uint32 function_global_id = 0;
+
 /* {{{ constructor */
 t_function * FunctionMake(t_bbl * entrypoint, t_const_string name,  t_function_type ft) 
 {

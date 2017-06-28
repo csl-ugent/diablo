@@ -1208,6 +1208,64 @@ CfgDrawFunctionGraphsAnnotated (t_cfg * cfg, t_const_string dirprefix, void (*fu
 }
 
 void
+DrawFunctionGraphAnnotated (t_function * function, t_const_string dirprefix)
+{
+  t_string dirpref = StringDup (dirprefix);
+  t_string cleaned_fun_name = NULL;
+  int noname_count = 0;
+  char noname[20];
+
+  /* dirprefix is by default ./dots */
+  if (!dirpref)
+    dirpref = StringDup ("./dots");
+
+  /* remove trailing slash */
+  if (dirpref[strlen (dirpref) - 1] == '/')
+    dirpref[strlen (dirpref) - 1] = '\0';
+
+#ifdef DIABLOSUPPORT_HAVE_MKDIR
+  DirMake (dirpref, FALSE);
+#else
+  Free (dirpref);
+  dirpref = StringDup (".");
+#endif
+
+  t_string fname;
+
+  if (!FUNCTION_NAME(function))
+    sprintf (noname, "-noname-%d-", noname_count++);
+  else
+  {
+    char *c;
+
+    cleaned_fun_name = StringDup(FUNCTION_NAME(function));
+    c = cleaned_fun_name;
+    while (*c)
+    {
+      if (*c == '/')
+        *c = '_';
+      c++;
+    }
+
+    if (strlen(cleaned_fun_name) > 80)
+      sprintf(cleaned_fun_name + 70,"TRUNCATED");
+  }
+
+  if (FUNCTION_BBL_FIRST(function))
+    fname = StringIo ("%s/@G.func-%s.dot", dirpref, BBL_OLD_ADDRESS(FUNCTION_BBL_FIRST(function)), FUNCTION_NAME(function) ? cleaned_fun_name : noname);
+  else
+    fname = StringIo ("%s/0x%x.func-%s.dot", dirpref, 0, FUNCTION_NAME(function) ? cleaned_fun_name : noname);
+  if (FUNCTION_NAME(function)
+      && cleaned_fun_name)
+    Free(cleaned_fun_name);
+
+  FunctionDrawGraph (function, fname);
+  Free (fname);
+
+  Free (dirpref);
+}
+
+void
 CfgDrawFunctionGraphs (t_cfg * cfg, t_const_string dirprefix)
 {
   CfgDrawFunctionGraphsAnnotated (cfg, dirprefix, FunctionDrawGraph);
