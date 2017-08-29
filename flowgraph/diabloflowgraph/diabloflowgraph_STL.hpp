@@ -9,4 +9,11 @@ struct bblcmp {
 typedef std::set<t_bbl *, bblcmp> BblSet;
 typedef std::vector<t_bbl *> BblVector;
 
+struct functioncmp {
+  bool operator() (const t_function *lhs, const t_function *rhs) const
+  {return FUNCTION_ID(lhs) < FUNCTION_ID(rhs);}
+};
+typedef std::set<t_function *, functioncmp> FunctionSet;
+typedef std::vector<t_function *> FunctionVector;
+
 #endif

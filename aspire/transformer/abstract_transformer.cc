@@ -585,24 +585,55 @@ void AbstractTransformer::TransformFunction (t_function* fun, t_bool split_funct
         }
       }
 
-      /* If the BBL ends in a switch we need to move the switch BBL to the new CFG as well */
-      if (switch_bbl && (ARM_INS_OPCODE(T_ARM_INS(BBL_INS_LAST(bbl)))==ARM_LDR))
+      /* If the BBL ends in a switch we need to move the potential switch BBL to the new CFG as well */
+      if (switch_bbl)
       {
-        t_bbl *switchtable = NULL;
-        t_reloc *rel;
+        BBL_FOREACH_SUCC_EDGE(bbl, edge)
+          if (CfgEdgeTestCategoryOr(edge, ET_SWITCH | ET_IPSWITCH))
+            break;
 
-        ASSERT (BBL_INS_LAST (bbl), ("switch without instructions"));
-        ASSERT (INS_REFERS_TO (BBL_INS_LAST (bbl)), ("gcc-style switch should have relocation attached"));
-        rel = RELOC_REF_RELOC (INS_REFERS_TO (BBL_INS_LAST (bbl)));
-        switchtable = T_BBL(RELOC_TO_RELOCATABLE (rel)[0]);
-        ASSERT (IS_DATABBL (switchtable), ("switch table not found?"));
-        if (!(IS_SWITCH_TABLE(switchtable)))
-          FATAL(("No switch table for switch @ieB\n",bbl));
+        t_bbl* target = CFG_EDGE_TAIL(edge);
+
+        t_reloc_ref* rr = BBL_REFED_BY(target);
+        t_bbl* switchtable = NULL;
+        while (rr)
+        {
+          /* Get reloc and go to next */
+          t_reloc* reloc = RELOC_REF_RELOC(rr);
+          rr = RELOC_REF_NEXT(rr);
+
+          t_bbl* candidate = INS_BBL(T_INS(RELOC_FROM(reloc)));
+          if (IS_DATABBL(candidate))
+          {
+            switchtable = candidate;
+            break;
+          }
+        }
 
         /* Move switchtable to new CFG */
-        CfgUnlinkNodeFromGraph(cfg, switchtable);
-        CfgInsertNodeInGraph(new_cfg, switchtable);
-        BBL_SET_CFG(switchtable, new_cfg);
+        if (switchtable != NULL)
+        {
+          CfgUnlinkNodeFromGraph(cfg, switchtable);
+          CfgInsertNodeInGraph(new_cfg, switchtable);
+          BBL_SET_CFG(switchtable, new_cfg);
+
+          /* Move all instructions of the BBL to new CFG */
+          t_ins* ins;
+          BBL_FOREACH_INS(switchtable, ins)
+            INS_SET_CFG(ins, new_cfg);
+
+          /* Move all relocations associated with the table to the new object's reloc table */
+          BBL_FOREACH_INS(switchtable, ins)
+          {
+            t_reloc_ref* rr = INS_REFERS_TO(ins);
+            while (rr)
+            {
+              /* Move reloc and go to next */
+              RelocMoveToRelocTable(RELOC_REF_RELOC(rr), OBJECT_RELOC_TABLE(new_obj));
+              rr = RELOC_REF_NEXT(rr);
+            }
+          }
+        }
       }
     }
 

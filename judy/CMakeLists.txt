@@ -37,7 +37,7 @@ macro(judygen name define output)
   add_custom_command(
     OUTPUT  ${output}
     DEPENDS ${name}
-    COMMAND ${name}
+    COMMAND ./${name}
     COMMENT "Generating Judy tables for ${define}")
 endmacro()
 
