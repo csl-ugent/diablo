@@ -252,7 +252,7 @@ AnnotationRequests ParseAnnotationContent(const Annotation *annotation)
     }
 
     /* Move pos along and do logging */
-    logInfo.text = annotation_content.substr(annotation_start_pos, protection_len);
+    logInfo.text = annotation_content.substr(protection_start_pos, protection_len);
     pos = skip_spaces(annotation_content, protection_end_pos);
 
     if (pos != string::npos && pos < annotation_content.length()) {
