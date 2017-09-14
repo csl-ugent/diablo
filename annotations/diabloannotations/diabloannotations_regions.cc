@@ -489,9 +489,9 @@ void RegionAddBbl(Region *region, t_bbl *bbl)
 /* This function iterates over all the BBL's in the region and inserts their function to the unordered_set
  * (no duplicates allowed, this is handled by the insert call).
  */
-OrderedFunctionSet RegionGetAllFunctions(const Region* region)
+FunctionSet RegionGetAllFunctions(const Region* region)
 {
-  OrderedFunctionSet functions;
+  FunctionSet functions;
   t_bbl* bbl;
   REGION_FOREACH_BBL(region, bbl)
   {

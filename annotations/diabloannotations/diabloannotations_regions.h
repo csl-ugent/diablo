@@ -37,12 +37,6 @@ typedef std::set<Region *, regioncmp> Regions;
 
 /* FUNCTIONS */
 
-struct funcmp {
-  bool operator() (const t_function* lhs, const t_function* rhs) const
-  {return (StringCmp(FUNCTION_NAME(lhs), FUNCTION_NAME(rhs)) < 0);}
-};
-typedef std::set<t_function*, funcmp> OrderedFunctionSet;
-
 void RegionsInit(const Annotations& annotations, t_cfg *cfg);
 void RegionsFini(t_cfg *cfg);
 
@@ -53,7 +47,7 @@ void CreateRegionsFromAnnotationsAndAnnotateBbls(t_cfg *cfg, const Annotations& 
 void ExpandRegionToCalleesOfDepth(Region* region, int call_depth);
 
 void RegionAddBbl(Region *region, t_bbl *bbl);
-OrderedFunctionSet RegionGetAllFunctions(const Region* region);
+FunctionSet RegionGetAllFunctions(const Region* region);
 
 void IoModifierBblRegions(t_bbl *bbl, t_string_array* array);
 void BblRemoveFromRegion(Region *region, t_bbl *bbl);
