@@ -650,9 +650,16 @@ void GMRTTransformer::TransformBbl (t_bbl* bbl)
       {
         /* Also: make sure we do not transform address producers that have a mobile section as their to relocatable, but
          * move it to the relocation table of the transformed object.
+         * If the ADR is internal, move it to the relocation table of the transformed object. An internal ADR refers to:
+         * - a mobile section
+         * - a switch table that is part of the transformed function
          */
-        if((RELOC_N_TO_RELOCATABLES(rel) == 1) && (RELOCATABLE_RELOCATABLE_TYPE(RELOC_TO_RELOCATABLE(rel)[0]) == RT_SUBSECTION)
+        if ((RELOC_N_TO_RELOCATABLES(rel) == 1) && (
+              /* Mobile section */
+            ((RELOCATABLE_RELOCATABLE_TYPE(RELOC_TO_RELOCATABLE(rel)[0]) == RT_SUBSECTION)
             && (mobile_sections.find(T_SECTION(RELOC_TO_RELOCATABLE(rel)[0])) != mobile_sections.end()))
+            /* Switch table */
+            || ((RELOCATABLE_RELOCATABLE_TYPE(RELOC_TO_RELOCATABLE(rel)[0]) == RT_BBL) && (BBL_CFG(T_BBL(RELOC_TO_RELOCATABLE(rel)[0])) == new_cfg))))
           RelocMoveToRelocTable(rel, OBJECT_RELOC_TABLE(new_objs.back()));
         else
           TransformAddressProducer(arm_ins);
