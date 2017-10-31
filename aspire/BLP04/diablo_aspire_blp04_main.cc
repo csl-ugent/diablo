@@ -274,8 +274,7 @@ main (int argc, char **argv)
 
         if (global_options.self_profiling)
         {
-          reachable_vector.push_back(FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "print");
-          reachable_vector.push_back(FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "Init");
+          reachable_vector.push_back(SP_IDENTIFIER_PREFIX "Init");
         }
 
         /* first, try to find the vmExecute function */

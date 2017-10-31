@@ -44,75 +44,46 @@ struct _t_ins_he
 static t_symbol* nr_of_bbls_sym  = NULL;
 static t_symbol* output_name_sym = NULL;
 static t_symbol* ps_sym = NULL;
-static t_symbol* init_sym = NULL;
-static t_symbol* print_sym = NULL;
-static t_section* profiling_sec = NULL;
-static t_section* name_sec = NULL;
 
 /* This function initializes self-profiling by linking in the profiling object (and any other necessary objects)
  * and performing some initialization on it.
  */
 void SelfProfilingInit (t_object* obj, t_string profiling_object_path)
 {
-  /* If the object doesn't have a PLT, check whether all needed symbols are already present in the binary. If not, link in their objects. */
-  if(OBJECT_DYNAMIC_SYMBOL_TABLE(obj) == NULL)
+  /* Depending on whether the path is that of an actual object, link it in or
+   * assume it is already present.
+   */
+  if (StringPatternMatch("*.o", profiling_object_path))
   {
-    if(!SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), "fopen"))
-      LinkObjectFileNew (obj, "libc.a:fopen.o", "", FALSE, FALSE, NULL);
+    /* If the object doesn't have a PLT, check whether all needed symbols are already present in the binary. If not, link in their objects. */
+    if(OBJECT_DYNAMIC_SYMBOL_TABLE(obj) == NULL)
+    {
+      if(!SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), "fopen"))
+        LinkObjectFileNew (obj, "libc.a:fopen.o", "", FALSE, FALSE, NULL);
 
-    if(!SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), "fwrite"))
-      LinkObjectFileNew (obj, "libc.a:fwrite.o", "", FALSE, FALSE, NULL);
+      if(!SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), "fwrite"))
+        LinkObjectFileNew (obj, "libc.a:fwrite.o", "", FALSE, FALSE, NULL);
 
-    if(!SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), "fclose"))
-      LinkObjectFileNew (obj, "libc.a:fclose.o", "", FALSE, FALSE, NULL);
+      if(!SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), "fclose"))
+        LinkObjectFileNew (obj, "libc.a:fclose.o", "", FALSE, FALSE, NULL);
+    }
+
+    /* Link in the actual profiling object */
+    LinkObjectFileNew (obj, profiling_object_path, PREFIX_FOR_LINKED_IN_SP_OBJECT, FALSE, TRUE, NULL);
   }
-
-  /* Link in the actual profiling object */
-  LinkObjectFileNew (obj, profiling_object_path, PREFIX_FOR_LINKED_IN_PROFILING_OBJECT, FALSE, TRUE, NULL);
 
   /* Initialization: some things that have to be performed on the linked in profiling object before flowgraphing */
-  nr_of_bbls_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "nr_of_bbls");
-  output_name_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "output_name");
-  ps_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "profilingSection");
-  print_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "print");
-  init_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "Init");
-  t_section* data_sec;
-  t_reloc* rel;
+  nr_of_bbls_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), SP_IDENTIFIER_PREFIX "nr_of_bbls");
+  output_name_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), SP_IDENTIFIER_PREFIX "output_name");
+  ps_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), SP_IDENTIFIER_PREFIX "data");
+  t_symbol* init_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), SP_IDENTIFIER_PREFIX "Init");
 
   /* Check if all symbols were found */
-  ASSERT(ps_sym && nr_of_bbls_sym && output_name_sym && (print_sym || init_sym), ("Didn't find all symbols present in the print object! Are you sure this object was linked in?"));
+  ASSERT(ps_sym && nr_of_bbls_sym && output_name_sym && init_sym, ("Didn't find all symbols present in the print object! Are you sure this object was linked in?"));
 
-  /* Find the data section from the linked in object and add new subsections. We want to add new subsections with a size 0
-   * so we'll have relocations to actual sections in stead of the *UNDEF* sections for the extern variables from the print object.
-   * This way Diablo will recognize the right instructions as being AddressProducers in stead of ConstantProducers. The subsections
-   * will be filled in with actual content later on in CfgAddSelfProfiling.
-   */
-  data_sec = T_SECTION(SYMBOL_BASE(nr_of_bbls_sym));
-  profiling_sec = SectionCreateForObject (SECTION_OBJECT(data_sec), DATA_SECTION, SECTION_PARENT_SECTION(data_sec),
-   AddressNullForObject(obj), ".profilingSection");
-  SymbolSetBase(ps_sym, T_RELOCATABLE(profiling_sec));
-  SECTION_SET_ALIGNMENT(profiling_sec, 0x10);
-  name_sec = SectionCreateForObject (SECTION_OBJECT(data_sec), DATA_SECTION, SECTION_PARENT_SECTION(data_sec),
-   AddressNullForObject(obj), ".output_name");
-  SymbolSetBase(output_name_sym, T_RELOCATABLE(name_sec));
-  SECTION_SET_ALIGNMENT(name_sec, 0x10);
-
-  for (rel = RELOC_TABLE_FIRST(OBJECT_RELOC_TABLE(obj)); rel != NULL; rel = RELOC_NEXT(rel))
-  {
-    if (RELOC_LABEL(rel))
-    {
-      if (StringPatternMatch("*" FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "profilingSection", RELOC_LABEL(rel)))
-      {
-        RelocSetToRelocatable(rel, 0, T_RELOCATABLE(profiling_sec));
-        continue;
-      }
-      if (StringPatternMatch("*" FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "output_name", RELOC_LABEL(rel)))
-      {
-        RelocSetToRelocatable(rel, 0, T_RELOCATABLE(name_sec));
-        continue;
-      }
-    }
-  }
+  /* Adapt the program so before start the initialization routine is executed */
+  if (SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_SP_OBJECT "Init"))
+      DiabloBrokerCall ("AddInitializationRoutine", obj, init_sym);
 }
 
 /* Add self-profiling to an object. This assumes print-object containing the code to print out the profiling information
@@ -125,7 +96,7 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
   t_uint32 size;
   t_cfg* cfg = OBJECT_CFG(obj);
   t_string base_name = FileNameBase(output_name);
-  t_string filename = StringConcat3("profiling_section", ".", base_name);
+  t_string filename = StringConcat2("profiling_data.", base_name);
   t_bbl** list = Malloc(sizeof(t_bbl*));
   t_bool have_line_number_info = FALSE;
   list[0] = NULL;
@@ -163,7 +134,7 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
   {
     /* Make sure it isn't empty, a DATA-BBL, or part of the linked in code */
     if ((BBL_NINS(bbl) != 0) && !IS_DATABBL(bbl) &&
-        (!BBL_FUNCTION(bbl) || !FUNCTION_NAME(BBL_FUNCTION(bbl)) || !StringPatternMatch (PREFIX_FOR_LINKED_IN_PROFILING_OBJECT"*", FUNCTION_NAME(BBL_FUNCTION(bbl)))))
+        (!BBL_FUNCTION(bbl) || !FUNCTION_NAME(BBL_FUNCTION(bbl)) || !StringPatternMatch (PREFIX_FOR_LINKED_IN_SP_OBJECT"*", FUNCTION_NAME(BBL_FUNCTION(bbl)))))
     {
       list = Realloc(list, (nr_of_bbls+2)*sizeof(t_bbl*));
       list[nr_of_bbls] = bbl;
@@ -178,12 +149,15 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
   /* For every BBL to be profiled this section contains its address in the original program (in 64-bit for compatibility),
    * and the number of times it has been executed (also 64-bit value).
    */
+  t_section* profiling_sec = T_SECTION(SYMBOL_BASE(ps_sym));
   size = (nr_of_bbls)*2*sizeof (t_uint64);
-  SECTION_SET_DATA(profiling_sec, Calloc (1, AddressExtractUint32 (size)));
+  SECTION_SET_DATA(profiling_sec, Realloc(SECTION_DATA(profiling_sec), size));
+  memset(SECTION_DATA(profiling_sec), 0, size);
   SECTION_SET_CSIZE(profiling_sec, size);
 
+  t_section* name_sec = T_SECTION(SYMBOL_BASE(output_name_sym));
   size = strlen (filename) + 1;
-  SECTION_SET_DATA(name_sec, Calloc (1, AddressExtractUint32 (size)));
+  SECTION_SET_DATA(name_sec, Realloc(SECTION_DATA(name_sec), size));
   SECTION_SET_CSIZE(name_sec, size);
   memcpy (SECTION_DATA(name_sec), filename, strlen (filename) + 1);
   Free(filename);
@@ -267,14 +241,6 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
 
   /* Cleanup and exit */
   Free(list);
-
-  /* If the initialization routine is present, install it as such. If not,
-   * install the print routine as a finalization routine.
-   */
-  if (init_sym)
-    DiabloBrokerCall ("AddInitializationRoutine", obj, init_sym);
-  else
-    DiabloBrokerCall ("AddFinalizationRoutine", obj, print_sym);
 
   STATUS(STOP, ("Adding self-profiling"));
 }
@@ -927,8 +893,8 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
 
         if (!node)
         {
-          // if (count>0)
-          // FATAL(("node not found for profile information 0x%x\n",value));
+          if (count>0)
+            FATAL(("node not found for profile information 0x%x\n",value));
         }
         else
         {

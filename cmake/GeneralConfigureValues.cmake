@@ -28,3 +28,5 @@ check_include_files(libgen.h HAVE_LIBGEN_H)
 check_include_files(sys/stat.h HAVE_SYS_STAT_H)
 check_include_files(sys/types.h HAVE_SYS_TYPES_H)
 check_include_files(sys/wait.h HAVE_SYS_WAIT_H)
+
+check_type_size("void *" MY_SIZEOF_VOIDP)

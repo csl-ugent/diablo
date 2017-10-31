@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 2.8.12)
 cmake_policy(VERSION 2.8.12)
+if (POLICY CMP0069)
+  cmake_policy(SET CMP0069 NEW)
+endif()
 project(diablo)
 
 # Versioning
@@ -8,9 +11,16 @@ set(DIABLO_MINOR_VERSION 9)
 set(DEB_PACKAGE_VERSION 1)
 
 include(CMakeDependentOption)
+include(cmake/LTO.cmake)
 include(cmake/VersionFromVCS.cmake)
 include(cmake/functions_macros.cmake)
 include(cmake/GeneralConfigureValues.cmake)# These need to be included/generated *before* we use their values
+
+if (NOT ${MY_SIZEOF_VOIDP} EQUAL ${CMAKE_SIZEOF_VOID_P})
+  message(FATAL_ERROR "Detected pointer size is ${MY_SIZEOF_VOIDP}, but cached value is ${CMAKE_SIZEOF_VOID_P}. \
+This is probably because you have reconfigured the build system to generate another type of target binary (e.g., now 64-bit instead of 32-bit). \
+This is not possible because of the cached value of CMAKE_SIZEOF_VOID_P. You need to create a new build directory and start from scratch.")
+endif()
 
 find_package(BISON)
 find_package(FLEX)

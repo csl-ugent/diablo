@@ -84,78 +84,85 @@ void CfgDynamicComplexityFini() {
   dynamic_compl_file = NULL;
 }
 
+/* When computing the cyclomatic complexity (or any other metric, for that matter), it is
+   important that the sets of edges and BBLs on which they are computed are consistend with one
+   another. In particular, when we filter unexecuted edges/BBLs when computing dynamic metrics,
+   and when we compute the connected components on them, it is important that we don't
+   have different criteria to count BBLs/edges in the different functions that then are
+   combined together in the complexity computation. Hence, we here compute these sets
+   all in one go, and the subsequent complexity computations should be based on these, and
+   *not* start to arbitrarily filtering them afterwards. If that would be required,
+   we should implement another function like this that explicitly creates coherent sets
+   of them */
 
-/* Get all (outgoing) edges originating in the set of BBLs that also end up in this set of BBLs.
-   If function calls occur to functions that are not part of the edge set, two behaviors can occur:
-   - keep those edges (interesting for cyclomatic_complexity, which otherwise might become a VERY negative number!
+struct RestrictedCfg {
+  BblSet bbls;
+  vector<t_cfg_edge*> edges;
+};
+
+/* If function calls occur to functions that are not part of the edge set, two behaviors can occur:
+   - keep those edges (interesting for cyclomatic_complexity)
    - drop those edges
+   For now, though, we *drop* those edges (TODO): were we to keep the edges, all remaining logic would
+   need to also be follow edges into this function / out of this function through following (cfg) edges,
+   without including the function itself in the complexity computation, or take these as special cases
+   into account.
    */
-vector<t_cfg_edge*> EdgesInBbls(const BblSet& bbls, bool keep_leaving_call_edges=true, bool dynamic_coverage=false) {
-  vector<t_cfg_edge*> edges_restricted;
+
+/* From a set of BBLs, get the RestrictedCfg with the edges that only come from AND go to edges in the BblSet
+   TODO: this is probably where (part of?) the keep_leaving_call_edges=true should be reinstated */
+RestrictedCfg CreateRestrictCfg(const BblSet& bbls) {
+  RestrictedCfg restricted;
+  restricted.bbls = bbls;
 
   t_cfg_edge* edge;
   for (auto bbl: bbls) {
+    /* We do not iterate over the PRED_EDGEs: if an edge is from AND to a bbl in the BblSet,
+       we will pick it up in any case, and that is the only case that will allow us to include
+       it in the return set */
     BBL_FOREACH_SUCC_EDGE(bbl, edge) {
-      if (dynamic_coverage && CFG_EDGE_EXEC_COUNT(edge) == 0 && !BBL_IS_HELL(CFG_EDGE_HEAD(edge)))
-        continue;
-
-      if (bbls.find(CFG_EDGE_TAIL(edge)) != bbls.end()) {
-        edges_restricted.push_back(edge);
-      } else if (keep_leaving_call_edges && CFG_EDGE_CAT(edge) == ET_CALL) {
-        edges_restricted.push_back(edge);
-        /* Since the call target is not in the region, we'll never see the corresponding edge, add it manually: */
-        if (CFG_EDGE_CORR(edge))
-          edges_restricted.push_back(CFG_EDGE_CORR(edge));
+      if (   (bbls.find(CFG_EDGE_TAIL(edge)) != bbls.end())
+          && (bbls.find(CFG_EDGE_HEAD(edge)) != bbls.end()) ) {
+        restricted.edges.push_back(edge);
       }
     }
+    /* TODO: Right now, this excludes all edges to/from HELL except when considering the 'entire program' region */
   }
 
-  return edges_restricted;
+  return restricted;
 }
 
-/* See comment about cyclomatic_complexity in EdgesInBbls: we count such function call targets here */
-t_uint64 NrExternalCallTargets(const BblSet& bbls, bool dynamic_coverage) {
-  set<t_bbl*> functions_seen;
-  t_cfg_edge* edge;
+BblSet ExecutedBbls(const BblSet& bbls) {
+  BblSet executed;
 
   for (auto bbl: bbls) {
-    BBL_FOREACH_SUCC_EDGE(bbl, edge) {
-      /* TODO: verify if the edge counts of hell edges (in particular to library functions) are correctly computed */
-      if (dynamic_coverage && CFG_EDGE_EXEC_COUNT(edge) == 0 && !BBL_IS_HELL(CFG_EDGE_HEAD(edge)))
-        continue;
-
-      if (bbls.find(CFG_EDGE_TAIL(edge)) == bbls.end() && CFG_EDGE_CAT(edge) == ET_CALL) {
-        functions_seen.insert(CFG_EDGE_TAIL(edge));
-      }
+    if (BBL_EXEC_COUNT(bbl) > 0) {
+      executed.insert(bbl);
     }
   }
 
-  return functions_seen.size();
+  return executed;
 }
 
-/* See comment about cyclomatic_complexity in EdgesInBbls: we count such function call targets here */
 /* The set of BBLs to compute metrics on can be a set of unconnected components, this number of components is used in computing the cyclomatic complexity.
    We compute this based on the edges given (such that they can be filtered/extended appropriately for executed / external code
    NOTE: this considers the CFG as undirected. */
-t_uint64 NrConnectedComponents(const BblSet& bbls, vector<t_cfg_edge*> edges, bool dynamic_coverage) {
-    if (bbls.empty())
+t_uint64 NrConnectedComponents(const RestrictedCfg& cfg) {
+    if (cfg.bbls.empty())
         return 0;
 
     t_uint64 nr_components = 0;
 
-    BblSet global_bbls_to_visit = bbls;
+    BblSet global_bbls_to_visit = cfg.bbls;
     set<t_cfg_edge*> edges_set;
     BblSet visited;
 
-    for (auto edge: edges)
+    for (auto edge: cfg.edges)
         edges_set.insert(edge);
 
     while (global_bbls_to_visit.size() > 0) {
         t_bbl* bbl_start = *global_bbls_to_visit.begin();
         global_bbls_to_visit.erase(global_bbls_to_visit.begin());
-
-        if (dynamic_coverage && BBL_EXEC_COUNT(bbl_start) == 0)
-            continue;
 
         nr_components++;
 
@@ -179,12 +186,6 @@ t_uint64 NrConnectedComponents(const BblSet& bbls, vector<t_cfg_edge*> edges, bo
                 if (visited.find(tail) != visited.end())
                     continue;
 
-                if (BBL_IS_HELL(tail))
-                    continue;
-
-                if (dynamic_coverage && CFG_EDGE_EXEC_COUNT(edge) == 0)
-                    continue;
-
                 visited.insert(tail);
                 to_visit_component.push_back(tail);
 
@@ -196,13 +197,7 @@ t_uint64 NrConnectedComponents(const BblSet& bbls, vector<t_cfg_edge*> edges, bo
 
                 t_bbl* head = CFG_EDGE_HEAD(edge);
 
-                if (BBL_IS_HELL(head))
-                    continue;
-
                 if (visited.find(head) != visited.end())
-                    continue;
-
-                if (dynamic_coverage && CFG_EDGE_EXEC_COUNT(edge) == 0)
                     continue;
 
                 visited.insert(head);
@@ -282,15 +277,11 @@ StaticComplexity BblsComputeStaticComplexity(const BblSet& bbls) {
     }
   }
 
-  auto edges_restricted = EdgesInBbls(bbls, true /* keep_leaving_call_edges */, false /* dynamic_coverage */);
+  RestrictedCfg restricted = CreateRestrictCfg(bbls);
 
-  for (auto edge: edges_restricted) {
-    /* We definitely don't count edges *from* HELL, we only count the instructions's edges that go to hell */
-    if (BBL_IS_HELL(CFG_EDGE_HEAD(edge)))
-      continue;
+  complexity.counts.nr_edges = restricted.edges.size();
 
-    complexity.counts.nr_edges++;
-
+  for (auto edge: restricted.edges) {
     if (!IsCfgEdgeDirect(edge, TRUE /* are_switches_direct_edges */)) {
       complexity.counts.nr_indirect_edges++;
 
@@ -298,7 +289,7 @@ StaticComplexity BblsComputeStaticComplexity(const BblSet& bbls) {
     }
   }
 
-  complexity.metrics.cyclomatic_complexity = complexity.counts.nr_edges - (bbls.size()+NrExternalCallTargets(bbls, false /* dynamic_coverage */)) + 2 * NrConnectedComponents(bbls, edges_restricted, false /* dynamic_coverage */);
+  complexity.metrics.cyclomatic_complexity = (t_int64) restricted.edges.size() - (t_int64) restricted.bbls.size() + 2 * (t_int64) NrConnectedComponents(restricted);
 
   return complexity;
 }
@@ -330,16 +321,18 @@ DynamicComplexity BblsComputeDynamicComplexity(const BblSet& bbls) {
     }
   }
 
-  auto edges_restricted = EdgesInBbls(bbls, true /* keep_leaving_call_edges */, true /* dynamic_coverage */);
+  RestrictedCfg restricted = CreateRestrictCfg(ExecutedBbls(bbls));
 
-  for (auto edge: edges_restricted) {
-    /* We definitely don't count edges *from* HELL, we only count the instructions's edges that go to hell */
-    if (BBL_IS_HELL(CFG_EDGE_HEAD(edge)))
-      continue;
+  /* We can filter away the unexecuted edges, as we filter away from the already restricted set, and edges do not influence which Bbls should
+     be in the restricted BblSet. */
+  for (auto it = restricted.edges.begin(); it != restricted.edges.end() ; /* explicit in the loop! */) {
+    if ( CFG_EDGE_EXEC_COUNT(*it) == 0 )
+      it = restricted.edges.erase(it);
+    else
+      ++it;
+  }
 
-    if (CFG_EDGE_EXEC_COUNT(edge) == 0)
-      continue;
-
+  for (auto edge: restricted.edges) {
     complexity.dynamic_size.nr_edges += CFG_EDGE_EXEC_COUNT(edge);
     complexity.dynamic_coverage.nr_edges += 1;
 
@@ -351,7 +344,7 @@ DynamicComplexity BblsComputeDynamicComplexity(const BblSet& bbls) {
     }
   }
 
-  complexity.metrics.cyclomatic_complexity = complexity.dynamic_size.nr_edges - (bbls.size()+NrExternalCallTargets(bbls, true /* dynamic_coverage */)) + 2 * NrConnectedComponents(bbls, edges_restricted, true /* dynamic_coverage */);
+  complexity.metrics.cyclomatic_complexity = (t_int64) restricted.edges.size() - (t_int64) restricted.bbls.size() + 2 * (t_int64) NrConnectedComponents(restricted);
 
   return complexity;
 }

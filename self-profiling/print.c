@@ -4,46 +4,46 @@
 
 #include <signal.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
-/* Some typedefs */
-typedef unsigned int t_uint32;
-typedef unsigned long long int t_uint64;
-typedef char* t_string;
-
-/* We declare these variables extern as they have to be filled in by Diablo, but 
- * set their visibility to hidden so they won't end up in the GOT (Diablo can't succesfully
- * add GOT variables yet). For information about this pragma, see https://gcc.gnu.org/wiki/Visibility
- */
-#pragma GCC visibility push(hidden)
-extern t_uint32 DIABLO_nr_of_bbls;
-extern char DIABLO_output_name[];
-extern t_uint64 DIABLO_profilingSection[];
-#pragma GCC visibility pop
+/* The functions that will be used by Diablo */
+#ifdef LINKIN_AFTER
+void DIABLO_Profiling_Init();
+#else
+/* Make this function an initialization routine, executed as late as possible (because of the fork */
+void DIABLO_Profiling_Init() __attribute__((constructor(65500)));
+#endif
 
 /* Global variables, already initialize them so they won't end up in BSS section */
-t_uint32 DIABLO_nr_of_bbls = 42;
+uint64_t DIABLO_Profiling_data[] __attribute__((section (".data.profiling_data"))) = { 0 };
+size_t DIABLO_Profiling_nr_of_bbls = 42;
+char DIABLO_Profiling_output_name[] __attribute__((section (".data.profiling_output_name"))) = "noname";
 
-#ifdef SIGNAL
 static void print()
-#else
-void DIABLO_print()
-#endif
 {
   /* Remember how often we have dumped the section already */
-  static t_uint64 nr_of_times_written = 0;
-  const t_uint64 nr_of_bbls = DIABLO_nr_of_bbls;/* Cast to t_uint64 */
+  static uint64_t nr_of_times_written = 0;
+  const uint64_t nr_of_bbls = DIABLO_Profiling_nr_of_bbls;/* Cast to uint64_t */
 
   /* Open the file */
-  FILE* fd = fopen(DIABLO_output_name, "a");
+  FILE* fd = fopen(DIABLO_Profiling_output_name, "a");
+  if (!fd)
+  {
+    /* If we can't open a file in the current directory (as might happen in Android), create it in /data/ */
+    char filename[256] = "/data/";
+    strncpy(filename + strlen(filename), DIABLO_Profiling_output_name, sizeof(filename) - (strlen(filename)));
+    fd = fopen(filename, "a");
+  }
 
   /* Write some metadata */
-  fwrite(&nr_of_bbls, sizeof(t_uint64), 1, fd);
-  fwrite(&nr_of_times_written, sizeof(t_uint64), 1, fd);
+  fwrite(&nr_of_bbls, sizeof(uint64_t), 1, fd);
+  fwrite(&nr_of_times_written, sizeof(uint64_t), 1, fd);
   nr_of_times_written++;
 
   /* Dump profiling section */
-  fwrite((void*) DIABLO_profilingSection, 2 * sizeof(t_uint64), DIABLO_nr_of_bbls, fd);
+  fwrite((void*) DIABLO_Profiling_data, 2 * sizeof(uint64_t), DIABLO_Profiling_nr_of_bbls, fd);
 
   /* Close file */
   fclose(fd);
@@ -53,8 +53,7 @@ void DIABLO_print()
  * For dynamically linked applications we can handle this in a cleaner fashion by installing an initialization routine (that also installs a signal handler).
  * The problem is that we can't link in any amount of functionality in a statically linked application in Diablo.
  */
-#ifdef SIGNAL
-void DIABLO_Init()
+void DIABLO_Profiling_Init()
 {
   /* Install the print routine to be executed when the SIGUSR2 signal is sent */
   signal(SIGUSR2, print);
@@ -68,4 +67,3 @@ void DIABLO_Init()
   on_exit(print, NULL);
 #endif
 }
-#endif

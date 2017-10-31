@@ -92,8 +92,7 @@ main (int argc, char **argv)
 
         if (global_options.self_profiling)
         {
-          reachable_vector.push_back(FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "print");
-          reachable_vector.push_back(FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "Init");
+          reachable_vector.push_back(FINAL_PREFIX_FOR_LINKED_IN_SP_OBJECT "Init");
         }
 
         t_const_string const *force_reachable_funs = stringVectorToConstStringArray(reachable_vector);

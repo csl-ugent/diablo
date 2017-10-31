@@ -262,7 +262,7 @@ main (int argc, char **argv)
         if (global_options.self_profiling)
           {
             t_const_string force_reachable[2];
-            force_reachable[0] = FINAL_PREFIX_FOR_LINKED_IN_PROFILING_OBJECT "print";
+            force_reachable[0] = FINAL_PREFIX_FOR_LINKED_IN_SP_OBJECT "Init";
             force_reachable[1] = NULL;
             ObjectFlowgraph (obj, NULL, force_reachable, FALSE);
           }

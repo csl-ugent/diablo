@@ -839,6 +839,8 @@ void FunctionDrawGraphAnnotated(
 	    bbl_data.fillcolor = StringDup("red");
 	    sprintf(nodename,"i%p",tail); /* tail will be the hell node */
 	    bbl_data.label = StringDup("HELL");
+      if (CFG_EDGE_CORR(edge))
+        draw_link = TRUE;
 	    break;
 	  case ET_IPUNKNOWN:
 	    edge_data.style = StringDup(EDGE_IP_STYLE);

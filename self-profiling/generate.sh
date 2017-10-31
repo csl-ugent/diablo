@@ -7,7 +7,7 @@ fi
 
 # Get the arguments
 cc=$1
-objname=$2
+makefile=$2
 
 # Decrypt the flags argument
 flags=""
@@ -25,4 +25,4 @@ case $3 in
 	;;
 esac
 
-sed -e "s#TEMPLATE_CC#$cc#g" -e "s/TEMPLATE_FLAGS/$flags/g" -e "s/TEMPLATE_OBJNAME/$objname/g" Makefile.template > Makefile
+sed -e "s#TEMPLATE_CC#$cc#g" -e "s/TEMPLATE_FLAGS/$flags/g" Makefile.template > $makefile
