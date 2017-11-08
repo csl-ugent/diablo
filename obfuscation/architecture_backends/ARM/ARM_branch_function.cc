@@ -123,9 +123,6 @@ t_bbl* ARMRegisterBasedBranchFunctionTransformation::createStackBranchFunctionFo
     ArmMakeInsForBbl(Add,  Append, ins, bbl, isThumb, ARM_REG_PC, ARM_REG_LR, reg, 0 /* immediate */, ARM_CONDITION_AL);
   }
 
-  /* Like longjmp, this function always redirects control and never returns, thus it needs no Exit Block */
-  BblKill (FunctionGetExitBlock (fun));
-
   VERBOSE(1, ("Added branch function %i %i @eiB", (int) isThumb, (int) reg, bbl));
 
   return bbl;
@@ -178,7 +175,6 @@ bool ARMRegisterBasedBranchFunctionTransformation::doTransform(t_bbl* bbl, t_ran
   
 void ARMRegisterBasedBranchFunctionTransformation::transformJumpToCall(t_bbl* bbl, t_randomnumbergenerator* rng) {
   t_cfg* cfg = BBL_CFG(bbl);
-  t_bbl* rubbish = SelectTargetFor(bbl, rng, true /* need_to_fall_through */);
   t_bool isThumb = ArmBblIsThumb(bbl);
   
   t_bbl* successor = NULL;
@@ -252,9 +248,13 @@ void ARMRegisterBasedBranchFunctionTransformation::transformJumpToCall(t_bbl* bb
 
   ArmMakeInsForBbl(CondBranchAndLink, Append, ins, split_off, isThumb, ARM_CONDITION_AL);
 
-  /* For now, model the call to the branch function as an IPJUMP, this ensures that liveness is propagated correctly. TODO this should be fixed in liveness */
-  CfgEdgeCreate(BBL_CFG(bbl), split_off, bf, ET_IPJUMP);
-  CfgEdgeCreate(BBL_CFG(bbl), bf, successor, ET_IPJUMP);
+  /* For now, model the call/return to/from the branch function as IPJUMPs (with compensating edges), this ensures that liveness is propagated correctly. */
+  e = CfgEdgeCreate(BBL_CFG(bbl), split_off, bf, ET_IPJUMP);
+  if (FunctionGetExitBlock(BBL_FUNCTION(split_off)))
+    CfgEdgeCreateCompensating(BBL_CFG(bbl), e);
+  e = CfgEdgeCreate(BBL_CFG(bbl), bf, successor, ET_IPJUMP);
+  if (FunctionGetExitBlock(BBL_FUNCTION(successor)))
+    CfgEdgeCreateCompensating(BBL_CFG(bbl), e);
 
   VERBOSE(1, ("Transformed BF: @eiB", bbl));
 
