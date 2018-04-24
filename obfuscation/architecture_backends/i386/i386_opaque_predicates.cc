@@ -334,7 +334,7 @@ static t_ins * InsertPiece(t_bbl * bbl, t_const_string file)/* {{{ */
 
 static void AddArboitPredicate(t_bbl * bbl, t_bbl *fake_bbl)/* {{{ */
 {
-  t_ins * ins;
+  t_ins * ins = NULL;
   /* input values; %eax, %edx */
   t_cfg * cfg=BBL_CFG(bbl);
   /* Arboit Implementation; compiled: -O4 {{{*/
@@ -393,7 +393,7 @@ static void AddArboitPredicate(t_bbl * bbl, t_bbl *fake_bbl)/* {{{ */
 
 static void AddArboitPredicateSum(t_bbl * bbl, t_bbl * fake_bbl)/* {{{ */
 {
-  t_ins * ins;
+  t_ins * ins = NULL;
   /* input values; %eax, %edx */
   t_cfg * cfg=BBL_CFG(bbl);
   /* Arboit Implementation; compiled: -Os, -O4 (combination...) {{{*/
@@ -472,8 +472,8 @@ static void InsertBblIntOf6(t_bbl * bbl, t_int32 nr, t_randomnumbergenerator* rn
 
   if(i<4)
   {
-    opaque_predicate* predicate;
-    t_i386_condition_code ccode;
+    opaque_predicate* predicate = NULL;
+    t_i386_condition_code ccode = I386_CONDITION_NONE;
     t_uint32 l;
 
     switch(i)

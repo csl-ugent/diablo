@@ -15,6 +15,7 @@ include(cmake/LTO.cmake)
 include(cmake/VersionFromVCS.cmake)
 include(cmake/functions_macros.cmake)
 include(cmake/GeneralConfigureValues.cmake)# These need to be included/generated *before* we use their values
+include(cmake/libcxx.cmake)
 
 if (NOT ${MY_SIZEOF_VOIDP} EQUAL ${CMAKE_SIZEOF_VOID_P})
   message(FATAL_ERROR "Detected pointer size is ${MY_SIZEOF_VOIDP}, but cached value is ${CMAKE_SIZEOF_VOID_P}. \
@@ -37,6 +38,7 @@ include_directories(${diablo_configs_dir})
 # Set the output directory for executables
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
+option(BUILD_SHARED_LIBS "Generate libraries" ON)
 
 # Allow Diablo binaries to find the shared libraries also built from the source, when installed somewhere else
 SET(CMAKE_SKIP_RPATH TRUE)

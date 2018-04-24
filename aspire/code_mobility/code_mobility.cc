@@ -10,8 +10,6 @@
 
 using namespace std;
 
-static void CodeMobilityPrepCfg (t_cfg* cfg);
-
 /* Create a stub function that contains the index and uses it to call upon the Resolve function. Return the entrypoint for the stub.
  * The entrypoint of the mobile function is passed as an argument so we can determine which registers are live and thus should be
  * pushed and popped.
@@ -97,7 +95,7 @@ void CodeMobilityTransformer::TransformObject ()
   STATUS(START, ("Code Mobility"));
 
   cfg = OBJECT_CFG(obj);
-  CodeMobilityPrepCfg(cfg);
+  PrepareCfg(cfg);
 
   Region* region;
   CodeMobilityAnnotationInfo *info;
@@ -234,7 +232,7 @@ static t_bool cm_split_helper_CanMerge(t_bbl* bbl1, t_bbl* bbl2)
 }
 
 /* Do some preparatory (CM-specific) work on the CFG before doing any transformations */
-static void CodeMobilityPrepCfg (t_cfg* cfg)
+void CodeMobilityTransformer::PrepareCfg (t_cfg* cfg)
 {
   /* Check for every BBL whether there is an annotation indicating it shouldn't be transformed. If this is
    * the case, we will remove it from all code mobility regions it is part of.
@@ -271,6 +269,22 @@ static void CodeMobilityPrepCfg (t_cfg* cfg)
 
   /* Recompute liveness */
   CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);
+
+  /* Prepare for marking */
+  CfgUnmarkAllFun (cfg);
+  t_function* fun;
+  CFG_FOREACH_FUN(cfg, fun)
+  {
+    FunctionUnmarkAllBbls (fun);
+    FunctionUnmark(fun);
+  }
+
+  BblMarkInit2 ();
+  CfgEdgeMarkInit ();
+
+  /* Mark all code that is potentially responsible for downloading new blocks, we can't make any of this mobile */
+  MarkFrom(cfg, T_BBL(SYMBOL_BASE(init_sym)));
+  MarkFrom(cfg, T_BBL(SYMBOL_BASE(resolve_sym)));
 }
 
 void CodeMobilityTransformer::FinalizeTransform ()

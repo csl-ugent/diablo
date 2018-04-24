@@ -5,6 +5,7 @@
 #include <string.h>
 #include <diabloflowgraph.h>
 
+extern void CfgEdgeChangeHeadIntern(t_cfg_edge * edge, t_bbl *new_head, t_bool updateCorr);
 
 t_cfg *CfgCreate(t_object *obj)
 {

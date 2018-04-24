@@ -216,6 +216,7 @@ void RelocRemoveToSymbolRef(t_reloc * reloc, t_uint32 i);
 void RelocTablePrint (const t_reloc_table *);
 t_uint32 RelocGetToRelocatableIndex (const t_reloc *rel, const t_relocatable *relocatable);
 void RelocMoveToRelocTable(t_reloc* rel, t_reloc_table* table);
+t_bool RelocIsRelative(const t_reloc *rel);
 
 int RelocCmp(const t_reloc * rel1, const t_reloc * rel2, t_bool position_dependent);
 void RelocTableSetCallbacks (t_reloc_table * table, void (*AddEdgeCallback) (t_reloc_table *, t_reloc *, void *), void (*DelEdgeCallback) (t_reloc_table *, t_reloc *, void *), void (*DelSwitchEdgeCallback) (t_reloc_table *, t_reloc *, void *));

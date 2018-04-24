@@ -1,3 +1,0 @@
-This directory holds all object handling code (including archives, linking,
-...) for diablo (Diablo Is A Better Link-time Optimizer, see
-http://www.elis.ugent.be/diablo for more details).

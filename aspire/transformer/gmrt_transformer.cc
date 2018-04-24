@@ -84,7 +84,7 @@ GMRTTransformer::GMRTTransformer (t_object* obj, initializer_list<t_const_string
   if (SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_GMRT_OBJECT "Init"))
     DiabloBrokerCall ("AddInitializationRoutine", obj, init_sym);
 
-  DiabloBrokerCallInstall("RelocIsRelative", "t_reloc *, t_bool *", (void*)RelocIsRelative, FALSE);
+  DiabloBrokerCallInstall("RelocIsRelative", "t_reloc *, t_bool *", (void*)GMRTTransformer::RelocIsTransformed, FALSE);
 }
 
 t_bool GMRTTransformer::CanTransformFunction (t_function* fun) const
@@ -105,31 +105,12 @@ t_bool GMRTTransformer::CanTransformFunction (t_function* fun) const
   if (FUNCTION_CFG(fun) != cfg)
     return log_and_return_false("it has already been transformed");
 
+  /* If the entry BBL is marked, this means it is reachable from the BBL that resolves invocations of transformed code */
+  if (BblIsMarked2(FUNCTION_BBL_FIRST(fun)))
+    return log_and_return_false("this function plays a part in accessing the transformed code and thus can't be transformed itself");
+
   if (FUNCTION_NAME(fun))
   {
-    t_const_string reason = "this function plays a part in accessing the transformed code and thus can't be transformed itself";
-
-    /* Don't transform involved in accessing transformed code */
-    if (StringPatternMatch("*" GMRT_IDENTIFIER_PREFIX "*", FUNCTION_NAME(fun)))
-      return log_and_return_false(reason);
-
-    /* If we factored out any part of this code for accessing transformed code, make sure it isn't transformed either */
-    if (StringPatternMatch("factor-*", FUNCTION_NAME(fun)))
-    {
-      t_cfg_edge* edge;
-      t_bbl* entry_bbl = FUNCTION_BBL_FIRST(fun);
-
-      /* We take a look at the incoming edges to ascertain the function isn't called from code that shouldn't be transformed */
-      BBL_FOREACH_PRED_EDGE(entry_bbl, edge)
-      {
-        t_bbl* head = T_BBL(CFG_EDGE_HEAD(edge));
-        t_function* caller = BBL_FUNCTION(head);
-
-        if (FUNCTION_NAME(caller) && StringPatternMatch("*" GMRT_IDENTIFIER_PREFIX "*", FUNCTION_NAME(caller)))
-          return log_and_return_false(reason);
-      }
-    }
-
     t_bbl* bbl;
     FUNCTION_FOREACH_BBL(fun, bbl)
     {
@@ -164,7 +145,7 @@ void GMRTTransformer::TransformAddressProducer (t_arm_ins* ins)
   /* We will generate the following code:
    * [OPTIONAL] PUSH {helper}
    * ADR dest, binary_base_addr
-   * LDR dest, [dest]
+   * [OPTIONAL] LDR dest, [dest] (if the relocation is not relative)
    * ADR helper, $offset
    * ADD dest, dest, helper
    * [OPTIONAL] POP {helper}
@@ -189,7 +170,7 @@ void GMRTTransformer::TransformAddressProducer (t_arm_ins* ins)
   /* The relocation for the address producer, this will produce the address of the data BBL containing the binary base */
   ArmMakeInsForIns(Mov, After, tmp, last_new, FALSE, dest, ARM_REG_NONE, 0, condition); /* Just get us an instruction with a correct regA */
   last_new = tmp;
-  t_reloc* rel = RelocTableAddRelocToRelocatable(address_producer_table,
+  t_reloc* tmp_rel = RelocTableAddRelocToRelocatable(address_producer_table,
     AddressNullForObject(obj), /* addend */
     T_RELOCATABLE(tmp), /* from */
     AddressNullForObject(obj), /* from-offset */
@@ -200,38 +181,52 @@ void GMRTTransformer::TransformAddressProducer (t_arm_ins* ins)
     NULL, /* corresp */
     NULL, /* sec */
     "R00A00+\\l*w\\s0000$");
-  ArmInsMakeAddressProducer(tmp, 0/* immediate */, rel);
+  ArmInsMakeAddressProducer(tmp, 0/* immediate */, tmp_rel);
 
-  ArmMakeInsForIns(Ldr, After, tmp, last_new, FALSE, dest, dest, ARM_REG_NONE,
-    0 /* immediate */, condition, TRUE /* pre */, TRUE /* up */, FALSE /* wb */);
-  last_new = tmp;
+  /* We get the original relocation that is to be transformed. Depending on whether or not the relocation
+   * is relative, we use either the base of the binary, or the base of the mobile block to calculate the
+   * offset from.
+   */
+  t_relocatable* offset_base;
+  t_reloc* orig_rel = RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins));
+  if (!RelocIsRelative(orig_rel))
+  {
+    /* Load the actual binary base */
+    ArmMakeInsForIns(Ldr, After, tmp, last_new, FALSE, dest, dest, ARM_REG_NONE,
+        0 /* immediate */, condition, TRUE /* pre */, TRUE /* up */, FALSE /* wb */);
+    last_new = tmp;
+    offset_base = T_RELOCATABLE(binary_base_sec);
+  }
+  else
+    /* Simply use the mobile block as base */
+    offset_base = T_RELOCATABLE(binary_base_bbl);
 
-  /* The relocation for the address producer, this will produce the offset of the target address in the binary */
+  /* We create the new address producer, duplicating the original relocation */
   ArmMakeInsForIns(Mov, After, tmp, last_new, FALSE, helper, ARM_REG_NONE, 0, condition); /* Just get us an instruction with a correct regA */
   last_new = tmp;
-  RELOC_SET_EDGE(RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins)), NULL);/* Slight hack: if this isn't NULL we'll get a use after free on the dup */
-  rel = RelocTableDupReloc(address_producer_table, RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins)));
-  ArmInsMakeAddressProducer(tmp, 0/* immediate */, rel);
+  RELOC_SET_EDGE(orig_rel, NULL);/* Slight hack: if this isn't NULL we'll get a use after free on the dup */
+  t_reloc* offset_rel = RelocTableDupReloc(address_producer_table, orig_rel);
+  ArmInsMakeAddressProducer(tmp, 0/* immediate */, offset_rel);
 
-  /* We need to adjust the relocation somewhat, the hardest part is rewriting the relocation code */
-  RelocSetFrom(rel, T_RELOCATABLE(tmp));
-  t_uint32 nreloc = RELOC_N_TO_RELOCATABLES(rel);
+  /* We need to adjust the relocation somewhat so that it is offset toward the "base". The hardest part is rewriting the relocation code. */
+  RelocSetFrom(offset_rel, T_RELOCATABLE(tmp));
+  t_uint32 nreloc = RELOC_N_TO_RELOCATABLES(offset_rel);
   char new_piece[6];
   sprintf(new_piece, "R%02d-\\", nreloc);
-  RelocAddRelocatable(rel, T_RELOCATABLE(binary_base_sec), AddressNullForObject(obj));
-  t_string old = RELOC_CODE(rel);
+  RelocAddRelocatable(offset_rel, offset_base, AddressNullForObject(obj));
+  t_string old = RELOC_CODE(offset_rel);
   char* loc = strstr(old, "\\");
   *loc = '\0';
   t_string code = StringConcat3(old, new_piece, (char*)((t_uint64)loc + 1));
   Free(old);
-  RELOC_SET_CODE(rel, code);
-  t_string label = RELOC_LABEL(rel);
+  RELOC_SET_CODE(offset_rel, code);
+  t_string label = RELOC_LABEL(offset_rel);
   if(label)
   {
-    RELOC_SET_LABEL(rel, StringConcat2(transform_label, label));
+    RELOC_SET_LABEL(offset_rel, StringConcat2(transform_label, label));
     Free(label);
   }
-  else RELOC_SET_LABEL(rel, StringDup(transform_label));
+  else RELOC_SET_LABEL(offset_rel, StringDup(transform_label));
 
   ArmMakeInsForIns(Add, After, tmp, last_new, FALSE, dest, dest, helper, 0, condition);
   last_new = tmp;
@@ -641,31 +636,39 @@ void GMRTTransformer::TransformBbl (t_bbl* bbl)
 
     if(ARM_INS_OPCODE(arm_ins) == ARM_ADDRESS_PRODUCER)
     {
-      /* If the the address being produced is an offset to the GOT we're dealing with something more alike to a
-       * constant producer as a real address producer, and thus this shouldn't be transformed. We will move the
-       * relocation to the address producer table however, as it will be an inter-object relocation.
-       */
       t_reloc* rel = RELOC_REF_RELOC(ARM_INS_REFERS_TO(arm_ins));
-      if (strstr(RELOC_CODE(rel), "g-") == NULL)
-      {
-        /* Also: make sure we do not transform address producers that have a mobile section as their to relocatable, but
-         * move it to the relocation table of the transformed object.
-         * If the ADR is internal, move it to the relocation table of the transformed object. An internal ADR refers to:
-         * - a mobile section
-         * - a switch table that is part of the transformed function
-         */
-        if ((RELOC_N_TO_RELOCATABLES(rel) == 1) && (
-              /* Mobile section */
+
+      /* We differentiate between internal and external addresses. An internal address is one located in:
+       * - a mobile section
+       * - a switch table that is part of the transformed function
+       */
+      if ((RELOC_N_TO_RELOCATABLES(rel) == 1) && (
+            /* Mobile section */
             ((RELOCATABLE_RELOCATABLE_TYPE(RELOC_TO_RELOCATABLE(rel)[0]) == RT_SUBSECTION)
-            && (mobile_sections.find(T_SECTION(RELOC_TO_RELOCATABLE(rel)[0])) != mobile_sections.end()))
+             && (mobile_sections.find(T_SECTION(RELOC_TO_RELOCATABLE(rel)[0])) != mobile_sections.end()))
             /* Switch table */
             || ((RELOCATABLE_RELOCATABLE_TYPE(RELOC_TO_RELOCATABLE(rel)[0]) == RT_BBL) && (BBL_CFG(T_BBL(RELOC_TO_RELOCATABLE(rel)[0])) == new_cfg))))
+      {
+        /* Normal internal address producers don't have to be transformed, we only have to move their relocation
+         * to the relocation table of the transformed object. If the value they produce is an offset however,
+         * things get more complicated.
+         */
+        if (RelocIsRelative(rel))
+          TransformAddressProducer(arm_ins);
+        else
           RelocMoveToRelocTable(rel, OBJECT_RELOC_TABLE(new_objs.back()));
+      }
+      else
+      {
+        /* If the the address being produced is an offset to the GOT we're dealing with something more alike to a
+         * constant producer as a real address producer, and thus this shouldn't be transformed. We will move the
+         * relocation to the address producer table however, as it will be an inter-object relocation.
+         */
+        if (RelocIsRelative(rel))
+          RelocMoveToRelocTable(rel, address_producer_table);
         else
           TransformAddressProducer(arm_ins);
       }
-      else
-        RelocMoveToRelocTable(rel, address_producer_table);
     }
   }
 }
@@ -687,7 +690,7 @@ void GMRTTransformer::TransformEntrypoint(t_function* fun)
   CfgEdgeCreate(new_cfg, binary_base_bbl, pop_bbl, ET_FALLTHROUGH);
 }
 
-void GMRTTransformer::RelocIsRelative(t_reloc* rel, t_bool* is_relative)
+void GMRTTransformer::RelocIsTransformed(t_reloc* rel, t_bool* is_relative)
 {
   /* Code mobility related relative relocations */
   if (RELOC_LABEL(rel) && (strncmp(RELOC_LABEL(rel), transform_label, strlen(transform_label)) == 0))

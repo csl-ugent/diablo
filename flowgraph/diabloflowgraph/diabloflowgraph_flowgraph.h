@@ -96,6 +96,7 @@ t_bool CfgDetectSimpleInfiniteLoops (t_cfg * cfg, t_loopref ** head);
 
 t_bool BblIsSwiExitNode (t_bbl * node);
 
+void MarkFrom (t_cfg * cfg, t_bbl * from);
 void CfgMarkFun (t_cfg * cfg, t_function * fun);
 t_bool CfgUnmarkFun (t_cfg * cfg, t_function ** fun);
 void CfgUnmarkAllFun (t_cfg * cfg);

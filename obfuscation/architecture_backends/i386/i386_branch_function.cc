@@ -64,7 +64,8 @@ static t_bbl * AddDataInCode(t_bbl* bbl, t_bool fixed_rub_data, t_uint8 * rub_da
 static t_bool AddBranchFunctionCallToBbl(t_bbl * bbl, t_bbl *branch_bbl)/* {{{ */
 {
   t_cfg * cfg=BBL_CFG(bbl);
-  t_bbl * target_bbl, * rubbish;
+  t_bbl * target_bbl = NULL;
+  t_bbl * rubbish;
   t_cfg_edge * edge, * s_edge;
   t_i386_ins * ins, *last_ins;
   t_uint8  rub_data[2]={0x0a, 0x05};

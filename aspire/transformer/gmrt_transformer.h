@@ -46,7 +46,7 @@ class GMRTTransformer : public AbstractTransformer
     /*** FUNCTIONS ***/
     /* Helper functions */
   private:
-    static void RelocIsRelative (t_reloc* rel, t_bool* is_relative);
+    static void RelocIsTransformed (t_reloc* rel, t_bool* is_relative);
     void TransformAddressProducer (t_arm_ins* ins);
   protected:
     void SelectMobileDataForFunction(const t_function* fun);

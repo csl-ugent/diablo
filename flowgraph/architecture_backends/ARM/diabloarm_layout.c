@@ -3940,48 +3940,6 @@ t_bool ArmValidateBbl(t_bbl * bbl)
         return !(is_thumb && is_arm);
 }
 
-/* #define DEBUG_PIC */
-static t_bool
-RelocIsRelative(t_reloc *rel)
-{
-#ifdef DEBUG_PIC
-  static int count = 0;
-#endif
-
-  char *writepos, *checkpos;
-
-#ifdef DEBUG_PIC
-  if (count++>diablosupport_options.debugcounter)
-    return TRUE;
-#endif
-
-  writepos = strchr(RELOC_CODE(rel),'\\');
-  /* subtracting the address of the got? */
-  checkpos = strstr(RELOC_CODE(rel),"g-");
-  if ((checkpos != NULL) &&
-      (checkpos < writepos))
-    return TRUE;
-
-  /* Obfuscation-related relative relocations */
-  if (strcmp(RELOC_CODE(rel), "R00R01-\\l*w\\s0000$") == 0)
-    return TRUE;
-  if (strcmp(RELOC_CODE(rel), "R00A00|R01-A01-\\l*w\\s0000$") == 0)
-    return TRUE;
-  if (strcmp(RELOC_CODE(rel), "R00R01Z01+-\\l*w\\s0000$") == 0)
-    return TRUE;
-
-  /* Allow broker calls to check whether a relocation is relative, if so, return TRUE */
-  t_bool bc_isrelative = FALSE;
-  DiabloBrokerCall("RelocIsRelative", rel, &bc_isrelative);
-  if (bc_isrelative)
-    return TRUE;
-
-#ifdef DEBUG_PIC
-  VERBOSE(3,("Converting reloc to PIC: @R",rel));
-#endif
-  return FALSE;
-}
-
 /* ArmConvertAddressProducersToPIC{{{*/
 /* Get relocation code to calculate a relative address for a particular
  * absolute address. Returns the code in newcode, and the index of the

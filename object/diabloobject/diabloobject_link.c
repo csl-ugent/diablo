@@ -52,7 +52,7 @@ ObjectReadMap (t_object * obj)
     }
     else
     {
-      FATAL(("Could not open map %s\nDiablo needs a linker map file to relink the program in exactly the same way as the original linker linked the program. You can generate a map file by passing the appropriate command line switches to the linker/compiler. More information about this can be found in the Diablo manual and the FAQ. (http://www.elis.ugent.be/diablo).", OBJECT_NAME(obj)));
+      FATAL(("Could not open map %s\nDiablo needs a linker map file to relink the program in exactly the same way as the original linker linked the program. You can generate a map file by passing the appropriate command line switches to the linker/compiler.", OBJECT_NAME(obj)));
     }
   }
   else

@@ -38,6 +38,9 @@ Diablo furthermore links against (and this repository contains their code for th
 * Jansson for working with JSON data (in the jansson-2.6 subdirectory)
 which each is copyrighted by their respective authors, and each fall under their own licenses as mentioned in their respective headers and LICENSE file.
 
-We also have a website:
-
-    http://diablo.elis.ugent.be/
+The easiest way to get Diablo compiled and running, including having a
+pre-built ARM toolchain, is by using a Docker image we developed for the Aspire
+FP7 project. It can be found on Github
+(https://github.com/aspire-fp7/framework). Note that this Docker contains more
+than just Diablo: it features the entire Aspire protection tool chain, of which
+Diablo is just a part.

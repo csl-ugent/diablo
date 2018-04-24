@@ -4,12 +4,12 @@ Diablo build an install instructions
 Prerequisites
 -------------
 
-In order to properly run Diablo, you need a machine of the same 
-endianess as the target cpu for which you want to rewrite binaries with 
-at least 512MB of RAM.  The programs you want to run through Diablo 
-should be compiled with a patched tool chain, in case you are using 
-gcc/binutils. See the Diablo web site (http://www.elis.ugent.be/diablo/) 
-for more information about this topic.
+In order to properly run Diablo, you need a machine of the same endianess as
+the target cpu for which you want to rewrite binaries with at least 512MB of
+RAM. The programs you want to run through Diablo should be compiled with a
+patched tool chain, in case you are using gcc/binutils. See the toolchains
+repository (https://github.com/csl-ugent/toolchains) for more information about
+this topic.
 
 Configuration and building
 --------------------------

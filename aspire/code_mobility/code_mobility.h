@@ -32,6 +32,7 @@ class CodeMobilityTransformer : public GMRTTransformer
     /*** FUNCTIONS ***/
     /* Helper functions */
     t_bbl* CreateGMRTStub (t_bbl* entry_bbl);
+    void PrepareCfg (t_cfg* cfg);
 
   public:
     void AddForceReachables (std::vector<std::string>& reachable_vector);

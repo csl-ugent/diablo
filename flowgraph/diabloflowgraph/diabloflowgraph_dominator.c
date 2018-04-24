@@ -388,7 +388,7 @@ void ComDominators(t_cfg * cfg)
 	  void_stack * working_stack[2] = {&stack,&stack2}; 
 	  t_uint8 x=0,y=1;
 	  t_bbl_list * prev_dominators;
-	  t_cfg_edge * stack_edge;
+	  t_cfg_edge * stack_edge = NULL;
 	  t_bool removed_dfs_head = FALSE;
 	  t_bool new_dfs_head = FALSE;
 	  t_cfg_edge * first_mark_edge;

@@ -1000,4 +1000,31 @@ void RelocMoveToRelocTable(t_reloc* rel, t_reloc_table* table)
     RelocTableLinkReloc(table, rel);
   }
 }
+
+t_bool RelocIsRelative(const t_reloc *rel)
+{
+  char* writepos = strchr(RELOC_CODE(rel),'\\');
+  /* subtracting the address of the got? */
+  char* checkpos = strstr(RELOC_CODE(rel),"g-");
+  if ((checkpos != NULL) &&
+      (checkpos < writepos))
+    return TRUE;
+
+  /* Obfuscation-related relative relocations */
+  if (strcmp(RELOC_CODE(rel), "R00R01-\\l*w\\s0000$") == 0)
+    return TRUE;
+  if (strcmp(RELOC_CODE(rel), "R00A00|R01-A01-\\l*w\\s0000$") == 0)
+    return TRUE;
+  if (strcmp(RELOC_CODE(rel), "R00R01Z01+-\\l*w\\s0000$") == 0)
+    return TRUE;
+
+  /* Allow broker calls to check whether a relocation is relative, if so, return TRUE */
+  t_bool bc_isrelative = FALSE;
+  DiabloBrokerCall("RelocIsRelative", rel, &bc_isrelative);
+  if (bc_isrelative)
+    return TRUE;
+
+  return FALSE;
+}
+
 /* vim: set shiftwidth=2 expandtab cinoptions=p5,t0,(0, foldmethod=marker tw=80 cindent: */
