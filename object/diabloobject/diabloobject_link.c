@@ -97,7 +97,7 @@ ObjectAppendSubObject (t_object * parent, t_object * child)
   }
   else if (OBJECT_MAPPED_FIRST(parent))
   {
-    FATAL(("The list with object files belonging to the executable named %s is corrupt. Unless you are modifying this list yourself, this probably is a Diablo bug... send information to the diablo mailing list (diablo@@elis.ugent.be)!", OBJECT_NAME(parent)));
+    FATAL(("The list with object files belonging to the executable named %s is corrupt. Unless you are modifying this list yourself, this probably is a Diablo bug... send information to the diablo mailing list (diablo@@lists.ugent.be)!", OBJECT_NAME(parent)));
   }
   else
   {
@@ -1072,7 +1072,7 @@ RelocateCore (t_object * obj, t_bool verify)
               }
               else {
                 VERBOSE(0, ("error on relocation @R with code %s", rel, RELOC_CODE(rel)));
-                FATAL(("Linker emulation failed. A relocated value differed after link emulation. There can be two reasons for this: either you are not using a patched ld (see the diablo website for details) or there is a bug in diablo. Implement %s: Diablo calculated @G, original binary has @G\nIf you think this is a bug, contact the diablo mailing list (diablo@elis.ugent.be).", RELOC_LABEL(rel), x, y));
+                FATAL(("Linker emulation failed. A relocated value differed after link emulation. There can be two reasons for this: either you are not using a patched ld (see the diablo website for details) or there is a bug in diablo. Implement %s: Diablo calculated @G, original binary has @G\nIf you think this is a bug, contact the diablo mailing list (diablo@@lists.ugent.be).", RELOC_LABEL(rel), x, y));
               }
             }
       }
@@ -1245,7 +1245,7 @@ ObjectCreateDataOrCodeTable (t_object * obj)
 #endif
           }
           else
-            FATAL(("A symbol that marks data in code ($d) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@elis.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain."));
+            FATAL(("A symbol that marks data in code ($d) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@lists.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain."));
         }
         he = (t_symbol *) SYMBOL_EQUAL(he);
 #ifdef DEBUG_SWITCHTABLE
@@ -1291,7 +1291,7 @@ ObjectCreateDataOrCodeTable (t_object * obj)
 #endif
           }
           else
-            FATAL(("A symbol that marks data or code (%s) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@elis.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.", SYMBOL_NAME(he2)));
+            FATAL(("A symbol that marks data or code (%s) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@lists.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.", SYMBOL_NAME(he2)));
         }
         he2 = (t_symbol *) SYMBOL_EQUAL(he2);
 #ifdef DEBUG_SWITCHTABLE
@@ -1333,7 +1333,7 @@ ObjectCreateDataOrCodeTable (t_object * obj)
 #endif
           }
           else
-            FATAL(("A symbol that marks data or code (%s) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@elis.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.", SYMBOL_NAME(he2)));
+            FATAL(("A symbol that marks data or code (%s) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@lists.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.", SYMBOL_NAME(he2)));
         }
         he3 = (t_symbol *) SYMBOL_EQUAL(he3);
 #ifdef DEBUG_SWITCHTABLE
@@ -1345,7 +1345,7 @@ ObjectCreateDataOrCodeTable (t_object * obj)
         prev_code = TRUE;
       }
       else
-        FATAL(("A problem was encountered in processing the symbols that mark data or code (most likely a part of the program is marked both data and code\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@elis.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.!"));
+        FATAL(("A problem was encountered in processing the symbols that mark data or code (most likely a part of the program is marked both data and code\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@lists.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.!"));
 
       first = FALSE;
     }
@@ -1391,7 +1391,7 @@ ObjectCreateDataOrCodeTable (t_object * obj)
                                           StackExecConst(SYMBOL_CODE(he), NULL, he, 0, obj), AddressNullForObject(obj), NULL, AddressNullForObject(obj), 0);
             }
             else
-              FATAL(("A symbol that marks data in code ($d) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@elis.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain."));
+              FATAL(("A symbol that marks data in code ($d) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@lists.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain."));
           }
           he = (t_symbol *) SYMBOL_EQUAL(he);
           prev_arm = FALSE;
@@ -1422,7 +1422,7 @@ ObjectCreateDataOrCodeTable (t_object * obj)
                                           StackExecConst(SYMBOL_CODE(he2), NULL, he2, 0, obj), AddressNullForObject(obj), NULL, AddressNullForObject(obj), 0);
             }
             else
-              FATAL(("A symbol that marks data or code (%s) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@elis.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.", SYMBOL_NAME(he2)));
+              FATAL(("A symbol that marks data or code (%s) was encountered that is not associated to a section or a subsection\nThis probably indicates a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@lists.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.", SYMBOL_NAME(he2)));
           }
           he2 = (t_symbol *) SYMBOL_EQUAL(he2);
           prev_arm = TRUE;
@@ -1740,7 +1740,7 @@ ObjectRebuildSectionsFromSubsections (t_object * obj)
           AddressExtractUint32 (AddressSub (SECTION_CADDRESS(subsec),
                                             SECTION_CADDRESS(sec)));
         if (prev_subsection_end > offset)
-          FATAL(("When rebuilding the (output) section named %s from the (input) subsections we found subsections that overlap.\nThis probably indicates that you are using an unpatched toolchain (string section merging and exception handler compaction need to be turned of in the linker) or you have encountered a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@elis.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.", SECTION_NAME(sec)));
+          FATAL(("When rebuilding the (output) section named %s from the (input) subsections we found subsections that overlap.\nThis probably indicates that you are using an unpatched toolchain (string section merging and exception handler compaction need to be turned of in the linker) or you have encountered a bug in the toolchain you are using. If you are using a supported toolchain contact the mailing list (diablo@@lists.ugent.be) and file a bug report. If not, you can contact the mailing list for help on how to fix your toolchain.", SECTION_NAME(sec)));
 
         if (offset + size >  AddressExtractUint32 (SECTION_CSIZE(sec)))
           FATAL(("When rebuilding the (output) section named %s at @G size @G from the (input) "

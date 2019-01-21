@@ -277,7 +277,7 @@ DirMake (t_const_string path, t_bool tmp)
 #endif
 
 #ifdef DIABLOSUPPORT_HAVE_MKDIR
-      int ret = mkdir (path, 0700);
+      int ret = mkdir (path, 0755);
 #else
       int ret = 1;
 #endif

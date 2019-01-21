@@ -5220,7 +5220,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
             }
 
 
-	  if ((ARM_INS_OPCODE(def)!=ARM_LDR) || (ARM_INS_REGB(def)!=ARM_REG_R15)) FATAL(("At @G: @I: PC-relative value is not loaded (no PC-relative LDR, the instruction for the definition is @I). This is in experimental, but essential code: mail this binary along with the error message to diablo-devel@@elis.ugent.be",address, ins, def));
+	  if ((ARM_INS_OPCODE(def)!=ARM_LDR) || (ARM_INS_REGB(def)!=ARM_REG_R15)) FATAL(("At @G: @I: PC-relative value is not loaded (no PC-relative LDR, the instruction for the definition is @I). This is in experimental, but essential code: mail this binary along with the error message to diablo@@lists.ugent.be",address, ins, def));
 
 	  /* Calculate the address from where we are loading, perform the load and get the relocation */
           value = GetPcRelLoadedValue(obj,def,&load_address,&rel,&getvalue_failed);
@@ -7028,6 +7028,7 @@ void ArmAddCallFromBblToBbl (t_object* obj, t_bbl* from, t_bbl* to)
  * increment a certain memory location every time the BBL is executed. Used by CfgAddSelfProfiling
  */
 #define COUNTER_SATURATION 1
+#define PROFILE_USE_LIVENESS 0
 void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_address offset)
 {
   t_arm_ins* tmp, *ins;
@@ -7047,16 +7048,19 @@ void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling
   static t_regset possible;
   static t_regset thumb_possible;
   static t_bool initialized = FALSE;
+
   if(!initialized)
   {
     RegsetSetEmpty(possible);
     RegsetSetEmpty(thumb_possible);
+#if PROFILE_USE_LIVENESS
     for (reg = ARM_REG_R0; reg <= ARM_REG_R12; reg++)
     {
       RegsetSetAddReg(possible, reg);
       if(IS_THUMB_REG(reg))
         RegsetSetAddReg(thumb_possible, reg);
     }
+#endif
     initialized = TRUE;
   }
 
