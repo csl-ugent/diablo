@@ -22,7 +22,8 @@ t_reg ARMArchitectureInfo::getGenericRandomRegister(t_randomnumbergenerator* rng
 }
 
 
-void ARMArchitectureInfo::saveOrRestoreRegisters(const vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend) {
+AddedInstructionInfo ARMArchitectureInfo::saveOrRestoreRegisters(const vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend) {
+  AddedInstructionInfo result = AddedInstructionInfo();
   t_arm_ins* ins;
 
   int mask = 0;
@@ -36,7 +37,7 @@ void ARMArchitectureInfo::saveOrRestoreRegisters(const vector<MaybeSaveRegister>
   }
 
   if (!mask)
-    return;
+    return result;
 
   if (prepend) { // TODO: hack for function flattening, remove the need for this!
     t_arm_ins* last_ins = T_ARM_INS(BBL_INS_LAST(bbl));
@@ -50,6 +51,9 @@ void ARMArchitectureInfo::saveOrRestoreRegisters(const vector<MaybeSaveRegister>
     else
       ArmMakeInsForBbl(Pop, Prepend, ins, bbl, isThumb, mask, ARM_CONDITION_AL, isThumb /* thumb */); // TODO: uniformize, make it also Append
   }
+  result.AddInstruction(T_INS(ins));
+
+  return result;
 }
 
 /* TODO merge with above */

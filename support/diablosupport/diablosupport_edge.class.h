@@ -14,7 +14,7 @@ DIABLO_CLASS_BEGIN
 /*! The node from which this edge originates */
 MEMBER(t_node *, head, HEAD)
 /*! The node to which this edge points */
-MEMBER(t_node *, tail, TAIL)
+IMEMBER(t_node *, tail, TAIL)
 /*! The next edge in the list that holds all edges */
 MEMBER(t_CLASS *, next, NEXT)
 /*! The previous edge in the list that holds all edges */
@@ -32,7 +32,7 @@ MEMBER(t_CLASS *, pred_prev, PRED_PREV)
 MEMBER(t_CLASS *, corr, CORR)
 /*! The category of the edge (a numeric value, identifying the type of the edge
  * */
-MEMBER(t_uint32, cat, CAT)
+IMEMBER(t_uint32, cat, CAT)
 /*! Edges are marked by assigning a number to them (this avoids unmarking
  * them). This field is used to store that number if the edge is marked, else
  * it can hold any other number

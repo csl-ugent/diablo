@@ -18,7 +18,7 @@ EXTENDS(t_edge)
 MEMBER(t_cfg *, cfg, CFG)
 /*! cfg edge specific flags, like EF_FROM_SWITCH_TABLE. You can use this field
  * to add you own analysis specific flags */
-MEMBER(t_uint32, flags, FLAGS)
+IMEMBER(t_uint32, flags, FLAGS)
 /*! Linked list of edges in the function it belongs to that are marked, is used
  * in FunctionMarkEdge, FunctionUnmarkEdge, etc. */
 MEMBER(t_cfg_edge *, next_marked_into_fun, NEXT_MARKED_INTO_FUN)
@@ -36,6 +36,8 @@ MEMBER(t_reloc *, rel, REL)
 MEMBER(t_uint32, switchvalue, SWITCHVALUE)
 /*! Holds an execution count when (instruction)profiles are available */
 MEMBER(t_int64, exec_count, EXEC_COUNT)
+/* An id that uniquely identifies each edge, and can be used to order edges */
+IMEMBER(t_uint32, id, ID)
 /*! In the case where from the blockprofiles it is not clear how many times this
  * edge has been followed, this field gives the minimal execution frequency */
 MEMBER(t_int64, execution_count_min, EXEC_COUNT_MIN)
@@ -141,6 +143,7 @@ CONSTRUCTOR3 (t_bbl *, from, t_bbl *, to, t_uint32, type,
               {
               CfgInitEdge (cfg, ret, from, to, type);
               CFG_EDGE_SET_REFCOUNT(ret, 1);
+              CFG_EDGE_SET_ID(ret, cfg_edge_global_id++);
               })
 
 DUPLICATOR(

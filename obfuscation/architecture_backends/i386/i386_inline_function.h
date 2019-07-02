@@ -3,10 +3,6 @@
 #ifndef I386_OBFUSCATION_INLINEFUNCTION_H
 #define I386_OBFUSCATION_INLINEFUNCTION_H
 
-#include <map>
-
-#include <obfuscation/obfuscation_transformation.h>
-
 class I386InlineFunctionTransformation : public BBLObfuscationTransformation {
   static constexpr const char* _name = "inline_function";
   long inlined;

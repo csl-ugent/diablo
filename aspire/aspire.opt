@@ -2,7 +2,7 @@ group "Aspire" bool_option control_flow_tagging
 {
    short="CFT";
    long="control_flow_tagging";
-   default=off;
+   default=on;
    description="Transform the binary with control flow tagging";
 }
 
@@ -66,7 +66,7 @@ group "Aspire" string_option actc_id
 {
    short="id";
    long="id";
-   default="DEADDEADDEADDEAD"
+   default="DEADDEADDEADDEADDEADDEADDEADDEAD"
    description="Specifies the ACTC unique ID.";
 }
 
@@ -84,4 +84,12 @@ group "Aspire" bool_option softvm_only
    long="softvm-only";
    default=off;
    description="Only integrate SoftVM related stuff, no other obfuscations.";
+}
+
+group "Aspire" bool_option code_guard_hack
+{
+   short="CGhack";
+   long="code_guard_hack";
+   default=off;
+   description="Enable the code guard hack to engage degradation on attestation failure.";
 }

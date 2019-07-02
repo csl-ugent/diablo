@@ -8,6 +8,7 @@ extern "C" {
 
 #include <algorithm>
 #include <map>
+#include <sstream>
 
 BBL_DYNAMIC_MEMBER_GLOBAL_ARRAY(regions);
 CFG_DYNAMIC_MEMBER_GLOBAL_ARRAY(regions);
@@ -308,13 +309,15 @@ t_object *GetSubobjectAndRangeContainingAddress(t_object *obj, t_address addr, t
 
 /* Get all BBLs associated with a specific object file (or name pattern) */
 static
-BblVector GetAllBblsInObjectFile(t_cfg *cfg, const std::string *file_name)
+BblVector GetAllBblsInObjectFile(t_cfg *cfg, const std::string *file_name, set<t_string>& matched_filenames)
 {
   BblVector result;
 
   t_address begin = AddressNullForObject(CFG_OBJECT(cfg)), end = begin;
   t_object *current_object = NULL;
   bool current_object_match = false;
+  
+  set<t_object *> matched_objects;
 
   t_bbl *bbl;
   CFG_FOREACH_BBL(cfg, bbl)
@@ -325,16 +328,28 @@ BblVector GetAllBblsInObjectFile(t_cfg *cfg, const std::string *file_name)
       /* out of current object range */
       current_object = GetSubobjectAndRangeContainingAddress(CFG_OBJECT(cfg), BBL_OLD_ADDRESS(bbl), begin, end);
 
-      if (current_object)
+      if (current_object) {
         current_object_match = StringPatternMatch(file_name->c_str(), OBJECT_NAME(current_object));
+        
+        /* HACK: this can be solved by using C++11 regex functionality.
+         * However, my GCC version (4.7.2) does not support this fully yet.
+         * And it is too hard to get a newer version working in the AspireVM... */
+        if (!strcmp(file_name->c_str(), "*.o")
+            && StringPatternMatch("*.a:*", OBJECT_NAME(current_object)))
+          current_object_match = false;
+      }
       else
         current_object_match = false;
     }
 
     if (current_object_match) {
       result.push_back(bbl);
+      matched_objects.insert(current_object);
     }
   }
+  
+  for (t_object *x : matched_objects)
+    matched_filenames.insert(OBJECT_NAME(x));
 
   return result;
 }
@@ -399,7 +414,12 @@ void CreateRegionsFromAnnotationsAndAnnotateBbls(t_cfg *cfg, const Annotations& 
         if (annotation->file_is_object_file)
         {
           VERBOSE(0, ("Creating region %u for object file '%s'", idx, annotation->file_name->c_str()));
-          bbls = GetAllBblsInObjectFile(cfg, annotation->file_name);
+          
+          set<t_string> matched_objects;
+          bbls = GetAllBblsInObjectFile(cfg, annotation->file_name, matched_objects);
+          
+          for (t_string str : matched_objects)
+            VERBOSE(0, ("   matched file '%s'", str));
         }
         else
         {
@@ -417,7 +437,11 @@ void CreateRegionsFromAnnotationsAndAnnotateBbls(t_cfg *cfg, const Annotations& 
     else
       FATAL(("no file name nor function name was given for this annotation"));
 
-    VERBOSE(0, ("    this region contains %u BBLs", bbls.size()));
+    size_t nr_exec = 0;
+    for (auto bbl : bbls)
+      if (BBL_EXEC_COUNT(bbl) > 0)
+        nr_exec++;
+    VERBOSE(0, ("    this region contains %u BBLs, of which %u are executed", bbls.size(), nr_exec));
 
     if (bbls.empty())
     {
@@ -792,6 +816,15 @@ void LogRegionsDynamicComplexity(t_const_string filename, t_cfg* cfg) {
   fclose(f);
 }
 
+bool RegionGetValueForIntOption(const Region *region, t_const_string option_name, int& value) {
+  for (auto request : region->requests)
+    if (request->GetValueForIntOption(option_name, value))
+      return true;
+
+  return false;
+}
+
+/* This constructor expects a vector of unique BBLs */
 Region::Region(t_cfg* cfg, Annotation* annotation, const BblSet& bbls, AbstractAnnotationInfo* request)
   : annotation(annotation), bbls(bbls), idx(CFG_REGIONS(cfg)->size())
 {
@@ -814,10 +847,14 @@ Region::Region(t_cfg* cfg, Annotation* annotation, const BblSet& bbls, AbstractA
     request->preprocessRegion(this); /* This can expand the region (for example, with a call_depth parameter) */
 }
 
-bool RegionGetValueForIntOption(const Region *region, t_const_string option_name, int& value) {
-  for (auto request : region->requests)
-    if (request->GetValueForIntOption(option_name, value))
-      return true;
+string Region::Print() const
+{
+  stringstream ss;
 
-  return false;
+  ss << "Region " << idx << " contains " << bbls.size() << " BBLs" << endl;
+  ss << "  Annotation " << annotation->Print() << endl;
+  for (auto r : requests)
+    ss << "  Request " << r->Print() << endl;
+
+  return ss.str();
 }

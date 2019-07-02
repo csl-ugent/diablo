@@ -5,10 +5,6 @@
 #ifndef ARM_ARCHITECTURE_BACKEND_H
 #define ARM_ARCHITECTURE_BACKEND_H
 
-#include <obfuscation/obfuscation_architecture_backend.h>
-
-#include <vector>
-
 struct ARMObfuscationArchitectureInitializer : public ObfuscationArchitectureInitializer {
   ARMObfuscationArchitectureInitializer();
   ~ARMObfuscationArchitectureInitializer();

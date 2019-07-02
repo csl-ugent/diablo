@@ -1,12 +1,23 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
-extern "C" {
-#include "diabloarm.h"
-}
-
+/* The functions here are adopted (i.e., *mostly* copy-pasted) from diabloarm_instructions.c */
+#include "ARM_obfuscations.h"
 #include "ARM_schedule_instructions.h"
 
-/* The functions here are adopted (i.e., *mostly* copy-pasted) from diabloarm_instructions.c */
+void ShouldKeepInsCombination(t_ins *last_ins, t_ins *prev_ins, bool *result) {
+  *result = false;
+
+  t_arm_ins *a = T_ARM_INS(last_ins);
+  t_arm_ins *b = T_ARM_INS(prev_ins);
+
+  if (ARM_INS_OPCODE(a) == ARM_SUB
+      && ARM_INS_REGA(a) == ARM_REG_R15
+
+      && ARM_INS_OPCODE(b) == ARM_MOV
+      && ARM_INS_REGC(b) == ARM_REG_R15) {
+    *result = true;
+  }
+}
 
 bool ARMScheduleInstructionsTransformation::modifiesStackPointer(t_ins* ins) const {
   if (RegsetIn(ARM_INS_REGS_DEF(T_ARM_INS(ins)), ARM_REG_R13)) {

@@ -5,10 +5,6 @@
 #ifndef ARM_OPAQUE_PREDICATES_H
 #define ARM_OPAQUE_PREDICATES_H
 
-#include <map>
-#include <set>
-#include <vector>
-
 #include <obfuscation/generic/opaque_predicate.h>
 
 class ARMOpaquePredicateTransformation : public OpaquePredicateTransformation {
@@ -18,7 +14,7 @@ protected:
   long possibleSplitPoints;
   long bblsTransformed;
   long insts_in_bbls;
-  virtual t_bbl* splitBasicBlockWhereFlagsAreDeadBlockWithJump(t_bbl* bbl, t_randomnumbergenerator* rng);
+  virtual t_bbl* splitBasicBlockWhereFlagsAreDeadBlockWithJump(t_bbl* bbl, t_randomnumbergenerator* rng, bool jump=true);
   /* Return a (random) constant <= the le argument; but preferably one that already occurs in the program elsewhere */
   virtual t_uint32 getRandomProgramConstantLE(t_cfg* cfg, t_uint32 le, t_randomnumbergenerator* rng, bool consecutive_mask=false);
 

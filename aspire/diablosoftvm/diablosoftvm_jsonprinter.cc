@@ -15,8 +15,6 @@ extern "C" {
 
 #include "diablosoftvm_vmchunk.h"
 
-extern int frontend_id;
-
 #define DEBUG_JSON_OUTPUT 0
 
 typedef std::vector<t_bbl *> BblVector;
@@ -401,7 +399,7 @@ json_t *ChunkArray2Json(t_cfg *cfg, t_ptr_array *chunks, t_bool emit_symbol_addr
   {
     t_vmchunk *chunk = reinterpret_cast<t_vmchunk*>(PtrArrayGet(chunks, i));
 
-    if (frontend_id == 4)
+    if (AspireSoftVMGetFrontendId() == 4)
     {
       if (!VMCHUNK_INTEGRATED(chunk))
         continue;
@@ -497,7 +495,7 @@ json_t *ChunkArray2Json(t_cfg *cfg, t_ptr_array *chunks, t_bool emit_symbol_addr
   {
     if (limit && i == max) break;
 
-    if (frontend_id == 4)
+    if (AspireSoftVMGetFrontendId() == 4)
     {
       t_vmchunk *chunk = reinterpret_cast<t_vmchunk*>(PtrArrayGet(chunks, i));
       if (!VMCHUNK_INTEGRATED(chunk))

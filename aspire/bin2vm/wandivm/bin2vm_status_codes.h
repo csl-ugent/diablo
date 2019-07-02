@@ -25,9 +25,11 @@ enum bin2vm_status_codes
 
 enum bin2vm_vm_type
 {
-  BIN2VM_VM_TYPE_NOTYPE  = 0,
-  BIN2VM_VM_TYPE_CLASSIC = 1, //Target softvm (static stack machine).
-  BIN2VM_VM_TYPE_NEXTGEN = 2  //Target wandivm (lli based).
+  BIN2VM_VM_TYPE_NOTYPE    = 0,
+  BIN2VM_VM_TYPE_CLASSIC   = 1, //Target softvm (static stack machine).
+  BIN2VM_VM_TYPE_NEXTGEN   = 2, //Target wandivm (lli based).
+  BIN2VM_VM_TYPE_NEXTGEN2  = 3, //Custom VM.
+  BIN2VM_VM_TYPE_GENERATED = 4  //Diversified Custom VM.
 };
 
 #endif /* BIN2VM_STATUS_CODES_H */

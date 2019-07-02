@@ -3,10 +3,6 @@
 #ifndef I386_INSTRUCTION_SELECTION_H
 #define I386_INSTRUCTION_SELECTION_H
 
-#include <map>
-
-#include <obfuscation/obfuscation_transformation.h>
-
 class I386InstructionSelectionTransformation : public BBLObfuscationTransformation {
   static constexpr const char* _name = "instruction_selection";
   long reselected;

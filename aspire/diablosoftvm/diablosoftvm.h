@@ -37,7 +37,7 @@ extern "C" {
 #include "diablosoftvm_json.h"
 #include "aspire_options.h"
 
-void AspireSoftVMInit();
+void AspireSoftVMInit(t_string binary_path);
 void AspireSoftVMPreFini();
 void AspireSoftVMFini(t_ptr_array *chunks);
 int AspireSoftVMMarkAndSplit(t_cfg *cfg, t_ptr_array *chunks, t_randomnumbergenerator *rng);
@@ -45,6 +45,7 @@ void AspireSoftVMExport(t_cfg *cfg, t_ptr_array *chunks);
 void AspireSoftVMFixups(t_cfg *cfg, t_ptr_array *chunks);
 void AspireSoftVMInsertGlueJumps(t_cfg *cfg, t_ptr_array *chunks);
 void AspireSoftVMReadExtractorOutput(t_cfg * cfg, t_ptr_array *unordered_chunks, t_ptr_array * chunks);
+int AspireSoftVMGetFrontendId();
 
 void CfgEdgeKillSoftVM(t_cfg_edge *edge);
 void BblKillSoftVM(t_bbl *bbl);

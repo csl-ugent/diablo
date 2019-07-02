@@ -1,5 +1,9 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
+#include <dlfcn.h>
+#include <sys/wait.h>
+
+int frontend_id = 4;
 #include "aspire_frontend_common.h"
 
 #include <obfuscation_opt.h>
@@ -14,6 +18,7 @@
 #include <diablosoftvm.h>
 #include <code_mobility.h>
 #include <reaction_mechanisms.h>
+#include <cf_tagging.h>
 #ifdef SELF_DEBUGGING
 #include <self_debugging.h>
 #else
@@ -21,9 +26,9 @@
 #include <self_debugging_json.h>
 #endif
 
-using namespace std;
+#include <map>
 
-int frontend_id = 4;
+using namespace std;
 
 /* Some combinations of protections on the same BBLs are disabled for now. This function ensures that */
 /* TODO: once each protection annotation gets its own region, this should be rewritten and be made more generic to only remove the conflicting BBLs from
@@ -74,9 +79,42 @@ void DisableMisbehavingProtectionCombinations(t_cfg* cfg) {
     /* Disable {RA,Code Guards} + Code Mobility */
     const CodeMobilityAnnotationInfo* info;
     bool needs_disabled_guards = false;
+    bool disable_cm_if_predecessor_antidebugging = false;
     BBL_FOREACH_CODEMOBILITY_REGION(bbl, region, info)
     {
       needs_disabled_guards = true;
+      disable_cm_if_predecessor_antidebugging = true;
+    }
+
+    if (disable_cm_if_predecessor_antidebugging) {
+      t_cfg_edge *e;
+      BBL_FOREACH_PRED_EDGE(bbl, e) {
+        t_cfg_edge *ee = e;
+        if (CFG_EDGE_CAT(e) == ET_RETURN) {
+          ee = CFG_EDGE_CORR(e);
+        }
+
+        const SelfDebuggingAnnotationInfo* info;
+        bool has_antidebugging_region = false;
+        BBL_FOREACH_SELFDEBUGGING_REGION(CFG_EDGE_HEAD(ee), region, info)
+          has_antidebugging_region = true;
+
+        if (has_antidebugging_region) {
+          VERBOSE(0, ("@eiB is marked for code mobility, predecessor @eiB for anti-debugging", bbl, CFG_EDGE_HEAD(ee)));
+
+          BBL_FOREACH_REGION(bbl, region) {
+            for (auto it = region->requests.begin(); it != region->requests.end(); ) {
+              if (dynamic_cast<CodeMobilityAnnotationInfo*>(*it)) {
+                VERBOSE(0, ("   disabling code mobility for this region"));
+                it = region->requests.erase(it);
+              }
+              else {
+                ++it;
+              }
+            }
+          }
+        }
+      }
     }
 
     if (needs_disabled_guards) {
@@ -101,8 +139,6 @@ void AfterLayoutBroker(t_cfg * cfg)
   AspireSoftVMPreFini();
 }
 
-LogFile* L_SOFTVM = NULL;
-
 int
 main (int argc, char **argv)
 {
@@ -111,6 +147,11 @@ main (int argc, char **argv)
 
   pid_t child_process_id = 0;
   int fd_fork_stdout;
+  bool forked = false;
+
+  /* print the command-line arguments */
+  PrintFullCommandline(argc, argv);
+  InitPluginSearchDirectory(FileDirectory(argv[0]));
 
   /* Initialise used Diablo libraries */
   DiabloAnoptArmInit (argc, argv);
@@ -166,6 +207,7 @@ main (int argc, char **argv)
   /* III. The REAL program {{{ */
   PrintAspireVersionInformationIfRequested();
 
+  RNGInitialise();
   if (global_options.random_overrides_file)
     RNGReadOverrides(global_options.random_overrides_file);
 
@@ -182,6 +224,8 @@ main (int argc, char **argv)
    */
   if (global_options.optimize && !diabloarm_options.orderseed_set)
     diabloarm_options.orderseed = 10;
+
+  DiabloBrokerCallInstall("FrontendId", "int*", (void*)BrokerFrontendId, FALSE);
 
   if (global_options.read)
   {
@@ -217,11 +261,29 @@ main (int argc, char **argv)
       RegisterAnnotationInfoFactory(codeguard_token, new CodeGuardAnnotationInfoFactory());
       RegisterAnnotationInfoFactory(attestator_token, new AttestatorAnnotationInfoFactory());
     }
+    RegisterAnnotationInfoFactory(cftagging_token, new CfTaggingAnnotationInfoFactory());
+    RegisterAnnotationInfoFactory(factoring_token, new FactoringAnnotationInfoFactory());
     ReadAnnotationsFromJSON(global_options.annotation_file, annotations);
 
-    /* CF Tagging might be requested, but it's not present in this version of Diablo */
+    /* If CF Tagging is requested, load the shared library and resolve the symbols */
+    void (*hAddCfTaggingForceReachables)(const t_object*, vector<string>&);
+    void (*hApplyCfTagging)(t_cfg*);
+    aspire_options.control_flow_tagging = aspire_options.control_flow_tagging && AnnotationContainsToken(annotations, cftagging_token);
     if (aspire_options.control_flow_tagging)
-      WARNING(("CF Tagging was requested but is not present in this version of Diablo!"));
+    {
+      void* handle = dlopen("/opt/cf_tagging/cf_tagging.so", RTLD_NOW);
+
+      if (!handle)
+      {
+        aspire_options.control_flow_tagging = false;
+        WARNING(("CF Tagging was requested but the shared library is not present: %s", dlerror()));
+      }
+      else
+      {
+        hAddCfTaggingForceReachables = (void (*)(const t_object*, vector<string>&)) dlsym(handle, "AddCfTaggingForceReachables");
+        hApplyCfTagging = (void (*)(t_cfg*)) dlsym(handle, "ApplyCfTagging");
+      }
+    }
 
     /* Find out whether code mobility is needed and initialize it if necessary */
     unique_ptr<CodeMobilityTransformer> cm_transformer;
@@ -238,7 +300,7 @@ main (int argc, char **argv)
     unique_ptr<SelfDebuggingTransformer> sd_transformer;
 #endif
     aspire_options.self_debugging = aspire_options.self_debugging && AnnotationContainsToken(annotations, selfdebugging_token);
-	
+
     if (aspire_options.self_debugging)
 #ifdef SELF_DEBUGGING
       sd_transformer.reset(new SelfDebuggingTransformer(obj, global_options.output_name));
@@ -276,6 +338,8 @@ main (int argc, char **argv)
         {
           reachable_vector.push_back(SP_IDENTIFIER_PREFIX "Init");
         }
+
+        DiabloBrokerCallInstall("OutputFileName", "t_string *", (void *)OutputFilenameBroker, FALSE);
 
         /* first, try to find the vmExecute function */
         if (SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), "vmExecute"))
@@ -320,17 +384,34 @@ main (int argc, char **argv)
 
         AddReactionForceReachables(obj, reachable_vector);
 
+        if (aspire_options.control_flow_tagging)
+          (*hAddCfTaggingForceReachables)(obj, reachable_vector);
+
         t_const_string const *force_reachable_funs = stringVectorToConstStringArray(reachable_vector);
 
         NewDiabloPhase("Flowgraph");
+        ComplexityInitTempInfo(OBJECT_CFG(obj));
         ObjectFlowgraph (obj, NULL, force_reachable_funs, TRUE);
         delete[] force_reachable_funs;
 
         cfg = OBJECT_CFG(obj);
 
+        /* we need to be able to distinguish between the main CFG (this one) and
+         * CFG's created by code mobility during the deflowgraphing phase */
+        SetMainCfg(cfg);
+
+        string kill_log_name = string(global_options.output_name) + ".killed";
+        OpenKilledInstructionLog(const_cast<t_string>(kill_log_name.c_str()));
+
+        RecordFunctionsAsOriginal(cfg);
+
         CfgRemoveDeadCodeAndDataBlocks (cfg);
         CfgPatchToSingleEntryFunctions (cfg);
         CfgRemoveDeadCodeAndDataBlocks (cfg);
+
+        DiabloBrokerCall("CfgConstantDistribution", cfg, global_options.output_name);
+
+        UniqueFunctionNames(cfg);
 
         if (diabloflowgraph_options.blockprofilefile
             && !FileExists(diabloflowgraph_options.blockprofilefile))
@@ -356,229 +437,299 @@ main (int argc, char **argv)
           }
         }
 
-        CfgComputeLiveness (cfg, TRIVIAL);
-        CfgComputeLiveness (cfg, CONTEXT_INSENSITIVE);
-        CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);
+#ifdef SELF_DEBUGGING
+        SelfDebuggingFixExecutionCount(cfg);
+#endif
 
-        while (ArmKillUselessInstructions (cfg));
+        InitialiseObjectFileTracking(cfg);
+        ComplexityFiniTempInfo(OBJECT_CFG(obj));
 
         RegionsInit(annotations, cfg);
 
         DisableMisbehavingProtectionCombinations(cfg);
 
-        if ((aspire_options.remote_attestation && AnnotationContainsToken(annotations, remoteattestation_token))
-            || (aspire_options.code_guards && AnnotationContainsToken(annotations, codeguard_token)))
-        {
-          NewDiabloPhase("Attestation");
-          AttestationInit(obj, aspire_options.actc_id, global_options.output_name);
-        }
-
         bool vm_present = SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), "vmExecute") != NULL;
-        if (aspire_options.softvm)
-        {
-          DiabloBrokerCallInstall("CfgEdgeKill", "t_cfg_edge *", (void *)CfgEdgeKillSoftVM, FALSE);
-          DiabloBrokerCallInstall("BblKill", "t_bbl *", (void *)BblKillSoftVM, FALSE);
+        if (global_options.optimize) {
+          CfgComputeLiveness (cfg, TRIVIAL);
+          CfgComputeLiveness (cfg, CONTEXT_INSENSITIVE);
+          CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);
 
-          /* generate dot file if requested */
-          if (global_options.generate_dots)
-            CfgDrawFunctionGraphs(cfg, initial_dot_path);
+          while (ArmKillUselessInstructions (cfg));
 
-          int nr_mobile_softvm_chunks = 0;
-          if (vm_present)
+          if ((aspire_options.remote_attestation && AnnotationContainsToken(annotations, remoteattestation_token))
+              || (aspire_options.code_guards && AnnotationContainsToken(annotations, codeguard_token)))
           {
-            t_const_string logging_svm_filename = StringConcat2 (global_options.output_name, ".diablo.integration.log");
-            INIT_LOGGING(L_SOFTVM, logging_svm_filename);
-            Free(logging_svm_filename);
+            NewDiabloPhase("Attestation");
+            AttestationInit(obj, aspire_options.actc_id, global_options.output_name);
 
-            LOG(L_SOFTVM, ("START OF INTEGRATION LOG\n"));
-
-            NewDiabloPhase("SoftVM");
-
-            AspireSoftVMInit();
-
-            /* generate softvm data */
-            PtrArrayInit(&unordered_chunks, FALSE);
-
-            t_randomnumbergenerator *rng_softvm = RNGCreateChild(RNGGetRootGenerator(), "softvm");
-            nr_mobile_softvm_chunks = AspireSoftVMMarkAndSplit(cfg, &unordered_chunks, rng_softvm);
-            RNGDestroy(rng_softvm);
-
-            /* fix the order of the chunks so the order in which they are written in the
-             * extractor output file is equal to the order in which they are stored in the Diablo IR. */
-            PtrArrayInit(&chunks, FALSE);
-            AspireSoftVMReadExtractorOutput(cfg, &unordered_chunks, &chunks);
-            PtrArrayFini(&unordered_chunks, FALSE);
-
-            /* Some unreachable parts of code (all vmStartX pieces and the vmExecute
-             * function) are not flowgraphed in functions. We do need them to be.
-             *      - vmStartX will be taken care of while replacing the chunks
-             *      - vmExecute we'll do here */
-            AspireSoftVMInsertGlueJumps(cfg, &chunks);
-
-            CfgRemoveDeadCodeAndDataBlocks (cfg);
-            CfgPatchToSingleEntryFunctions (cfg);
-            CfgRemoveDeadCodeAndDataBlocks (cfg);
-
-            CfgComputeLiveness (cfg, TRIVIAL);
-            CfgComputeLiveness (cfg, CONTEXT_INSENSITIVE);
-            CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);
-            CfgComputeSavedChangedRegisters (cfg);
-
-            DiabloBrokerCallInstall("AfterDataLayoutFixed", "const t_cfg *", reinterpret_cast<void*>(AfterLayoutBroker), FALSE, cfg);
-
-            LOG(L_SOFTVM,("END OF INTEGRATION LOG\n"));
-            FINI_LOGGING(L_SOFTVM);
-
-            if (aspire_options.code_mobility)
-              cm_transformer->ReserveEntries(nr_mobile_softvm_chunks);
-          }
-          else
-          {
-            Region *region;
-            const SoftVMAnnotationInfo *info;
-            CFG_FOREACH_SOFTVM_REGION(cfg, region, info)
-              FATAL(("SoftVM protection requested but no SoftVM present in binary"));
-          }
-        }
-
-        /* TODO: can't we perhaps put these checks in the SoftVM? :-) */
-        /* TODO: enable/disable with commandline args */
-
-        if (!aspire_options.softvm_only)
-        {
-          if (aspire_options.call_stack_checks)
-          {
-            t_const_string logging_callchecks_filename = StringConcat2 (global_options.output_name, ".diablo.callchecks.log");
-            INIT_LOGGING(L_CALLCHECKS, logging_callchecks_filename);
-            Free(logging_callchecks_filename);
-            LOG(L_CALLCHECKS, ("START OF CALLCHECKS LOG\n"));
-
-            NewDiabloPhase("CallChecks");
-            ApplyCallStackChecks(cfg);
-
-            LOG(L_CALLCHECKS,("END OF CALLCHECKS LOG\n"));
-            FINI_LOGGING(L_CALLCHECKS);
+            if (aspire_options.code_guard_hack)
+              AttestationActivate(cfg);
           }
 
-          if (global_options.factoring)
-          {
-            t_randomnumbergenerator *rng_factoring = RNGCreateChild(RNGGetRootGenerator(), "factoring");
+          t_const_string target_selector_log = StringConcat2(global_options.output_name, ".diablo.newtargetselectors.log");
+          InitTargetSelectorLogging(target_selector_log);
+          Free(target_selector_log);
 
-            NewDiabloPhase("Factoring");
-            if (BblFactorInit(cfg))
+          if (aspire_options.softvm)
+          {
+            DiabloBrokerCallInstall("CfgEdgeKill", "t_cfg_edge *", (void *)CfgEdgeKillSoftVM, FALSE);
+            DiabloBrokerCallInstall("BblKill", "t_bbl *", (void *)BblKillSoftVM, FALSE);
+
+            /* generate dot file if requested */
+            if (global_options.generate_dots)
             {
-              FunctionEpilogueFactoring (cfg);
+              CfgDrawFunctionGraphs(cfg, initial_dot_path);
 
-              CfgPatchToSingleEntryFunctions (cfg);
-              BblFactoring (cfg, rng_factoring);
+              t_string callgraph_dot_file = StringConcat2(initial_dot_path, "/callgraph.dot");
+              CfgDrawFunctionGraphsWithHotness (OBJECT_CFG(obj), initial_dot_path);
+              CgBuild (cfg);
+              CgExport (CFG_CG(cfg), callgraph_dot_file);
+              Free(callgraph_dot_file);
             }
-            BblFactorFini(cfg);
 
-            RNGDestroy(rng_factoring);
-          }
+            int nr_mobile_softvm_chunks = 0;
+            if (vm_present)
+            {
+              NewDiabloPhase("SoftVM");
 
-          AddReactions(obj);
+              AspireSoftVMInit(argv[0]);
 
-          if (aspire_options.obfuscations)
-          {
-            LogFile* L_OBF = NULL;
-            t_const_string logging_obf_filename = StringConcat2 (global_options.output_name, ".diablo.obfuscation.log");
-            INIT_LOGGING(L_OBF, logging_obf_filename);
-            Free(logging_obf_filename);
-            ATTACH_LOGGING(L_OBF_BF, L_OBF);
-            ATTACH_LOGGING(L_OBF_FF, L_OBF);
-            ATTACH_LOGGING(L_OBF_OOP, L_OBF);
+              /* generate softvm data */
+              PtrArrayInit(&unordered_chunks, FALSE);
 
-            NewDiabloPhase("Obfuscation");
-            if (global_options.annotation_file == NULL)
-              ObjectObfuscate(global_options.objectfilename, obj);
+              t_randomnumbergenerator *rng_softvm = RNGCreateChild(RNGGetRootGenerator(), "softvm");
+              nr_mobile_softvm_chunks = AspireSoftVMMarkAndSplit(cfg, &unordered_chunks, rng_softvm);
+              RNGDestroy(rng_softvm);
+
+              /* fix the order of the chunks so the order in which they are written in the
+               * extractor output file is equal to the order in which they are stored in the Diablo IR. */
+              PtrArrayInit(&chunks, FALSE);
+              AspireSoftVMReadExtractorOutput(cfg, &unordered_chunks, &chunks);
+              PtrArrayFini(&unordered_chunks, FALSE);
+
+              /* Some unreachable parts of code (all vmStartX pieces and the vmExecute
+               * function) are not flowgraphed in functions. We do need them to be.
+               *      - vmStartX will be taken care of while replacing the chunks
+               *      - vmExecute we'll do here */
+              AspireSoftVMInsertGlueJumps(cfg, &chunks);
+
+              CfgRemoveDeadCodeAndDataBlocks (cfg);
+              CfgPatchToSingleEntryFunctions (cfg);
+              CfgRemoveDeadCodeAndDataBlocks (cfg);
+
+              CfgComputeLiveness (cfg, TRIVIAL);
+              CfgComputeLiveness (cfg, CONTEXT_INSENSITIVE);
+              CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);
+              CfgComputeSavedChangedRegisters (cfg);
+
+              DiabloBrokerCallInstall("AfterDataLayoutFixed", "const t_cfg *", reinterpret_cast<void*>(AfterLayoutBroker), FALSE, cfg);
+
+              if (aspire_options.code_mobility)
+                cm_transformer->ReserveEntries(nr_mobile_softvm_chunks);
+            }
             else
-              CfgObfuscateRegions(cfg);
-
-            CfgPatchToSingleEntryFunctions (cfg);
-            LOG(L_OBF,("END OF OBFUSCATION LOG\n"));
-            FINI_LOGGING(L_OBF);
-            FINI_LOGGING(L_OBF_BF);
-            FINI_LOGGING(L_OBF_FF);
-            FINI_LOGGING(L_OBF_OOP);
+            {
+              Region *region;
+              const SoftVMAnnotationInfo *info;
+              CFG_FOREACH_SOFTVM_REGION(cfg, region, info)
+                FATAL(("SoftVM protection requested but no SoftVM present in binary"));
+            }
           }
 
-#if SELF_DEBUGGING
-          if (aspire_options.self_debugging)
+          if (diabloflowgraph_options.postblockprofilefile
+              && !FileExists(diabloflowgraph_options.postblockprofilefile))
           {
-            NewDiabloPhase("Self-Debugging");
-            sd_transformer->TransformObject();
+            /* execution profile does not exist! */
+            WARNING(("Execution profile (%s) does not exist!", diabloflowgraph_options.postblockprofilefile));
+
+            Free(diabloflowgraph_options.postblockprofilefile);
+            diabloflowgraph_options.postblockprofilefile = NULL;
+            diabloflowgraph_options.postblockprofilefile_set = FALSE;
           }
+
+          if (diabloflowgraph_options.postblockprofilefile)
+          {
+            CfgReadBlockExecutionCounts (cfg, diabloflowgraph_options.postblockprofilefile);
+
+            VERBOSE(0,("START WEIGHT OF CFG ACCORDING TO POST PROFILE INFORMATION: %lld", CfgComputeWeight (cfg)));
+          }
+
+          /* TODO: can't we perhaps put these checks in the SoftVM? :-) */
+          /* TODO: enable/disable with commandline args */
+          t_const_string bbl_file_name = StringConcat2(global_options.output_name, ".bbl_list");
+          DumpBasicBlocks(cfg, bbl_file_name);
+          Free(bbl_file_name);
+
+          CfgRemoveDeadCodeAndDataBlocks (cfg);
+          CfgPatchToSingleEntryFunctions (cfg);
+          CfgRemoveDeadCodeAndDataBlocks (cfg);
+
+          /* Advanced Factoring */
+          NewDiabloPhase("AdvancedFactoring");
+          if (diabloanoptarm_options.advanced_factoring)
+          {
+            t_const_string advanced_factoring_filename = StringConcat2(global_options.output_name, ".advanced_factoring.log");
+            DiabloBrokerCall("BblConstructCompareMatrices", cfg, advanced_factoring_filename);
+            Free(advanced_factoring_filename);
+          }
+
+          diabloanopt_options.rely_on_calling_conventions = false;
+
+          if (!aspire_options.softvm_only)
+          {
+            if (aspire_options.control_flow_tagging)
+            {
+              NewDiabloPhase("CFG Tagging");
+              (*hApplyCfTagging)(cfg);
+            }
+
+            if (aspire_options.call_stack_checks)
+            {
+              t_const_string logging_callchecks_filename = StringConcat2 (global_options.output_name, ".diablo.callchecks.log");
+              INIT_LOGGING(L_CALLCHECKS, logging_callchecks_filename);
+              Free(logging_callchecks_filename);
+              LOG(L_CALLCHECKS, ("# START OF CALLCHECKS LOG\n"));
+
+              NewDiabloPhase("CallChecks");
+              ApplyCallStackChecks(cfg);
+
+              LOG(L_CALLCHECKS,("# END OF CALLCHECKS LOG\n"));
+              FINI_LOGGING(L_CALLCHECKS);
+            }
+
+#if 0
+            if (global_options.factoring)
+            {
+              t_randomnumbergenerator *rng_factoring = RNGCreateChild(RNGGetRootGenerator(), "factoring");
+
+              NewDiabloPhase("Factoring");
+              if (BblFactorInit(cfg))
+              {
+                FunctionEpilogueFactoring (cfg);
+
+                CfgPatchToSingleEntryFunctions (cfg);
+                BblFactoring (cfg, rng_factoring);
+              }
+              BblFactorFini(cfg);
+
+              RNGDestroy(rng_factoring);
+            }
 #endif
 
-          if (aspire_options.code_mobility)
-          {
-            NewDiabloPhase("Code Mobility");
-            cm_transformer->TransformObject();
-          }
-        }
+            AddReactions(obj);
 
-        if (global_options.self_profiling)
-        {
-          /* open up a file for the stdout of the forked process */
-          stdout_file = StringConcat2(global_options.output_name, ".self_profiling.stdout");
-          fd_fork_stdout = open(stdout_file, O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR | S_IROTH | S_IRGRP);
-          ASSERT(fd_fork_stdout != -1, ("Could not open file '%s' to redirect the stdout of the forked process to.", stdout_file));
+            if (aspire_options.obfuscations)
+            {
+              LogFile* L_OBF = NULL;
+              t_const_string logging_obf_filename = StringConcat2 (global_options.output_name, ".diablo.obfuscation.log");
+              INIT_LOGGING(L_OBF, logging_obf_filename);
+              Free(logging_obf_filename);
+              ATTACH_LOGGING(L_OBF_BF, L_OBF);
+              ATTACH_LOGGING(L_OBF_FF, L_OBF);
+              ATTACH_LOGGING(L_OBF_OOP, L_OBF);
 
-          /* flush output streams before forking */
-          fflush(stdout);
-          fflush(stderr);
+              NewDiabloPhase("Obfuscation");
+              if (global_options.annotation_file == NULL || diabloanoptarm_options.advanced_factoring)
+                ObjectObfuscate(global_options.objectfilename, obj);
+              else
+                CfgObfuscateRegions(cfg);
 
-          if (aspire_options.no_sp_fork)
-          {
-            VERBOSE(0, ("As requested, no fork is executed for the insertion of self-profiling support code."));
-            VERBOSE(0, ("The remaining output is redirected to \"%s\".", stdout_file));
-            child_process_id = 1;
-            Free(stdout_file);
-          }
-          else
-          {
-            Free(stdout_file);
-            child_process_id = fork();
-          }
+              CfgPatchToSingleEntryFunctions (cfg);
+              LOG(L_OBF,("# END OF OBFUSCATION LOG\n"));
+              FINI_LOGGING(L_OBF);
+              FINI_LOGGING(L_OBF_BF);
+              FINI_LOGGING(L_OBF_FF);
+              FINI_LOGGING(L_OBF_OOP);
+            }
 
-          /* a different execution path is taken for the parent and the child process */
-          if (child_process_id < 0)
-          {
-            FATAL(("Could not fork (%d)! Maybe use a spoon instead?", child_process_id));
-          }
-          else if (child_process_id > 0)
-          {
-            /* parent process */
-
-            /* redirect stdout */
-            dup2(fd_fork_stdout, STDOUT_FILENO);
+#if SELF_DEBUGGING
+            if (aspire_options.self_debugging)
+            {
+              NewDiabloPhase("Self-Debugging");
+              sd_transformer->TransformObject();
+            }
+#endif
 
             if (aspire_options.code_mobility)
             {
-              t_string s = StringConcat2(code_mobility_options.output_dir, ".self_profiling");
-              Free(code_mobility_options.output_dir);
-              code_mobility_options.output_dir = s;
+              NewDiabloPhase("Code Mobility");
+              cm_transformer->TransformObject();
+            }
+          }
+
+          if (global_options.self_profiling)
+          {
+            /* open up a file for the stdout of the forked process */
+            stdout_file = StringConcat2(global_options.output_name, ".self_profiling.stdout");
+            fd_fork_stdout = open(stdout_file, O_WRONLY | O_CREAT, S_IWUSR | S_IRUSR | S_IROTH | S_IRGRP);
+            ASSERT(fd_fork_stdout != -1, ("Could not open file '%s' to redirect the stdout of the forked process to.", stdout_file));
+
+            /* flush output streams before forking */
+            fflush(stdout);
+            fflush(stderr);
+
+            if (aspire_options.no_sp_fork)
+            {
+              VERBOSE(0, ("As requested, no fork is executed for the insertion of self-profiling support code."));
+              VERBOSE(0, ("The remaining output is redirected to \"%s\".", stdout_file));
+              child_process_id = 1;
+              Free(stdout_file);
+            }
+            else
+            {
+              forked = true;
+              Free(stdout_file);
+              child_process_id = fork();
             }
 
-            global_options.output_name = StringConcat2(global_options.output_name, ".self_profiling");
-            final_dot_path = StringConcat2(final_dot_path, "-self_profiling");
+            /* a different execution path is taken for the parent and the child process */
+            if (child_process_id < 0)
+            {
+              FATAL(("Could not fork (%d)! Maybe use a spoon instead?", child_process_id));
+            }
+            else if (child_process_id > 0)
+            {
+              /* parent process */
 
-            /* Add self-profiling */
-            CfgAssignUniqueOldAddresses(cfg);
-            NewDiabloPhase("Self-profiling");
-            CfgComputeLiveness (cfg, TRIVIAL);/* We'll need this later on */
-            CfgComputeLiveness (cfg, CONTEXT_INSENSITIVE);/* We'll need this later on */
-            CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);/* We'll need this later on */
-            CfgAddSelfProfiling (obj, global_options.output_name);
-          }
-          else
-          {
-            /* child process */
+              /* redirect stdout */
+              dup2(fd_fork_stdout, STDOUT_FILENO);
 
-            /* do nothing */
+              if (aspire_options.code_mobility)
+              {
+                t_string s = StringConcat2(code_mobility_options.output_dir, ".self_profiling");
+                Free(code_mobility_options.output_dir);
+                code_mobility_options.output_dir = s;
+              }
+
+              global_options.output_name = StringConcat2(global_options.output_name, ".self_profiling");
+              final_dot_path = StringConcat2(final_dot_path, "-self_profiling");
+
+              /* Add self-profiling */
+              CfgAssignUniqueOldAddresses(cfg);
+              NewDiabloPhase("Self-profiling");
+              CfgComputeLiveness (cfg, TRIVIAL);/* We'll need this later on */
+              CfgComputeLiveness (cfg, CONTEXT_INSENSITIVE);/* We'll need this later on */
+              CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);/* We'll need this later on */
+              CfgAddSelfProfiling (obj, global_options.output_name);
+
+              DisableOriginTracking();
+            }
+            else
+            {
+              /* child process */
+
+              /* do nothing */
+            }
           }
         }
+
+        if (global_options.branch_flipping || (diabloanoptarm_options.af_fake_fallthrough_condbranch_chance > 0)) {
+          DiabloBrokerCallInstall("BeforeDeflowgraphNonTF", "t_cfg *", (void*)ArmFlipBranchesFakeEdges, FALSE);
+          DiabloBrokerCallInstall("BeforeDeflowgraphNonTF", "t_cfg *", (void*)ArmPossiblyFlipConditionalBranches, FALSE);
+        }
+
+        if (global_options.branch_elimination)
+          DiabloBrokerCall ("BranchElimination", cfg);
 
         /* Export dots after optimzation {{{  */
         if (global_options.generate_dots)
@@ -622,7 +773,7 @@ main (int argc, char **argv)
         NewDiabloPhase("Deflowgraph");
         ObjectDeflowgraph (obj);
 
-        if (vm_present && aspire_options.softvm)
+        if (vm_present && aspire_options.softvm && global_options.optimize)
         {
           AspireSoftVMFini(&chunks);
           PtrArrayFini(&chunks, FALSE);
@@ -679,6 +830,8 @@ main (int argc, char **argv)
   } /* }}} */
   /* END REAL program }}} */
 
+  RNGFinalise();
+
   /* IV. Free all structures {{{ */
   /* remove directory that held the restored dump */
   /*if (global_options.restore) RmdirR("./DUMP"); */
@@ -699,6 +852,8 @@ main (int argc, char **argv)
    * removed when a real version of diablo is made */
   diablosupport_options.verbose++;
   PrintRemainingBlocks ();
+
+  CloseAllLibraries();
 
   /* End Fini }}} */
   return 0;

@@ -206,6 +206,7 @@ t_architecture_description i386_description =
    NULL,   
    NULL,
    NULL,
+   NULL,
    NULL
 };
 /* vim: set shiftwidth=2: */

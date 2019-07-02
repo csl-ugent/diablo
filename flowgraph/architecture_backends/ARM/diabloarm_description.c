@@ -176,6 +176,23 @@ t_bool ArmInsIsCopyPlug(t_ins * i_ins, t_reg * copy, t_reg * original)
   return ArmInsIsCopy(T_ARM_INS(i_ins),copy,original);
 }
 
+t_bool ArmInsIsInvariantPlug(t_ins *ins)
+{
+  return ArmInsIsInvariant(T_ARM_INS(ins));
+}
+
+t_bool ArmInsIsConstantProducerPlug(t_ins *ins) {
+  return ARM_INS_OPCODE(T_ARM_INS(ins)) == ARM_CONSTANT_PRODUCER;
+}
+
+t_int64 ArmInsGetImmediatePlug(t_ins *ins) {
+  return ARM_INS_IMMEDIATE(T_ARM_INS(ins));
+}
+
+void ArmInsSetImmediatePlug(t_ins *ins, t_int64 imm) {
+  ARM_INS_SET_IMMEDIATE(T_ARM_INS(ins), imm);
+}
+
 /* Architecture Description */
 t_architecture_description arm_description =
 {
@@ -321,7 +338,11 @@ t_architecture_description arm_description =
    unbehaved_funs,
    ArmComputeLiveRegsBeforeSwiPlug,
    ArmInsIsCopyPlug,		    /* */
-   ArmModus
+   ArmModus,
+   ArmInsIsInvariantPlug,
+   ArmInsIsConstantProducerPlug,
+   ArmInsGetImmediatePlug,
+   ArmInsSetImmediatePlug
 };
 /* \todo Clean this up and document */
 #if MAX_REG_ITERATOR > 64

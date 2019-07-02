@@ -25,7 +25,7 @@ void ArmOptimizeStackLoadAndStores(t_cfg * cfg)
         int highest_reg_second_ins = -1;
 
 	for (i=15; i>=0; i--)
-	  if (ARM_INS_IMMEDIATE(i_ins) & (1 << i)) 
+	  if (ARM_INS_IMMEDIATE(i_ins) & (1 << i))
             {
               num_regs++;
               lowest_reg_first_ins = i;
@@ -38,7 +38,7 @@ void ArmOptimizeStackLoadAndStores(t_cfg * cfg)
               break;
             }
 
-        if (!(highest_reg_second_ins<lowest_reg_first_ins)) 
+        if (!(highest_reg_second_ins<lowest_reg_first_ins))
           continue;
 
 	if (num_regs>=5)
@@ -66,7 +66,7 @@ void ArmOptimizeStackLoadAndStores(t_cfg * cfg)
         int highest_reg_first_ins = -1;
         int lowest_reg_second_ins = -1;
 	for (i=0; i<16; i++)
-	  if (ARM_INS_IMMEDIATE(i_ins) & (1 << i)) 
+	  if (ARM_INS_IMMEDIATE(i_ins) & (1 << i))
 	    {
               highest_reg_first_ins = i;
               num_regs++;
@@ -79,7 +79,7 @@ void ArmOptimizeStackLoadAndStores(t_cfg * cfg)
               break;
             }
 
-        if (!(lowest_reg_second_ins>highest_reg_first_ins)) 
+        if (!(lowest_reg_second_ins>highest_reg_first_ins))
           continue;
 
 	if (num_regs>=5)
@@ -127,7 +127,7 @@ static t_bool ArmOptKillUseless(t_cfg * cfg)
   RegsetSetAddReg(condition_bits,ARM_REG_N_CONDITION);
 
   STATUS(START,("Kill Useless Instructions"));
-  
+
   CFG_FOREACH_BBL(cfg,i_bbl)
   {
     if (!BBL_FUNCTION(i_bbl)) continue;
@@ -208,10 +208,10 @@ static t_bool ArmOptKillUseless(t_cfg * cfg)
               kcountuncond++;
 	    }
 	  }
-	} 
+	}
       }
-      
-      if (RegsetIsEmpty(tmp) 
+
+      if (RegsetIsEmpty(tmp)
           && !InsHasSideEffect(i_ins)
 #ifdef DEBUG_KILL_USELESS
           && total_count < diablosupport_options.debugcounter
@@ -222,6 +222,7 @@ static t_bool ArmOptKillUseless(t_cfg * cfg)
         VERBOSE(0,("-- Killing @I in @ieB\n",i_ins,INS_BBL(i_ins)));
         total_count++;
 #endif
+        LogKilledInstruction(INS_OLD_ADDRESS(i_ins));
         InsKill(i_ins);
         kcount++;
       }
@@ -283,7 +284,7 @@ void OptimizeStackLoadAndStores(t_cfg * cfg)
 	int num_regs = 0;
 
 	for (i=0; i<16; i++)
-	  if (ARM_INS_IMMEDIATE(i_ins) & (1 << i)) 
+	  if (ARM_INS_IMMEDIATE(i_ins) & (1 << i))
 	    num_regs++;
 	if (num_regs>=5)
 	{
@@ -308,7 +309,7 @@ void OptimizeStackLoadAndStores(t_cfg * cfg)
 	int num_regs = 0;
 
 	for (i=0; i<16; i++)
-	  if (ARM_INS_IMMEDIATE(i_ins) & (1 << i)) 
+	  if (ARM_INS_IMMEDIATE(i_ins) & (1 << i))
 	    num_regs++;
 	if (num_regs>=5)
 	{
@@ -446,7 +447,7 @@ void OptimizeSingleThreaded(t_cfg * cfg)
 				/* skip other instructions by default */
 				break;
 			}
-			
+
 			ARM_INS_SET_REGS_DEF(i_ins,  ArmDefinedRegisters(i_ins));
 			ARM_INS_SET_REGS_USE(i_ins,  ArmUsedRegisters(i_ins));
 		}
@@ -677,6 +678,9 @@ void ArmBranchEliminationDo(t_bbl * a, t_bbl * b, t_bool * ret)
       return;
     }
   }
+  else if (ARM_INS_ATTRIB(T_ARM_INS(BBL_INS_LAST(a))) & IF_SWITCHJUMP) {
+    *ret = FALSE;
+  }
 
   VERBOSE(3, ("eliminating @eiB to @eiB", a, b));
 }
@@ -689,4 +693,224 @@ void ArmBranchForwardingDo(t_cfg_edge * edge, t_bool * ret)
     VERBOSE(3, ("not forwarding @E", edge));
     *ret = FALSE;
   }
+}
+
+static bool FlipBranchesCheckFallthroughLoop(t_bbl *from)
+{
+	/* if the FROM is marked, this is a fallthrough loop! */
+	if (BblIsMarked(from))
+		return true;
+
+	/* mark this BBL as visited */
+	BblMark(from);
+
+	/* lookup the fallthrough edge, if any */
+	t_cfg_edge *ft_edge = ArmGetFallThroughEdge(from);
+
+	/* if no fallthrough destination is found, no loop is possible */
+	if (!ft_edge)
+		return false;
+
+	return FlipBranchesCheckFallthroughLoop(CFG_EDGE_TAIL(ft_edge));
+}
+
+t_bool CanModifyBranch(t_bbl *bbl) {
+	if (BBL_IS_HELL(bbl))
+		return FALSE;
+
+	if (!BBL_INS_LAST(bbl))
+		return FALSE;
+
+	/* at least one instruction exists */
+	t_arm_ins *last = T_ARM_INS(BBL_INS_LAST(bbl));
+
+	/* do we care about this instruction? */
+	if (ARM_INS_TYPE(last) != IT_BRANCH)
+		/* don't care about this */
+		return FALSE;
+
+	if (ARM_INS_OPCODE(last) != ARM_B)
+		return FALSE;
+
+	return TRUE;
+}
+
+t_bool CanModifyBranchConditional(t_bbl *bbl) {
+	if (!CanModifyBranch(bbl))
+		return FALSE;
+
+	t_arm_ins *last = T_ARM_INS(BBL_INS_LAST(bbl));
+	if (!(ARM_INS_IS_CONDITIONAL(last)
+				&& ARM_INS_CONDITION(last)))
+		/* don't care about this */
+		return FALSE;
+
+	return TRUE;
+}
+
+t_bool CanModifyJumpEdge(t_cfg_edge *e) {
+	t_bbl *bbl = CFG_EDGE_HEAD(e);
+
+	/* BBL jumping to itself */
+	if (CFG_EDGE_TAIL(e) == bbl)
+		return FALSE;
+
+	/* take into account possible conditional branch-and-links */
+	if (CFG_EDGE_CAT(e) == ET_CALL)
+		return FALSE;
+
+	ASSERT(CFG_EDGE_CAT(e) == ET_JUMP
+					|| CFG_EDGE_CAT(e) == ET_IPJUMP, ("did not expect this type of edge @E: @eiB", e, bbl));
+
+	/* jump destination is the exit block of a function, no transformation can be done! */
+	if (CFG_EDGE_TAIL(e) == FunctionGetExitBlock(BBL_FUNCTION(bbl)))
+		return FALSE;
+
+	if (!CanModifyJumpEdgeAF(e))
+		return FALSE;
+
+	return TRUE;
+}
+
+t_bool CanFlipBranch(t_bbl *bbl, t_cfg_edge ** ft_edge, t_cfg_edge ** jump_edge) {
+	/* look up the jump and fallthrough edges */
+	*jump_edge = NULL;
+	*ft_edge = NULL;
+	t_cfg_edge *e;
+	BBL_FOREACH_SUCC_EDGE(bbl, e)
+	{
+		if (CfgEdgeIsFallThrough(e))
+			*ft_edge = e;
+		else
+			*jump_edge = e;
+	}
+
+	ASSERT(*ft_edge, ("no fallthrough edge found for @eiB", bbl));
+	ASSERT(*jump_edge, ("no jump edge found for @eiB", bbl));
+
+	if (!CanModifyJumpEdge(*jump_edge))
+		return FALSE;
+
+	return TRUE;
+}
+
+void DoUncondBranchToFallthrough(t_bbl *bbl) {
+	t_cfg_edge *e = BBL_SUCC_FIRST(bbl);
+	t_bool e_was_fake = CfgEdgeIsFake(e);
+	t_uint32 exec = CFG_EDGE_EXEC_COUNT(e);
+
+	t_bbl *dest = CFG_EDGE_TAIL(e);
+
+	/* kill existing edges */
+	if (CFG_EDGE_CORR(e))
+		CfgEdgeKill(CFG_EDGE_CORR(e));
+	CfgEdgeKill(e);
+
+	/* recreate fallthrough edge */
+	t_cfg_edge *new_ft = CfgEdgeCreate(BBL_CFG(bbl), bbl, dest, ET_FALLTHROUGH);
+	if (e_was_fake)
+		CfgEdgeMarkFake(new_ft);
+	EdgeMakeInterprocedural(new_ft);
+	CFG_EDGE_SET_EXEC_COUNT(new_ft, exec);
+
+	/* kill last instruction (the branch instruction) */
+	t_arm_ins *last = T_ARM_INS(BBL_INS_LAST(bbl));
+	ASSERT(ArmInsIsUnconditionalBranch(last), ("expected unconditional branch @eiB", bbl));
+
+	ArmInsKill(last);
+}
+
+void DoFlipBranch(t_bbl *bbl, t_cfg_edge *ft_edge, t_cfg_edge *jump_edge) {
+	t_bbl *ft_dest = CFG_EDGE_TAIL(ft_edge);
+	t_uint32 ft_exec = CFG_EDGE_EXEC_COUNT(ft_edge);
+	if (CFG_EDGE_CORR(ft_edge))
+		CfgEdgeKill(CFG_EDGE_CORR(ft_edge));
+	t_bool ft_was_fake = CfgEdgeIsFake(ft_edge);
+	CfgEdgeKill(ft_edge);
+
+	t_bbl *jump_dest = CFG_EDGE_TAIL(jump_edge);
+	t_uint32 jump_exec = CFG_EDGE_EXEC_COUNT(jump_edge);
+	if (CFG_EDGE_CORR(jump_edge))
+		CfgEdgeKill(CFG_EDGE_CORR(jump_edge));
+	t_bool jump_was_fake = CfgEdgeIsFake(jump_edge);
+	CfgEdgeKill(jump_edge);
+
+	t_cfg_edge *new_jump = CfgEdgeCreate(BBL_CFG(bbl), bbl, ft_dest, ET_JUMP);
+	if (ft_was_fake)
+		CfgEdgeMarkFake(new_jump);
+	EdgeMakeInterprocedural(new_jump);
+	CFG_EDGE_SET_EXEC_COUNT(new_jump, ft_exec);
+
+	t_cfg_edge *new_ft = CfgEdgeCreate(BBL_CFG(bbl), bbl, jump_dest, ET_FALLTHROUGH);
+	if (jump_was_fake)
+		CfgEdgeMarkFake(new_ft);
+	EdgeMakeInterprocedural(new_ft);
+	CFG_EDGE_SET_EXEC_COUNT(new_ft, jump_exec);
+
+	/* invert the condition by conveniently inverting the LSbit */
+	t_arm_ins *last = T_ARM_INS(BBL_INS_LAST(bbl));
+	t_arm_condition_code cond = ARM_INS_CONDITION(last) ^ 0x1;
+	ARM_INS_SET_CONDITION(last, cond);
+}
+
+//#define DEBUG_FLIP
+void ArmPossiblyFlipConditionalBranches(t_cfg *cfg)
+{
+	if (diabloanoptarm_options.af_fake_fallthrough_condbranch_chance > 0)
+		return;
+
+	t_uint32 nr_transormations = 0;
+	STATUS(START, ("Branch Flipping"));
+
+	t_bbl *bbl;
+	CFG_FOREACH_BBL(cfg, bbl)
+	{
+		if (!CanModifyBranchConditional(bbl))
+			continue;
+
+		t_cfg_edge *jump_edge = NULL;
+		t_cfg_edge *ft_edge = NULL;
+		if (!CanFlipBranch(bbl, &ft_edge, &jump_edge))
+			continue;
+
+		/* make sure we don't introduce any fallthrough loops */
+		BblMarkInit();
+		BblMark(bbl);
+		if (FlipBranchesCheckFallthroughLoop(CFG_EDGE_TAIL(jump_edge))) {
+			DEBUG(("FT loop!"));
+			continue;
+		}
+
+		t_bbl *ft_dest = CFG_EDGE_TAIL(ft_edge);
+		if (BBL_NINS(ft_dest) == 1
+				&& ARM_INS_TYPE(T_ARM_INS(BBL_INS_LAST(ft_dest))) == IT_BRANCH)
+		{
+			t_bbl *jump_dest = CFG_EDGE_TAIL(jump_edge);
+			t_cfg_edge *e;
+
+			/* The jump destination will become the fallthrough destination.
+			 * Make sure that this new fallthrough destination does not have an incoming (implicit) fallthrough edge already! */
+			bool has_incoming_ft = false;
+			BBL_FOREACH_PRED_EDGE(jump_dest, e)
+				if (CfgEdgeIsFallThrough(e)
+						|| CFG_EDGE_CAT(e) == ET_RETURN)
+				{
+					has_incoming_ft = true;
+					break;
+				}
+			if (has_incoming_ft)
+				continue;
+
+			//DEBUG(("flip %u: @eiB", nr_transormations, bbl));
+			DoFlipBranch(bbl, ft_edge, jump_edge);
+			//DEBUG(("   -----> @eiB", bbl));
+			nr_transormations++;
+		}
+
+#ifdef DEBUG_FLIP
+		if (diablosupport_options.debugcounter <= nr_transormations) break;
+#endif
+	}
+
+	STATUS(STOP, ("Branch Flipping (%u flips)", nr_transormations));
 }

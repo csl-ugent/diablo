@@ -25,6 +25,15 @@
 #define REG_NONE (-1)
 
 #define MAX_REG_ITERATOR (MAX_NR_REG_SUBSETS*REG_SUBSET_SIZE)
+
+#if REG_SUBSET_SIZE == 32
+#define RegSubsetCountBits(x) CountSetBits32(x)
+#elif REG_SUBSET_SIZE == 64
+#define RegSubsetCountBits(x) CountSetBits64(x)
+#else
+#error "implement me"
+#endif
+
 #if MAX_REG_ITERATOR > 64
 
 typedef struct _t_regset t_regset, renamed_t_regset;
@@ -60,6 +69,12 @@ struct _t_regset
   t_uint16 max_reg;
   t_uint32 regset[MAX_REG_ITERATOR / 32]; /* TODO: define REGS_IN_SUBSET for efficiency? */  
 };
+#define REGSET_FOREACH_SUBSET(r, s, i) for (i = 0, s = r.regset[0]; (i < (MAX_REG_ITERATOR / 32)) ? (s = r.regset[i], TRUE): FALSE; i++)
+
+static inline t_uint32
+register_get_subset(t_regset regs, t_uint16 index) {
+  return regs.regset[index];
+}
 
 extern t_regset NullRegs;
 

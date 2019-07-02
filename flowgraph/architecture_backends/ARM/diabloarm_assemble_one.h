@@ -7,6 +7,8 @@
 #ifdef DIABLOARM_FUNCTIONS
 #ifndef ARM_ASSEMBLE_ONE_FUNCTIONS
 #define ARM_ASSEMBLE_ONE_FUNCTIONS
+t_bool ArmEncodeImmediate(t_arm_ins * ins, t_uint32 * instr);
+
 void ArmAssembleBranch(t_arm_ins * ins, t_uint32 * instr);
 void ArmAssembleSwap(t_arm_ins * ins, t_uint32 * instr);
 void ArmAssembleDataProc(t_arm_ins * ins, t_uint32 * instr);

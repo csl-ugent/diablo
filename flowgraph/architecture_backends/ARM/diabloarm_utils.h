@@ -20,8 +20,10 @@
 #ifdef DIABLOARM_FUNCTIONS
 #ifndef ARM_UTILS_FUNCTIONS
 #define ARM_UTILS_FUNCTIONS
-t_regset ArmUsedRegisters(t_arm_ins * ins);
-t_regset ArmDefinedRegisters(t_arm_ins * ins);
+t_regset ArmUsedRegistersX(t_arm_ins * ins, t_uint8 *use);
+#define ArmUsedRegisters(ins) ArmUsedRegistersX(ins, NULL)
+t_regset ArmDefinedRegistersX(t_arm_ins * ins, t_uint8 *def);
+#define ArmDefinedRegisters(ins) ArmDefinedRegistersX(ins, NULL)
 t_bool ArmInsIsCommutative(t_arm_ins * ins);
 int ArmInsWriteBackHappens(t_arm_ins * ins);
 int ArmInsHasShiftedFlexible(t_arm_ins * ins);
@@ -66,6 +68,9 @@ t_bool ArmInsIsSwitchedBL(t_arm_ins * ins);
 t_uint32 ArmInsSwitchedBLTableEntrySize(t_arm_ins * ins);
 t_bool ArmInsSwitchedBLIsSignExtend(t_arm_ins * ins);
 void ArmInstructionIsDirectControlTransfer(t_ins * ins, t_bool* result);
+t_bool ArmInsHasImmediateOp(t_arm_ins * ins);
+t_bool ArmInsCanReplaceImmediateWithRegister(t_arm_ins *ins);
+t_bool ArmInsIsInvariant(t_arm_ins *ins);
 #endif
 #endif
 /* vim: set shiftwidth=2 foldmethod=marker: */

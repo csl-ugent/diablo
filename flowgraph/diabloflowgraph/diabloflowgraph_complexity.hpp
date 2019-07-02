@@ -55,4 +55,17 @@ StaticComplexity BblsComputeStaticComplexity(const BblSet& bbls);
 /* TODO: maybe this could at the same time also compute static metrics */
 DynamicComplexity BblsComputeDynamicComplexity(const BblSet& bbls);
 
+struct StaticComplexityOrigin {
+  std::vector<StaticComplexity> archives;
+  std::vector<StaticComplexity> objects;
+  std::vector<StaticComplexity> functions;
+};
+
+struct DynamicComplexityOrigin {
+  std::vector<DynamicComplexity> archives;
+  std::vector<DynamicComplexity> objects;
+  std::vector<DynamicComplexity> functions;
+};
+void CfgComputeDynamicComplexityOrigin(t_cfg * cfg, size_t nr_archives, size_t nr_objects, size_t nr_functions, std::map<FunctionUID, t_bbl *> function_to_bbl);
+
 #endif

@@ -1970,9 +1970,11 @@ static void ArmOptimizeSwitches(t_cfg *cfg)
 	  t_bbl * tmp;
 	  t_cfg_edge * new_edge;
 	  ins_split = T_ARM_INS(ObjectGetInsByAddress(obj, INS_CADDRESS(BBL_INS_FIRST(next_bbl))));
+          
 
 	  for (switchcount=0; switchcount < 2; switchcount++)
 	  {
+            ARM_INS_SET_ATTRIB(T_ARM_INS(BBL_INS_LAST(bbl)), ARM_INS_ATTRIB(T_ARM_INS(BBL_INS_LAST(bbl))) | IF_SWITCHJUMP_FIXEDCASESIZE);
 
 	    for (i=0;i<nr_of_iterations;i++)
 	    {
@@ -3201,7 +3203,7 @@ static t_uint32 ArmAddBasicBlockEdges(t_object *obj)
                     || ARM_INS_CONDITION(block_end) == ARM_CONDITION_LT))
 	      {
 		/* {{{ it's a switch */
-		t_uint32 ncases;
+		t_uint32 ncases = 0;
 
 		for (iter = block_end; iter != stop; iter = ArmGetPrevIns(obj,iter))
 		{
@@ -3220,7 +3222,25 @@ static t_uint32 ArmAddBasicBlockEdges(t_object *obj)
                         t_arm_ins * cmp_resolver;
                         t_reg propagated_reg = ARM_INS_REGC(iter);
 
-                        for(cmp_resolver = ArmGetPrevIns(obj,iter); cmp_resolver != stop; cmp_resolver = ArmGetPrevIns(obj,cmp_resolver))
+                        /* WARNING WARNING WARNING
+                         * This is a nasty hack.
+                         *
+                         * ----- BBL1
+                         * movw ip, 0xXXX
+                         * ...
+                         * ----- BBL2
+                         * ldr ...
+                         * cmp r1, ip
+                         * ADDLS pc, pc, r1 LSL 2
+                         *
+                         * If we want to be truly conservative here, we should not cross the basic block boundary.
+                         * However, if the last instruction of the previous basic block is not a control flow instruction,
+                         * we can assume that the compiler intends the transition between BBL1 and BBL2 to be a fallthrough path.
+                         * So, under these circumstances, we can safely propagate backwards.
+                         *
+                         * This was an issue for the NAGRA use case with the Wandi diversified VM.
+                         */
+                        for(cmp_resolver = ArmGetPrevIns(obj,iter); !ArmIsControlflow(cmp_resolver); cmp_resolver = ArmGetPrevIns(obj,cmp_resolver))
                         {
                                 if (RegsetIn(ARM_INS_REGS_DEF(cmp_resolver), propagated_reg)
                                     && ARM_INS_OPCODE(cmp_resolver)==ARM_MOVW)
@@ -3232,6 +3252,7 @@ static t_uint32 ArmAddBasicBlockEdges(t_object *obj)
 
                         if (cmp_resolver==stop) FATAL(("Bound not found (after register propagation)! Switch approx at @I",iter));
                 }
+                ASSERT(ncases > 0, ("what? @I", block_end));
 
 		if (ARM_INS_CONDITION(block_end) == ARM_CONDITION_LS)
 		  ncases++;
@@ -4818,7 +4839,7 @@ static t_bool ArmFindLoadImmThatDefinesRegisterInBbl(t_arm_ins * start, t_reg re
           if (new_last_ins && (ARM_INS_OPCODE(new_last_ins)==ARM_BL || ARM_INS_OPCODE(new_last_ins)==ARM_BLX) && RegsetIn(arm_description.callee_saved,reg))
             {
               i_ins = new_last_ins;
-              //              DEBUG(("second continue with @I",new_last_ins));
+                //        DEBUG(("second continue with @I",new_last_ins));
               continue;
             }
         }
@@ -5318,6 +5339,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
               continue;
 	    }
 
+	    ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	    ArmMakeAddressProducer(__FILE__,__LINE__,ins, value + G_T_UINT32(address) + G_T_UINT32(ARM_INS_CSIZE(ins)), rel);
 
 #ifdef KEEP_INFO
@@ -5331,6 +5353,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
             {
               /* case of ABS_SYMBOL */
               /* replace the ADD with an constant producer instruction */
+	      ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
               ArmMakeConstantProducer(ins,value + G_T_UINT32(address) + G_T_UINT32(ARM_INS_CSIZE(ins)));
 	      ARM_INS_SET_FLAGS(ins,   ARM_INS_FLAGS(ins)| FL_ORIG_CONST_PROD);
 #ifdef KEEP_INFO
@@ -5369,6 +5392,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 	      rel=RelocTableAddRelocToRelocatable(OBJECT_RELOC_TABLE(obj), AddressNullForObject(obj),T_RELOCATABLE(ins), AddressNullForObject(obj), T_RELOCATABLE(found),AddressSub(load_address,BBL_CADDRESS(bbl)), RELOC_HELL(rel),RELOC_EDGE(rel),NULL,NULL,"R00\\l*w\\s0000$");
 	      RELOC_SET_LABEL(rel, StringDup("Weak undefined symbol"));
 	      
+	      ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	      ArmMakeAddressProducer(__FILE__,__LINE__,ins, value + G_T_UINT32(address) + G_T_UINT32(ARM_INS_CSIZE(ins)), rel);
 	      
 #ifdef KEEP_INFO
@@ -5388,6 +5412,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 	     it since this would change addresses, and we
 	     still need them! */
 
+	  ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(def));
 	  ArmInsMakeNoop(def);
 #ifdef KEEP_INFO
 	  ARM_INS_SET_INFO(def, ArmAddrInfoNew());
@@ -5475,6 +5500,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 	  }
 
 	  /* frees the original relocation */
+	  ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	  ArmMakeConstantProducer(ins,value & 0xffffffff);
           if (value & 0xffffffff00000000ULL)
           {
@@ -5575,6 +5601,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
                 * between the load and this add
                 */
                ASSERT((ARM_INS_OPCODE(actual_load) == ARM_ADD) && ((ARM_INS_REGB(actual_load) == ARM_REG_R15) || (ARM_INS_REGC(actual_load) == ARM_REG_R15)), ("Second part of GOT load is neither load nor an apprpriate ADD:\n  First LDR: @I\n  Second ins: @I\nregb: %d, regc: %d, oldrega: %d",ins,actual_load,ARM_INS_REGB(actual_load),ARM_INS_REGC(actual_load),ARM_INS_REGA(ins)));
+	       ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(actual_load));
                ArmInsMakeNoop(actual_load);
              }
 
@@ -5746,6 +5773,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
                     REGA(ins)==REGA(actual_load) but that this is totally irrelevant because the value was 
                     spilled in the meantime and reloaded into another register!
                  */
+	         ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(actual_load));
                  ArmInsMakeNoop(actual_load);
                }
              else
@@ -5828,6 +5856,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 	      if (RELOC_LABEL(rel)) 
 		Free(RELOC_LABEL(rel));
 	      RELOC_SET_LABEL(rel, StringDup("ADDR RELATIVE LOAD"));
+	      ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	      ArmMakeAddressProducer(__FILE__,__LINE__,ins,value , rel);
 	    }
 	  }
@@ -5840,6 +5869,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 	    if (RELOC_LABEL(rel)) 
 	      Free(RELOC_LABEL(rel));
 	    RELOC_SET_LABEL(rel, StringDup("ADDR RELATIVE LOAD (from bbl)"));
+	    ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	    ArmMakeAddressProducer(__FILE__,__LINE__,ins,value , rel);
 	  }
 	}
@@ -6020,6 +6050,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 	else
 	{
 	  /* adest lies outside all sections. make a constant producer instead. */
+	  ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	  ArmMakeConstantProducer(ins,G_T_UINT32(adest));
 	  ARM_INS_SET_FLAGS(ins,  ARM_INS_FLAGS(ins) | FL_ORIG_CONST_PROD);
 	} /* }}} */
@@ -6036,6 +6067,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 	      TRUE, NULL, NULL,NULL,
 	      "R00A00+\\l*w\\s0000$");
 	  RELOC_SET_LABEL(rel, StringDup("ADDR ADD TO DATA"));
+	  ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	  ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(adest),rel);
 	  /* }}} */
 	}
@@ -6077,6 +6109,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 		FALSE, NULL, NULL,NULL,
 		"R00A00+R00M|\\l*w\\s0000$");
 	    RELOC_SET_LABEL(rel, StringDup("ADDR RETURN"));
+	    ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	    ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(adest),rel);
 	    /* }}} */
 	  }
@@ -6126,6 +6159,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 		  "R00A00+\\l*w\\s0000$");
 	      RELOC_SET_LABEL(rel, StringDup("ADDR ADD TO UNKNOWN CODE"));
 	      VERBOSE(2,("DANGEROUS: @I produces code address @G, use not found\n",ins,adest));
+	      ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 	      ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(adest),rel);
 	      /* }}} */
 	    }
@@ -6210,6 +6244,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 		    NULL,NULL,NULL,
 		    "R00A00+\\l*w\\s0000$");
 		RELOC_SET_LABEL(rel, StringDup("ADDR ADD TO DATA (guessed)"));
+		ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 		ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(adest),rel);
 		/* }}} */
 	      }
@@ -6222,6 +6257,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 		    T_RELOCATABLE(bdest),AddressNullForObject(obj),
 		    TRUE,edge,NULL,NULL,"R00A00+\\l*w\\s0000$");
 		RELOC_SET_LABEL(rel, StringDup("Addr from thumb stub to call main"));
+		ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 		ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(adest)&0xfffffffe,rel);
 		/* }}} */
 	      }
@@ -6290,6 +6326,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 		    "R00A00+\\l*w\\s0000$");
 		RELOC_SET_LABEL(rel, StringDup("ADDR ADD TO UNKNOWN CODE (intermediate AP)"));
 		VERBOSE(2,("DANGEROUS: @I produces code address @G, use not found\n",ins,adest));
+		ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 		ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(adest),rel);
 	      }
 	      else if (ARM_INS_OPCODE(ins)==ARM_ADD && (ARM_INS_FLAGS(ins) & FL_IMMED) && ARM_INS_IMMEDIATE(ins) == 4 && 
@@ -6310,6 +6347,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
                                                         TRUE,edge,NULL,NULL,
                                                         "R00A00+\\l*w\\s0000$");
                   RELOC_SET_LABEL(rel, StringDup("addr switch from arm to thumb stub"));
+		  ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
                   ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(adest),rel);
                 }
               else
@@ -6355,6 +6393,7 @@ void ArmMakeAddressProducers(t_cfg *cfg)
                     "R00A00+\\l*w\\s0000$");
                 RELOC_SET_LABEL(rel, StringDup("ADDR ADD TO UNKNOWN CODE (could not understand use)"));
 		VERBOSE(2,("DANGEROUS: @I produces code address @G, use @I not understood\n",ins,adest,use));
+		ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 		ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(adest),rel);
 	      }
 	    }
@@ -6456,7 +6495,9 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 		    addr = AddressNew32(G_T_UINT32(addr) & ~3);
 		    rel=RelocTableAddRelocToRelocatable(OBJECT_RELOC_TABLE(obj),AddressNullForObject(obj),T_RELOCATABLE(ins),AddressNullForObject(obj),T_RELOCATABLE(bbl2),AddressSub(addr,base), TRUE, NULL, NULL, NULL, "R00A00+\\l*w\\s0000$");
 		    RELOC_SET_LABEL(rel, StringDup("ADDR ADD TO DATA"));
+		    ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 		    ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(addr),rel);
+		    ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(i_ins));
 		    ArmInsMakeNoop(i_ins);
 		  }
 		  else if (ARM_INS_OPCODE(i_i_ins)==ARM_LDR)
@@ -6466,7 +6507,9 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 		      addr = AddressNew32(G_T_UINT32(addr) & ~3);
 		      rel=RelocTableAddRelocToRelocatable(OBJECT_RELOC_TABLE(obj),AddressNullForObject(obj),T_RELOCATABLE(ins),AddressNullForObject(obj),T_RELOCATABLE(bbl2),AddressSub(addr,base), TRUE, NULL, NULL, NULL, "R00A00+\\l*w\\s0000$");
 		      RELOC_SET_LABEL(rel, StringDup("ADDR ADD TO DATA"));
+		      ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 		      ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(addr),rel);
+		      ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(i_ins));
 		      ArmInsMakeNoop(i_ins);
 		    }
 		    else /* maybe there is only one datablock, so that is legal too */
@@ -6508,7 +6551,9 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 		      addr = AddressNew32(G_T_UINT32(addr) & ~3);
 		      rel=RelocTableAddRelocToRelocatable(OBJECT_RELOC_TABLE(obj),AddressSub(addr,BBL_CADDRESS(datablock)),T_RELOCATABLE(ins),AddressNullForObject(obj),T_RELOCATABLE(datablock),AddressNullForObject(obj),FALSE,NULL,NULL,NULL, "R00A00+\\l*w\\s0000$");
 		      RELOC_SET_LABEL(rel, StringDup("ADDR ADD TO DATA"));
+		      ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 		      ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(addr),rel);
+		      ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(i_ins));
 		      ArmInsMakeNoop(i_ins);
 		    }
 		  }
@@ -6529,8 +6574,10 @@ void ArmMakeAddressProducers(t_cfg *cfg)
 			FALSE, NULL, NULL,NULL,
 			"R00A00+R00M|\\l*w\\s0000$");
 		    RELOC_SET_LABEL(rel, StringDup("ADDR RETURN2"));
+		    ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(ins));
 		    ArmMakeAddressProducer(__FILE__,__LINE__,ins,G_T_UINT32(addr),rel);
 		    /* the add is folded into the address producer */
+		    ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(i_ins));
 		    ArmInsMakeNoop(i_ins);
                   }
 		  else FATAL(("Serious troubles!!"));
@@ -6670,6 +6717,7 @@ if (!diabloarm_options.nomovwmovtprod)
             if (!movt) 
               {
                 //DEBUG(("TRANSFORMED @I without movt",movw));
+		ComplexityRecordTransformedInstruction(T_INS(movw), T_INS(movw));
                 ArmMakeConstantProducer(movw,ARM_INS_IMMEDIATE(movw));
                 //DEBUG(("       INTO @I",movw));
               }
@@ -6677,7 +6725,9 @@ if (!diabloarm_options.nomovwmovtprod)
               {
                 //DEBUG(("TRANSFORMED @I",movw));
                 //DEBUG(("            @I",movt));
+		ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movt));
                 ArmMakeConstantProducer(movt,ARM_INS_IMMEDIATE(movw));
+		ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                 ArmInsMakeNoop(movw);
                 //DEBUG(("       INTO @I",movw));
                 //DEBUG(("            @I",movt));
@@ -6748,7 +6798,9 @@ if (!diabloarm_options.nomovwmovtprod)
 from the immediates encoded in the instructions did not match! This suggests the size of some subsection was changed after linker emulation. \
 When adding new initialization or finalization routines this is to be expected.\nInstruction: @I\nValue calculated through StackExec: %x\n\
 Value calculated from encoded immediates: %x\n", movt, value, value2));
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                     ArmInsMakeNoop(movw);
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                     ArmMakeAddressProducer(__FILE__,__LINE__,movt, value, reloct);
                     //DEBUG(("ADDR PROD @I",movw));
                     //DEBUG(("          @I\n",movt));
@@ -6771,7 +6823,9 @@ Value calculated from encoded immediates: %x\n", movt, value, value2));
 from the immediates encoded in the instructions did not match! This suggests the size of some subsection was changed after linker emulation. \
 When adding new initialization or finalization routines this is to be expected.\nInstruction: @I\nValue calculated through StackExec: %x\n\
 Value calculated from encoded immediates: %x\n", movt, value, value2));
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                     ArmInsMakeNoop(movw);
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movt));
                     ArmMakeAddressProducer(__FILE__,__LINE__,movt, value, reloct);
                     //DEBUG(("ADDR PROD @I",movw));
                     //DEBUG(("          @I\n",movt));
@@ -6794,7 +6848,9 @@ Value calculated from encoded immediates: %x\n", movt, value, value2));
 from the immediates encoded in the instructions did not match! This suggests the size of some subsection was changed after linker emulation. \
 When adding new initialization or finalization routines this is to be expected.\nInstruction: @I\nValue calculated through StackExec: %x\n\
 Value calculated from encoded immediates: %x\n", movt, value, value2));
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                     ArmInsMakeNoop(movw);
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movt));
                     ArmMakeAddressProducer(__FILE__,__LINE__,movt, value, reloct);
                     //DEBUG(("ADDR PROD @I",movw));
                     //DEBUG(("          @I\n",movt));
@@ -6817,7 +6873,9 @@ Value calculated from encoded immediates: %x\n", movt, value, value2));
 from the immediates encoded in the instructions did not match! This suggests the size of some subsection was changed after linker emulation. \
 When adding new initialization or finalization routines this is to be expected.\nInstruction: @I\nValue calculated through StackExec: %x\n\
 Value calculated from encoded immediates: %x\n", movt, value, value2));
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                     ArmInsMakeNoop(movw);
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movt));
                     ArmMakeAddressProducer(__FILE__,__LINE__,movt, value, reloct);
                     //DEBUG(("ADDR PROD @I",movw));
                     //DEBUG(("          @I\n",movt));
@@ -6840,7 +6898,9 @@ Value calculated from encoded immediates: %x\n", movt, value, value2));
 from the immediates encoded in the instructions did not match! This suggests the size of some subsection was changed after linker emulation. \
 When adding new initialization or finalization routines this is to be expected.\nInstruction: @I\nValue calculated through StackExec: %x\n\
 Value calculated from encoded immediates: %x\n", movt, value, value2));
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                     ArmInsMakeNoop(movw);
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movt));
                     ArmMakeAddressProducer(__FILE__,__LINE__,movt, value, reloct);
                     //DEBUG(("ADDR PROD @I",movw));
                     //DEBUG(("          @I\n",movt));
@@ -6863,7 +6923,9 @@ Value calculated from encoded immediates: %x\n", movt, value, value2));
 from the immediates encoded in the instructions did not match! This suggests the size of some subsection was changed after linker emulation. \
 When adding new initialization or finalization routines this is to be expected.\nInstruction: @I\nValue calculated through StackExec: %x\n\
 Value calculated from encoded immediates: %x\n", movt, value, value2));
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                     ArmInsMakeNoop(movw);
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movt));
                     ArmMakeAddressProducer(__FILE__,__LINE__,movt, value, reloct);
                     //DEBUG(("ADDR PROD @I",movw));
                     //DEBUG(("          @I\n",movt));
@@ -6886,7 +6948,9 @@ Value calculated from encoded immediates: %x\n", movt, value, value2));
 from the immediates encoded in the instructions did not match! This suggests the size of some subsection was changed after linker emulation. \
 When adding new initialization or finalization routines this is to be expected.\nInstruction: @I\nValue calculated through StackExec: %x\n\
 Value calculated from encoded immediates: %x\n", movt, value, value2));
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movw));
                     ArmInsMakeNoop(movw);
+		    ComplexityRecordTransformedInstruction(T_INS(movt), T_INS(movt));
                     ArmMakeAddressProducer(__FILE__,__LINE__,movt, value, reloct);
                     //DEBUG(("ADDR PROD @I",movw));
                     //DEBUG(("          @I\n",movt));

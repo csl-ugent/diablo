@@ -46,6 +46,8 @@ typedef enum
 #define IF_ADDRESS_PRODUCER 0x20000
 #define IF_ADDRESS_POOL_ENTRY 0x40000
 #define IF_COMPILER_GENERATED 0x80000
+#define IF_SWITCHJUMP_FIXEDCASESIZE 0x200000
+#define IF_AF_INDEX_INSTRUCTION 0x400000
 /* A flag useful if you want to mark some instruction during debugging */
 #define IF_DEBUG_MARK 0x80000000
 
@@ -238,6 +240,7 @@ t_ins *SecGetInsByAddress (t_section * sec, t_address addr);
 t_ins *ObjectGetInsByAddress(t_object *obj, t_address addr);
 t_ins *InsFindMovableDownEqualInsInBbl (t_ins * search, t_bbl * bbl);
 t_ins *InsFindMovableUpEqualInsInBbl (t_ins * search, t_bbl * bbl);
+void InsMoveToEndOfBbl(t_ins *ins, t_bbl *bbl);
 
 void InitDelayedInsKilling ();
 void ApplyDelayedInsKilling ();
@@ -247,6 +250,9 @@ t_bool GenericInsIsStore (t_ins * ins);
 t_bool GenericInsIsLoad (t_ins * ins);
 
 void ObjectDumpDisassembledCode (t_object *obj, t_string dumpname);
+
+#define InsIsAfIndexInstruction(x) (INS_ATTRIB(x) & IF_AF_INDEX_INSTRUCTION)
+#define InsMarkAfIndexInstruction(x) (INS_SET_ATTRIB(x, INS_ATTRIB(x) | IF_AF_INDEX_INSTRUCTION))
 #endif
 /* }}} */
 #endif

@@ -21,6 +21,23 @@
  * to_disassemble_buffer, else we are indexing a
  * buffer with all the instructions in it.*/
 
+static t_bool generate_new_old_address = TRUE;
+
+t_address GenerateOldAddressForNewInstruction(t_cfg *cfg) {
+  t_address result = AddressNullForCfg(cfg);
+
+  if (generate_new_old_address) {
+    static t_uint32 new_ins_old_address = 0xff000000;
+
+    t_address result = AddressNew32(new_ins_old_address);
+    new_ins_old_address--;
+
+    ASSERT(new_ins_old_address >= 0xf0000000, ("new_ins_old_address out of range 0x%x", new_ins_old_address));
+  }
+
+  return result;
+}
+
 void *
 RealGetInsByNumber (const char *filename, int lnno, t_section * section, t_uint32 ins_num)
 {
@@ -59,16 +76,17 @@ InsNewForSec (t_section * sec)
     t_uint32 nins;
 
     SECTION_SET_NINS(sec, SECTION_NINS(sec) + 1);
-    
+
     nins = SECTION_NINS(sec);
 
-    if (nins > SECTION_TMP(sec)) 
+    if (nins > SECTION_TMP(sec))
       FATAL(("We did not provide enough room to store all instructions! This probably means the architecture description (instruction_min_size) is wrong!"));
 
 
     InsInit (AINS(obj, sec, nins - 1), OBJECT_CFG(SECTION_OBJECT(sec)));
 
     INS_SET_PHASE(AINS(obj, sec, nins - 1),GetDiabloPhase());
+    INS_SET_TRANSFORMATION_ID(AINS(obj, sec, nins - 1),GetTransformationId());
 
     if (nins > 1)
     {
@@ -96,6 +114,7 @@ InsNewForSec (t_section * sec)
 
     InsInit (ret, OBJECT_CFG(SECTION_OBJECT(sec)));
     INS_SET_PHASE(ret,GetDiabloPhase());
+    INS_SET_TRANSFORMATION_ID(ret, GetTransformationId());
     INS_SET_CSIZE(ret, AddressNewForSection(sec,
       CFG_DESCRIPTION(OBJECT_CFG(SECTION_OBJECT(sec)))->minimal_encoded_instruction_size / 8));
     INS_SET_RELOCATABLE_TYPE(ret, RT_INS);
@@ -108,6 +127,7 @@ InsNewForSec (t_section * sec)
 
     InsInit (ret, OBJECT_CFG(SECTION_OBJECT(sec)));
     INS_SET_PHASE(ret,GetDiabloPhase());
+    INS_SET_TRANSFORMATION_ID(ret, GetTransformationId());
     INS_SET_CSIZE(ret, AddressNewForSection(sec,
       CFG_DESCRIPTION(OBJECT_CFG(SECTION_OBJECT(sec)))->minimal_encoded_instruction_size / 8));
     INS_SET_RELOCATABLE_TYPE(ret, RT_INS);
@@ -126,10 +146,11 @@ InsNewForCfg (t_cfg * cfg)
 
   InsInit (ret, cfg);
   INS_SET_PHASE(ret,GetDiabloPhase());
+  INS_SET_TRANSFORMATION_ID(ret, GetTransformationId());
   INS_SET_SECTION(ret, OBJECT_CODE(CFG_OBJECT(cfg))[0]);
   INS_SET_CSIZE (ret, AddressNewForCfg(cfg,
                    CFG_DESCRIPTION(cfg)->minimal_encoded_instruction_size / 8));
-  INS_SET_OLD_ADDRESS(ret,AddressNullForCfg(cfg));
+  INS_SET_OLD_ADDRESS(ret, GenerateOldAddressForNewInstruction(cfg));
   INS_SET_OLD_SIZE(ret,AddressNullForCfg(cfg));
   INS_SET_CADDRESS(ret,AddressNullForCfg(cfg));
   INS_SET_RELOCATABLE_TYPE(ret, RT_INS);
@@ -146,12 +167,12 @@ InsNewForBbl (t_bbl * bbl)
 
   InsInit (ret, BBL_CFG(bbl));
   INS_SET_PHASE(ret,GetDiabloPhase());
+  INS_SET_TRANSFORMATION_ID(ret, GetTransformationId());
   INS_SET_SECTION(ret, sec);
   INS_SET_BBL(ret, bbl);
   INS_SET_CSIZE(ret, AddressNewForBbl(bbl,
           CFG_DESCRIPTION(BBL_CFG(bbl))->minimal_encoded_instruction_size / 8));
-                                       
-  INS_SET_OLD_ADDRESS(ret,AddressNullForBbl(bbl));
+  INS_SET_OLD_ADDRESS(ret, GenerateOldAddressForNewInstruction(BBL_CFG(bbl)));
   INS_SET_OLD_SIZE(ret,AddressNullForBbl(bbl));
   INS_SET_CADDRESS(ret,AddressNullForBbl(bbl));
   INS_SET_RELOCATABLE_TYPE(ret, RT_INS);
@@ -205,6 +226,7 @@ InsFreeReferedRelocs (t_ins * ins)
 void
 InsKill (t_ins * ins)
 {
+  DiabloBrokerCall("InsInvalidateSlices", ins);
   if (INS_INEXT(ins))
   {
     INS_SET_IPREV(INS_INEXT(ins), INS_IPREV(ins));
@@ -405,10 +427,45 @@ InsFindMovableUpEqualInsInBbl (t_ins * search, t_bbl * bbl)
   return NULL;
 }
 
+void InsMoveToEndOfBbl(t_ins *ins, t_bbl *bbl) {
+  t_bbl *from = INS_BBL(ins);
+
+  /* make sure that the instruction is at the end of its BBL */
+  if (ins != BBL_INS_LAST(from))
+    BblMoveInstructionAfter(ins, BBL_INS_LAST(from));
+
+  /* update 'from' */
+  if (INS_IPREV(ins)) {
+    BBL_SET_INS_LAST(from, INS_IPREV(ins));
+    INS_SET_INEXT(INS_IPREV(ins), NULL);
+  }
+  else {
+    BBL_SET_INS_LAST(from, NULL);
+    BBL_SET_INS_FIRST(from, NULL);
+  }
+
+  BBL_SET_NINS(from, BBL_NINS(from) - 1);
+  BBL_SET_CSIZE(from, AddressSub(BBL_CSIZE(from), INS_CSIZE(ins)));
+
+  /* update 'to' */
+  INS_SET_BBL(ins, bbl);
+  BBL_SET_NINS(bbl, BBL_NINS(bbl) + 1);
+  BBL_SET_CSIZE(bbl, AddressAdd(BBL_CSIZE(bbl), INS_CSIZE(ins)));
+
+  /* insert 'ins' in chain of instructions, but at the end of the 'to' */
+  if (BBL_INS_LAST(bbl))
+    INS_SET_INEXT(BBL_INS_LAST(bbl), ins);
+  INS_SET_IPREV(ins, BBL_INS_LAST(bbl));
+
+  if (BBL_INS_FIRST(bbl) == NULL)
+    BBL_SET_INS_FIRST(bbl, ins);
+  BBL_SET_INS_LAST(bbl, ins);
+}
+
 t_regset
 InsRegsLiveAfter (t_ins * ins)
 {
-  if (!INS_INEXT(ins)) 
+  if (!INS_INEXT(ins))
     return BBL_REGS_LIVE_OUT (INS_BBL (ins));
   return InsRegsLiveBefore(INS_INEXT(ins));
 }
@@ -428,7 +485,7 @@ InsRegsLiveBefore (t_ins * ins)
     if (!INS_IS_CONDITIONAL(i_ins))
       RegsetSetDiff (live, INS_REGS_DEF (i_ins));
     RegsetSetUnion (live, INS_REGS_USE (i_ins));
-    
+
     if (i_ins == ins) break;
   }
   if(!INS_IPREV(ins))

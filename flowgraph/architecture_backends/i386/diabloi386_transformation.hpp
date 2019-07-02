@@ -12,7 +12,7 @@ struct I386ArchitectureInfo : public ArchitectureInfoWrapper, ArchitectureInfo {
   virtual ~I386ArchitectureInfo() {}
 
   virtual t_reg getGenericRandomRegister(t_randomnumbergenerator* rng);
-  virtual void saveOrRestoreRegisters(const std::vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend=false);
+  virtual AddedInstructionInfo saveOrRestoreRegisters(const std::vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend=false);
 
   virtual void appendUnconditionalBranchInstruction(t_bbl* bbl);
 

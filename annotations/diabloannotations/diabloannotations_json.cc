@@ -514,3 +514,31 @@ vector<string> splitListOfIDs(const string& list)
 
   return tokens;
 }
+
+string Annotation::Print() const
+{
+  stringstream ss;
+
+  if (file_name)
+    ss << "File: " << *file_name << " (is object file? " << file_is_object_file << ")" << endl;
+  ss << "Line range: " << line_begin << "-" << line_end << endl;
+  if (function_name)
+    ss << "Function: " << *function_name << endl;
+  if (annotation_content)
+    ss << "Annotation content: " << *annotation_content << endl;
+  ss << "JSON index " << index << endl;
+
+  return ss.str();
+}
+
+string AbstractAnnotationInfo::Print() const
+{
+  stringstream ss;
+
+  ss << "Name: " << name << endl;
+  ss << "Successfully applied? " << successfully_applied << endl;
+  for (auto o : options)
+    ss << "  OPTION " << o.first << ": " << o.second << endl;
+
+  return ss.str();
+}

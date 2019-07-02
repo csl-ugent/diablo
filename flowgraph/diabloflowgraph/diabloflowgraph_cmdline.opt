@@ -8,6 +8,14 @@ hidden bool_option annotate_loops
    default=off;
 }
 
+bool_option origin_tracking
+{
+   long="origin-tracking";
+   short="origin-tracking";
+   description="Enable origin tracking";
+   default=off;
+}
+
 group "Profile" bool_option profiled_layout
 {
    long="profiled-layout";
@@ -65,5 +73,3 @@ usage_option help
   short="h";
   description="Print this help message";
 }
-
-

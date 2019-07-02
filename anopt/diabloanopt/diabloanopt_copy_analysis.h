@@ -13,6 +13,7 @@ void CopyAnalysisFini(t_cfg *);
 void BblCopyAnalysisUntilIns(t_ins * ins, t_equations eqs);
 void BblCopyAnalysisFromInsToUntilIns(t_ins * from_ins, t_ins * to_ins, t_equations eqs);
 extern t_uint32 max_nr_equations, null_register;
+void BblCopyAnalysis(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint_calculations);
 
 EDGE_DYNAMIC_MEMBER_GLOBAL_BODY(equations, EQS, Eqs, t_equations, {*valp=NULL;}, { if (valp && *valp) EquationsFree (*valp); }, {});
 BBL_DYNAMIC_MEMBER_GLOBAL_BODY(eqs_in, EQS_IN, EqsIn, t_equations, {*valp=NULL;}, { if (valp && *valp) EquationsFree (*valp); }, {});

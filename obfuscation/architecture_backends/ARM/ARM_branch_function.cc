@@ -1,23 +1,11 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
-
-#include <iostream>
-#include <map>
-#include <set>
-#include <sstream>
-#include <vector>
-
 #include "ARM_obfuscations.h"
 #include "ARM_branch_function.h"
-
-extern "C" {
-#include "diabloarm.h"
-}
+using namespace std;
 
 /* TODO: these branch functions do not just replace branches; they SPLIT the BBL, insert unconditional jump, and THEN replace that jump. Make that clearer / more generic! */
-
-using namespace std;
 
 AbstractARMRegisterBasedBranchFunctionTransformation::AbstractARMRegisterBasedBranchFunctionTransformation() {
 }
@@ -26,6 +14,7 @@ AbstractARMRegisterBasedBranchFunctionTransformation::AbstractARMRegisterBasedBr
 static t_bbl* SplitBasicBlockWithJump(t_bbl* bbl, t_ins* ins, t_bool before) {
   //VERBOSE(0, ("BEFORE SPLIT @eiB", bbl));
   t_bbl* split_off = BblSplitBlock(bbl, ins, before);
+  DiabloBrokerCall("AFAfterSplit", bbl, split_off);
   t_cfg_edge* edge;
   t_cfg_edge* edge_s;
   t_arm_ins* ins_ = T_ARM_INS(ins);
@@ -77,6 +66,18 @@ t_bbl* AbstractARMRegisterBasedBranchFunctionTransformation::getStackBranchFunct
  return bf;
 }
 
+SpecialFunctionTrackResults ARMRegisterBasedBranchFunctionTransformation_ObjectTrackingStatistics(t_bbl *bbl) {
+  FATAL(("implement me"));
+}
+
+ARMRegisterBasedBranchFunctionTransformation::ARMRegisterBasedBranchFunctionTransformation() {
+  insts_in_bbls = 0;
+  possibleSplitPoints = 0;
+  bblsTransformed = 0;
+  RegisterTransformationType(this, _name);
+  special_function_uid = RegisterSpecialFunctionType(ARMRegisterBasedBranchFunctionTransformation_ObjectTrackingStatistics);
+}
+
 void ARMRegisterBasedBranchFunctionTransformation::dumpStats(const std::string& prefix) {
   VERBOSE(0, ("%sBranch_Stats,bbls_transformed,%i", prefix.c_str(), bblsTransformed));
   VERBOSE(0, ("%sBranch_Stats,split_points,%i", prefix.c_str(), possibleSplitPoints));
@@ -112,6 +113,8 @@ t_bbl* ARMRegisterBasedBranchFunctionTransformation::createStackBranchFunctionFo
   t_bbl* retBlock = BblNew(cfg);
 
   fun=FunctionMake(bbl, StringIo("BranchFunctionStackR%i_%s", (int) reg, isThumb ? "Thumb2" : "ARM"), FT_NORMAL);
+  ASSERT(special_function_uid != FunctionUID_INVALID, ("invalid special function uid!"));
+  BblSetOriginalFunctionUID(bbl, special_function_uid);
 
   t_regset regs;
   
@@ -205,6 +208,7 @@ void ARMRegisterBasedBranchFunctionTransformation::transformJumpToCall(t_bbl* bb
   t_bbl* bf = getStackBranchFunction(BBL_CFG(bbl), isThumb, random_reg.reg);
 
   t_bbl* split_off = BblSplitBlock(bbl, BBL_INS_LAST(bbl), TRUE /* before */);
+  DiabloBrokerCall("AFAfterSplit", bbl, split_off);
 
   InsKill(BBL_INS_LAST(split_off)); // Get rid of the jump. It was useful before for the liveness
   CfgEdgeKill(successor_edge);
@@ -264,16 +268,20 @@ void ARMRegisterBasedBranchFunctionTransformation::transformJumpToCall(t_bbl* bb
   VERBOSE(1, ("Transformed BF: @eiB", successor));
 }
 
-
-
 ARMSplitCallWithBranchFunctionsTransformation::ARMSplitCallWithBranchFunctionsTransformation() {
 }
 
 
 
 
+SpecialFunctionTrackResults ARMCallFunctionTransformation_ObjectTrackingStatistics(t_bbl *bbl) {
+  FATAL(("implement me"));
+}
 
-
+ARMCallFunctionTransformation::ARMCallFunctionTransformation() {
+  RegisterTransformationType(this, _name);
+  special_function_uid = RegisterSpecialFunctionType(ARMCallFunctionTransformation_ObjectTrackingStatistics);
+}
 
 /* Call functions / Return functions */
 static t_function* branch_fun_for_with_ret = NULL;
@@ -328,6 +336,8 @@ t_function* ARMCallFunctionTransformation::getRetFunForReg(t_cfg* cfg, t_bool is
   t_reloc* global_reloc;
 
   fun=FunctionMake(bbl, "BranchFunctionWithReturn", FT_NORMAL);
+  ASSERT(special_function_uid != FunctionUID_INVALID, ("invalid special function uid!"));
+  BblSetOriginalFunctionUID(bbl, special_function_uid);
 
   /* Insert Bbl in Branch Function:
     * push {rx}
@@ -401,6 +411,8 @@ t_bbl* ARMCallFunctionTransformation::jumpAndPopStubFor(t_cfg* cfg, t_bool isThu
   t_function* fun;
 
   fun = FunctionMake(bbl, "ReturnAddressStub", FT_NORMAL);
+  ASSERT(special_function_uid != FunctionUID_INVALID, ("invalid special function uid!"));
+  BblSetOriginalFunctionUID(bbl, special_function_uid);
 
   MaybeSaveRegister reg_1(reg, true /* always save, for now */);
   GetArchitectureInfo(target)->saveOrRestoreRegisters({reg_1}, bbl, false /* push */);

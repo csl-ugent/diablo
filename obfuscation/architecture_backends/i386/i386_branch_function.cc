@@ -9,14 +9,10 @@
  *
  * mmadou@elis.ugent.be
  **********************************************************/
-
-extern "C" {
-#include <diabloanopti386.h>
-}
-
-#include <obfuscation/obfuscation_architecture_backend.h>
+#include "i386_obfuscations.h"
 #include "i386_architecture_backend.h"
 #include "i386_branch_function.h"
+using namespace std;
 
 static t_function* branch_fun = NULL;
 

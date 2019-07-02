@@ -5,8 +5,6 @@
 #ifndef ARM_OBFUSCATION_TRANSFORMATION_H
 #define ARM_OBFUSCATION_TRANSFORMATION_H
 
-#include <map>
-
 #include <obfuscation/generic/branch_function.h>
 
 class I386BranchFunctionTransformation : public BranchFunctionTransformation {

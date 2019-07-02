@@ -1,10 +1,9 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
+int frontend_id = 0;
 #include "aspire_frontend_common.h"
 
 using namespace std;
-
-int frontend_id = 0;
 
 int
 main (int argc, char **argv)
@@ -197,6 +196,9 @@ main (int argc, char **argv)
 
           Free(callgraph_dot_file);
         }/*}}}*/
+
+        if (child_process_id > 0 && !aspire_options.no_sp_fork)
+          Free(final_dot_path);
 
         static_compl_file = StringConcat2(global_options.output_name, ".stat_complexity_info");
         dynamic_compl_file = StringConcat2(global_options.output_name, ".dynamic_complexity_info");

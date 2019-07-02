@@ -79,6 +79,9 @@ static inline t_uint32 Bitmask(int size)
 
 /* }}} */
 
+#define CountSetBits32(x) __builtin_popcount(x)
+#define CountSetBits64(x) __builtin_popcountll(x)
+
 #endif
 
 /* vim:set ts=4 sw=4 tw=80 foldmethod=marker expandtab cindent cinoptions=p5,t0,(0: */

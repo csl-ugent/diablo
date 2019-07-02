@@ -820,7 +820,7 @@ void EquationPrint(t_cfg * cfg, t_reg index, t_equation* eq)
   if(eq->constant <= 0)
   {
 #ifndef VERBOSE_COPY_ANALYSIS
-    fprintf(stdout,"%s = %s + %d + (%p - %p)",rega==desc->num_int_regs?"Nullreg":desc->register_names[(rega)],eq->regb==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(eq->regb)],0-eq->constant, eq->taga, eq->tagb);
+    fprintf(stdout,"%s = %s + %d + (%p - %p)\n",rega==desc->num_int_regs?"Nullreg":desc->register_names[(rega)],eq->regb==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(eq->regb)],0-eq->constant, eq->taga, eq->tagb);
 #else
     fprintf(stdout,"%s = %s + %d + (%p - %p) (%d:%s)",rega==desc->num_int_regs?"Nullreg":desc->register_names[(rega)],eq->regb==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(eq->regb)],0-eq->constant, eq->taga, eq->tagb,eq->rega,rega!=eq->rega?"YEP":"NEP");
 #endif
@@ -828,11 +828,35 @@ void EquationPrint(t_cfg * cfg, t_reg index, t_equation* eq)
   else
   {
 #ifndef VERBOSE_COPY_ANALYSIS
-    fprintf(stdout,"%s = %s + %d + (%p - %p)",eq->regb==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(eq->regb)],rega==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(rega)],eq->constant, eq->tagb, eq->taga);
+    fprintf(stdout,"%s = %s + %d + (%p - %p)\n",eq->regb==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(eq->regb)],rega==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(rega)],eq->constant, eq->tagb, eq->taga);
 #else
     fprintf(stdout,"%s = %s + %d + (%p - %p) (%d:%s)",eq->regb==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(eq->regb)],rega==CFG_DESCRIPTION(cfg)->num_int_regs?"Nullreg":desc->register_names[(rega)],eq->constant, eq->tagb, eq->taga,eq->rega,rega!=eq->rega?"YEP":"NEP");
 #endif
   }
+}
+
+t_equation EquationNormalize(t_equation* eq, t_reg index)
+{
+  t_equation result;
+
+  if (eq->constant <= 0)
+  {
+    result.rega = index;
+    result.regb = eq->regb;
+    result.constant = -eq->constant;
+    result.taga = eq->taga;
+    result.tagb = eq->tagb;
+  }
+  else
+  {
+    result.rega = eq->regb;
+    result.regb = index;
+    result.constant = eq->constant;
+    result.taga = eq->tagb;
+    result.tagb = eq->taga;
+  }
+
+  return result;
 }
 
 void EquationsCopy(t_cfg * cfg, t_equations src, t_equations dest)

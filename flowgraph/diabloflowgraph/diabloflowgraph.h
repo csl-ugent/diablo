@@ -116,12 +116,7 @@ void DiabloFlowgraphCppInit (int, char **);
 void DiabloFlowgraphCppFini ();
 #endif
 
-#ifdef __cplusplus
-extern "C++"
-{
-#include "diabloflowgraph.hpp"
-}
-#endif
+#include "diabloflowgraph_object_tracking.h"
 
 #endif
 /* vim: set shiftwidth=4 cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-2,+0.5s foldmethod=marker tw=78 cindent: */

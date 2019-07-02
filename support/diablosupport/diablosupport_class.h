@@ -96,6 +96,7 @@ typedef void renamed_void;
 /* MEMBERU: special version of MEMBER, calls CallUpdateMY_FIELD each time the
  * value of the field is changed */
 #undef MEMBERU
+#undef IMEMBER
 #undef CONSTRUCTOR
 #undef CONSTRUCTOR1
 #undef CONSTRUCTOR2
@@ -169,6 +170,7 @@ typedef void renamed_void;
 #define DIABLO_CLASS_BEGIN typedef struct _t_CLASS
 #define MEMBER(x,y,z)
 #define MEMBERU(x,y,z)
+#define IMEMBER(x,y,z)
 #define CONSTRUCTOR(b)
 #define CONSTRUCTOR1(e,r,b)
 #define CONSTRUCTOR2(e,r,f,s,b)
@@ -201,6 +203,7 @@ typedef void renamed_void;
 #define EXTENDS(x) x _hidden_parent;
 #define MEMBER(x,y,z) x _concat_(_hidden_,y);
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #define CONSTRUCTOR(b)
 #define CONSTRUCTOR1(e,r,b)
 #define CONSTRUCTOR2(e,r,f,s,b)
@@ -235,13 +238,16 @@ typedef void renamed_void;
 #ifdef GEN_CODE_STATIC
 #define MEMBER(x,y,z) static inline x _concat3_(_concat_(CLASS,_field_select_prefix),_,z) (const t_CLASS * c) { return c-> _concat_(_hidden_,y); }
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #else
 #ifdef GEN_CODE
 #define MEMBER(x,y,z) x _concat3_(_concat_(CLASS,_field_select_prefix),_,z) (const t_CLASS * c) { return c-> _concat_(_hidden_,y); }
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) static inline MEMBER(x,y,z)
 #else /* GEN_PROTO */
 #define MEMBER(x,y,z) x _concat3_(_concat_(CLASS,_field_select_prefix),_,z) (const t_CLASS * c);
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) static inline x _concat3_(_concat_(CLASS,_field_select_prefix),_,z) (const t_CLASS * c) { return c-> _concat_(_hidden_,y); }
 #endif
 #endif
 
@@ -278,13 +284,16 @@ typedef void renamed_void;
 #ifdef GEN_CODE_STATIC
 #define MEMBER(x,y,z) static inline void _concat3_(_concat_(CLASS,_field_select_prefix), _SET_,z) (t_CLASS * c, x val ) { c-> _concat_(_hidden_,y)=val; }
 #define MEMBERU(x,y,z) static inline void _concat3_(_concat_(CLASS,_field_select_prefix), _SET_,z) (t_CLASS * c, x val ) { _concat3_(_concat_(CLASS,_function_prefix),Update,z) (c,val); c-> _concat_(_hidden_,y)=val; }
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #else
 #ifdef GEN_CODE
 #define MEMBER(x,y,z) void _concat3_(_concat_(CLASS,_field_select_prefix), _SET_,z) (t_CLASS * c, x val ) { c-> _concat_(_hidden_,y)=val; }
 #define MEMBERU(x,y,z) void _concat3_(_concat_(CLASS,_field_select_prefix), _SET_,z) (t_CLASS * c, x val ) { _concat3_(_concat_(CLASS,_function_prefix),Update,z) (c,val); c-> _concat_(_hidden_,y)=val; }
+#define IMEMBER(x,y,z) static inline MEMBER(x,y,z)
 #else /* GEN_PROTO */
 #define MEMBER(x,y,z) void _concat3_(_concat_(CLASS,_field_select_prefix), _SET_,z) (t_CLASS * c, x val );
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) static inline void _concat3_(_concat_(CLASS,_field_select_prefix), _SET_,z) (t_CLASS * c, x val ) { c-> _concat_(_hidden_,y)=val; }
 #endif
 #endif
 
@@ -319,6 +328,7 @@ typedef void renamed_void;
 #define EXTENDS(x)
 #define MEMBER(x,y,z)
 #define MEMBERU(x,y,z)
+#define IMEMBER(x,y,z)
 #define CONSTRUCTOR(b)
 #define CONSTRUCTOR1(e,r,b)
 #define CONSTRUCTOR2(e,r,f,s,b)
@@ -482,6 +492,7 @@ CALLBACKPREFIX void _concat_(_concat_(CLASS,_function_prefix),CallbackUninstall)
 #define EXTENDS(x)
 #define MEMBER(x,y,z)
 #define MEMBERU(x,y,z)
+#define IMEMBER(x,y,z)
 #define CONSTRUCTOR(b) \
 static t_CLASS * _concat_(_concat_(CLASS,_function_prefix),New) (MANAGER_TYPE MANAGER_NAME)\
 {\
@@ -647,6 +658,7 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #define EXTENDS(x) : public x { public:
 #define MEMBER(x,y,z) x y;
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #define CONSTRUCTOR(b)
 #define CONSTRUCTOR1(e,r,b)
 #define CONSTRUCTOR2(e,r,f,s,b)
@@ -678,6 +690,7 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #define EXTENDS(x)
 #define MEMBER(x,y,z) x y;
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #define CONSTRUCTOR(b)
 #define CONSTRUCTOR1(e,r,b)
 #define CONSTRUCTOR2(e,r,f,s,b)
@@ -709,6 +722,7 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #define EXTENDS(x)
 #define MEMBER(x,y,z) _concat_(CLASS,_field_select_prefix):z PATMEMBER(x,y,z)
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #define CONSTRUCTOR(b) _concat_(CLASS,_function_prefix):New+Init PATCONSTRUCTOR
 #define CONSTRUCTOR1(e,r,b) _concat_(CLASS,_function_prefix):New+Init PATCONSTRUCTOR
 #define CONSTRUCTOR2(e,r,f,s,b) _concat_(CLASS,_function_prefix):New+Init PATCONSTRUCTOR
@@ -804,13 +818,16 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #ifdef GEN_CODE_STATIC
 #define MEMBER(x,y,z) static inline renamed_##x _concat3_(_concat_(CLASS,_field_select_prefix),_,z) (const renamed_t_CLASS * c) { return (renamed_##x) (GET_PARENT(c)-> _concat_(_hidden_,y)); }
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) MEMBER(x,y,z);
 #else
 #ifdef GEN_CODE 
 #define MEMBER(x,y,z) renamed_##x _concat3_(_concat_(CLASS,_field_select_prefix),_,z) (const renamed_t_CLASS * c) { return (renamed_##x) (GET_PARENT(c)-> _concat_(_hidden_,y)); }
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) static inline MEMBER(x,y,z)
 #else /* GEN_PROTO */
 #define MEMBER(x,y,z) renamed_##x _concat3_(_concat_(CLASS,_field_select_prefix),_,z) (const renamed_t_CLASS * c);
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) static inline renamed_##x _concat3_(_concat_(CLASS,_field_select_prefix),_,z) (const renamed_t_CLASS * c) { return (renamed_##x) (GET_PARENT(c)-> _concat_(_hidden_,y)); }
 #endif
 #endif
 
@@ -846,13 +863,16 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #ifdef GEN_CODE_STATIC
 #define MEMBER(x,y,z) static inline void _concat3_(_concat_(CLASS,_field_select_prefix),_SET_,z) (renamed_t_CLASS * c, renamed_##x val) { ((GET_PARENT(c))-> _concat_(_hidden_,y))=(x) val; }
 #define MEMBERU(x,y,z) static inline void _concat3_(_concat_(CLASS,_field_select_prefix),_SET_,z) (renamed_t_CLASS * c, renamed_##x val) { _concat3_(_concat_(CLASS,_field_select_prefix),Update,z)(c,val); ((GET_PARENT(c))-> _concat_(_hidden_,y))=(x) val; }
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #else
 #ifdef GEN_CODE 
 #define MEMBER(x,y,z) void _concat3_(_concat_(CLASS,_field_select_prefix),_SET_,z) (renamed_t_CLASS * c, renamed_##x val) { ((GET_PARENT(c))-> _concat_(_hidden_,y))=(x) val; }
 #define MEMBERU(x,y,z) void _concat3_(_concat_(CLASS,_field_select_prefix),_SET_,z) (renamed_t_CLASS * c, renamed_##x val) { _concat3_(_concat_(CLASS,_field_select_prefix),Update,z)(c,val); ((GET_PARENT(c))-> _concat_(_hidden_,y))=(x) val; }
+#define IMEMBER(x,y,z) inline MEMBER(x,y,z)
 #else /* GEN_PROTO */
 #define MEMBER(x,y,z) void _concat3_(_concat_(CLASS,_field_select_prefix),_SET_,z) (renamed_t_CLASS * c, renamed_##x val);
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) static inline void _concat3_(_concat_(CLASS,_field_select_prefix),_SET_,z) (renamed_t_CLASS * c, renamed_##x val) { ((GET_PARENT(c))-> _concat_(_hidden_,y))=(x) val; }
 #endif
 #endif
 
@@ -958,6 +978,7 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #define PFUNCTION7(x,y,z,u,v,w,a,b,c)
 #define MEMBER(x,y,z)
 #define MEMBERU(x,y,z)
+#define IMEMBER(x,y,z)
 #define CONSTRUCTOR(b)
 #define CONSTRUCTOR1(e,r,b)
 #define CONSTRUCTOR2(e,r,f,s,b)
@@ -970,6 +991,7 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #define EXTENDS(x)
 #define MEMBER(x,y,z)
 #define MEMBERU(x,y,z)
+#define IMEMBER(x,y,z)
 #define CONSTRUCTOR(b)
 #define CONSTRUCTOR1(e,r,b)
 #define CONSTRUCTOR2(e,r,f,s,b)
@@ -1000,6 +1022,7 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #define EXTENDS(x)
 #define MEMBER(x,y,z) _concat_(CLASS,_field_select_prefix):z -> BASECLASS
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #define CONSTRUCTOR(b)
 #define CONSTRUCTOR1(e,r,b)
 #define CONSTRUCTOR2(e,r,f,s,b)
@@ -1031,6 +1054,7 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #ifdef DOC_DERIVED
 #define MEMBER(x,y,z) x y;
 #define MEMBERU(x,y,z) MEMBER(x,y,z)
+#define IMEMBER(x,y,z) MEMBER(x,y,z)
 #define FUNCTION0(x,y) x _concat_(_concat_(CLASS,_function_prefix),y) ();
 #define FUNCTION1(x,y,z) x _concat_(_concat_(CLASS,_function_prefix),y) (z p1);
 #define FUNCTION2(x,y,z,u) x _concat_(_concat_(CLASS,_function_prefix),y) (z p1,u p2);
@@ -1059,6 +1083,7 @@ static void _concat_(_concat_(CLASS,_function_prefix),AfterDup) (t_CLASS * to_du
 #define DIABLO_CLASS_END
 #define MEMBER(x,y,z)
 #define MEMBERU(x,y,z)
+#define IMEMBER(x,y,z)
 #define FUNCTION0(x,y)
 #define FUNCTION1(x,y,z)
 #define FUNCTION2(x,y,z,u)

@@ -20,6 +20,36 @@
  */
 t_uint32 function_global_id = 0;
 
+void FunctionCreateExitBlock(t_function *fun) {
+  ASSERT(!FunctionGetExitBlock(fun), ("already exit block for @F", fun));
+
+  /* exit block creation */
+  t_bbl *exit_block = BblNew(FUNCTION_CFG(fun));
+  BBL_SET_ATTRIB(exit_block, BBL_ATTRIB(exit_block) | BBL_IS_EXITBLOCK);
+
+  /* insert block in function */
+  BblInsertInFunction(exit_block, fun);
+
+  /* the block has been added as the next-to-last block,
+   * adapt the linked list here so it becomes the last block */
+  t_bbl *before_exit = BBL_PREV_IN_FUN(exit_block);
+  t_bbl *after_exit = BBL_NEXT_IN_FUN(exit_block);
+
+  ASSERT(before_exit, ("what? @eiB", exit_block));
+  if (!after_exit)
+    return;
+
+  ASSERT(after_exit == FUNCTION_BBL_LAST(fun), ("what? @eiB vs @eiB", exit_block, FUNCTION_BBL_LAST(fun)));
+
+  BBL_SET_NEXT_IN_FUN(before_exit, after_exit);
+  BBL_SET_PREV_IN_FUN(after_exit, before_exit);
+
+  BBL_SET_NEXT_IN_FUN(exit_block, NULL);
+  BBL_SET_PREV_IN_FUN(exit_block, after_exit);
+
+  FUNCTION_SET_BBL_LAST(fun, exit_block);
+}
+
 /* {{{ constructor */
 t_function * FunctionMake(t_bbl * entrypoint, t_const_string name,  t_function_type ft) 
 {
@@ -637,6 +667,9 @@ static t_string GetHellNodeLabel(t_bbl *bbl)
   if (bbl == CFG_UNIQUE_EXIT_NODE(cfg))
     return StringDup("UNIQUE EXIT");
 
+  if (BBL_FUNCTION(bbl) && FUNCTION_NAME(BBL_FUNCTION(bbl)))
+    return StringDup(FUNCTION_NAME(BBL_FUNCTION(bbl)));
+
   FATAL(("Unknown hell node @B",bbl));
 }
 
@@ -696,7 +729,7 @@ void FunctionDrawGraphAnnotated(
       BBL_FOREACH_INS(bbl,ins)
       {
 	tmp1 = final;
-	tmp2 = StringIo("@gI\\l",ins);
+	tmp2 = StringIo("@gtI\\l",ins);
 	final = StringConcat2(tmp1,tmp2);
 	Free(tmp1);
 	Free(tmp2);

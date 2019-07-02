@@ -118,6 +118,9 @@ t_bbl *CfgGetDynamicCallHell(t_cfg *cfg, t_string fname);
 t_bool EdgeMakeInterprocedural(t_cfg_edge *edge);
 t_bool EdgeMakeIntraProcedural(t_cfg_edge *edge);
 void DrawFunctionGraphAnnotated (t_function * function, t_const_string dirprefix);
+
+void SetMainCfg(t_cfg *cfg);
+t_cfg *GetMainCfg();
 #endif
 /* }}} */
 #endif

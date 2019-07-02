@@ -7,6 +7,10 @@
 
 typedef struct t_randomnumbergenerator_ t_randomnumbergenerator;
 
+/* */
+void RNGInitialise();
+void RNGFinalise();
+
 /* constructors */
 t_randomnumbergenerator *RNGCreateBySeed(t_uint32 seed, t_const_string name);
 t_randomnumbergenerator *RNGCreateChild(t_randomnumbergenerator *parent, t_const_string name);
@@ -24,6 +28,7 @@ void RNGSetRange(t_randomnumbergenerator *rng, t_uint32 min, t_uint32 max);
 t_uint32 RNGGenerate(t_randomnumbergenerator *rng);
 t_uint32 RNGGenerateWithRange(t_randomnumbergenerator *rng, t_uint32 min, t_uint32 max);
 t_bool RNGGenerateBool(t_randomnumbergenerator *rng);
+t_uint32 RNGGeneratePercent(t_randomnumbergenerator *rng);
 
 /* lookup */
 

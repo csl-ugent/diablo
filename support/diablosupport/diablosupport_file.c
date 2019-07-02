@@ -38,6 +38,8 @@ static char cp[PATH_MAX] = "\0";
 #define ErrorClearErrno() errno=0
 #define ErrorGetErrno() errno
 
+extern void mkdir_recursive(t_const_string p_path);
+
 /* Paths */
 void
 PathAddDirectory(t_path *path, t_const_string dir)
@@ -277,11 +279,11 @@ DirMake (t_const_string path, t_bool tmp)
 #endif
 
 #ifdef DIABLOSUPPORT_HAVE_MKDIR
-      int ret = mkdir (path, 0755);
+      mkdir_recursive (path);
 #else
       int ret = 1;
-#endif
       ASSERT(!ret, ("Could not make directory %s", path));
+#endif
 
 #ifdef DIABLOSUPPORT_HAVE_STAT
     }
@@ -719,6 +721,10 @@ void
 FileRegionsSort(t_file_regions * regions)
 {
    diablo_stable_sort(regions->region_array, regions->nregions, sizeof(t_file_region), sort_regions);
+}
+
+t_string FileDirectory(t_string x) {
+  return dirname(x);
 }
 /* }}} */
 /* vim: set shiftwidth=2 expandtab cinoptions=p5,t0,(0, foldmethod=marker: */

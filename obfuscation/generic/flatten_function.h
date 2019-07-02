@@ -5,12 +5,7 @@
 #ifndef GEN_FLATTEN_TRANSFORMATION_H
 #define GEN_FLATTEN_TRANSFORMATION_H
 
-#include <obfuscation/obfuscation_transformation.h>
-
-#include <map>
 #include <memory>
-#include <set>
-#include <vector>
 
 class FlattenFunctionTransformation : public FunctionObfuscationTransformation {
   const char* _name;

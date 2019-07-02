@@ -15,6 +15,7 @@ extern "C"
   #include <diabloobject.h>
   #include <diablosupport.h>
 }
+#include <diabloflowgraph.hpp>
 
 class AbstractTransformer
 {
@@ -43,6 +44,7 @@ class AbstractTransformer
      */
     t_reloc_table* address_producer_table;
     t_bool separate_reloc_table;
+    FunctionUID special_function_uid;
 
     /*** FUNCTIONS ***/
     /* These helper functions are used by (and invoke) virtual functions implemented by more derived classes */

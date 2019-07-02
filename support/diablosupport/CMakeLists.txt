@@ -1,6 +1,5 @@
-file(GLOB Support_C "*.c")
-file(GLOB Support_H "*.h")
-file(GLOB Support_CC "*.cc")
+file(GLOB Support_C "*.c" "*.cc")
+file(GLOB Support_H "*.h" "*.hpp")
 
 option(Addresses32 "Base requirement: support 32 bit target architectures" ON)
 option(Addresses64 "Support 64 bit target architectures (WARNING: makes diablo no longer compile!)" OFF) # TODO
@@ -28,6 +27,7 @@ target_link_libraries(Support
   INTERFACE DiabloJudy1
   INTERFACE DiabloJudyL
   PRIVATE rt
+  PRIVATE dl
 )
 
 #install(FILES ${Support_H} DESTINATION include)

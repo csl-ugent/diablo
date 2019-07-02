@@ -53,9 +53,9 @@ typedef struct _bbl_hash_entry {
 
 t_bool BblFactorInit(t_cfg * cfg)
 {
-	CfgInitBblFactor(CFG_OBJECT(cfg));
-	CfgInitBblFingerprint(CFG_OBJECT(cfg));
-	CfgInitBblCanBeFactored(CFG_OBJECT(cfg));
+  CfgInitBblFactor(CFG_OBJECT(cfg));
+  CfgInitBblFingerprint(CFG_OBJECT(cfg));
+  CfgInitBblCanBeFactored(CFG_OBJECT(cfg));
 	DiabloBrokerCall("BblFactorInit",cfg);
 	if (!CFG_BBL_FACTOR(cfg))
 	{
@@ -79,9 +79,9 @@ t_bool BblFactorInit(t_cfg * cfg)
 
 void BblFactorFini(t_cfg * cfg)
 {
-	CfgFiniBblFactor(CFG_OBJECT(cfg));
-	CfgFiniBblFingerprint(CFG_OBJECT(cfg));
-	CfgFiniBblCanBeFactored(CFG_OBJECT(cfg));
+  CfgFiniBblFactor(CFG_OBJECT(cfg));
+  CfgFiniBblFingerprint(CFG_OBJECT(cfg));
+  CfgFiniBblCanBeFactored(CFG_OBJECT(cfg));
 }
 												  
 void BblFactoring(t_cfg *cfg, t_randomnumbergenerator *rng)
@@ -134,6 +134,8 @@ void BblFactoring(t_cfg *cfg, t_randomnumbergenerator *rng)
   {
     for (he = table[i]; he; he = he->next)
     {
+      /* construct a equivalent BBL holder,
+         containing the BBLs that can be factored together */
       t_equiv_bbl_holder holder = {0,0};
       if (BblIsMarked(he->bbl)) continue;
       BblMark(he->bbl);
@@ -141,31 +143,35 @@ void BblFactoring(t_cfg *cfg, t_randomnumbergenerator *rng)
 
       for (he2 = he->next; he2; he2 = he2->next)
       {
-	if (BblIsMarked(he2->bbl)) continue;
-	if (CompareTwoBlocks(he->bbl,he2->bbl))
-	{
-	  AddToHolder(holder,he2->bbl);
-	  BblMark(he2->bbl);
-	}
+      	if (BblIsMarked(he2->bbl)) continue;
+      	if (CompareTwoBlocks(he->bbl,he2->bbl))
+      	{
+      	  AddToHolder(holder,he2->bbl);
+      	  BblMark(he2->bbl);
+      	}
       }
 
+      /* only try to factor if more than one equivalent BBL is found */
       if (holder.nbbls > 1)
       {
-	nins = BBL_NINS(he->bbl);
-	/*if (totalcount < diablosupport_options.debugcounter)*/
-	{
-	  int i;
-	  VERBOSE(1,("BBL FACTOR: TRY @iB",holder.bbl[0]));
-	  for (i = 1; i < holder.nbbls; i++)
-	    VERBOSE(1,("slave @B",holder.bbl[i]));
+      	nins = BBL_NINS(he->bbl);
+      	/*if (totalcount < diablosupport_options.debugcounter)*/
+      	{
+      	  int i;
+      	  VERBOSE(1,("BBL FACTOR: TRY @iB",holder.bbl[0]));
+      	  for (i = 1; i < holder.nbbls; i++)
+      	    VERBOSE(1,("slave @B",holder.bbl[i]));
 
-	  if (CFG_BBL_FACTOR(cfg)(&holder,holder.bbl[0]))
-	  {
-	    VERBOSE(1,("SUCCES"));
-	    factorcount += (holder.nbbls - 1) * nins - holder.nbbls;
-	    totalcount++;
-	  }
-	}
+          if (!BblFactoringHolderConsiderForFactoring(&holder, NULL))
+            continue;
+
+      	  if (CFG_BBL_FACTOR(cfg)(&holder,holder.bbl[0]))
+      	  {
+      	    VERBOSE(1,("SUCCES"));
+      	    factorcount += (holder.nbbls - 1) * nins - holder.nbbls;
+      	    totalcount++;
+      	  }
+      	}
       }
 
       Free(holder.bbl);

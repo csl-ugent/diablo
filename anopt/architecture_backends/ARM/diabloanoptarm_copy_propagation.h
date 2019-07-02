@@ -9,4 +9,5 @@ void ArmCopyAnalysisInit(t_cfg * cfg);
 void ArmUseCopyPropagationInfo(t_cfg * cfg);
 void ArmOptEliminateCmpEdges(t_cfg * cfg);
 void ArmInsPrecomputeCopyPropEvaluation(t_arm_ins * ins);
+void ArmAliasAnalysis(t_cfg *cfg);
 #endif

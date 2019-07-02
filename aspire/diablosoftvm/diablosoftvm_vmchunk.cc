@@ -8,8 +8,6 @@ extern "C" {
 #include <diabloannotations.h>
 #include "diablosoftvm_vmchunk.h"
 
-extern int frontend_id;
-
 using namespace std;
 
 /* Constructor & Destructor {{{ */
@@ -87,7 +85,7 @@ static t_bbl *BblCopyToCfg(t_vmchunk *chunk, t_bbl *bbl, t_cfg *cfg)
 
     ArmInsAppendToBbl(copy,newbbl);
 
-    if (frontend_id == 4)
+    if (AspireSoftVMGetFrontendId() == 4)
     {
       /* When the original instruction was copied, the targets (to-relocatables) associated with this instruction
        * were not copied into the new CFG. As this is not necessary (for now), just remove all references in the

@@ -16,6 +16,54 @@ static char *Shifts[] = {"LSL","LSR","ASR","ROR","LSL","LSR","ASR","ROR","RRX"};
 
 char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "invalid", "NSHST", "NSH", "invalid", "invalid", "ISHST", "ISH", "invalid", "invalid", "ST", "SY"};
 
+static t_bool print_virtual_regs = FALSE;
+void ArmPrintVirtualRegisters(t_bool b)
+{
+  print_virtual_regs = b;
+}
+
+#define VREG_STR_SZ 100
+#define BUF_SZ 100
+
+static
+void VirtualRegisterName(int type, char *value) {
+  ASSERT(type != 0xff, ("invalid type"));
+
+  /* should match the VREG_* macros defined in eq_registers.cc */
+  int pos = 0;
+  value[pos] = '\0';
+
+  if (type & 0x01)
+    value[pos++] = 'I';
+  if (type & 0x02)
+    value[pos++] = 'i';
+  if (type & 0x04)
+    value[pos++] = 'O';
+
+  value[pos] = '\0';
+}
+
+static
+void VirtualRegisterInformation(t_arm_ins *ins, char *vrega, char *vregabis, char *vregb, char *vregc, char *vregs, char *usedefs)
+{
+  if (!print_virtual_regs)
+    return;
+
+  char name[4];
+  
+  VirtualRegisterName(ARM_INS_VREG_TYPE(ARM_INS_VREGA(ins)), name);
+  sprintf(vrega, "(%s%06x)", name, ARM_INS_VREG_VALUE(ARM_INS_VREGA(ins)));
+  VirtualRegisterName(ARM_INS_VREG_TYPE(ARM_INS_VREGABIS(ins)), name);
+  sprintf(vregabis, "(%s%06x)", name, ARM_INS_VREG_VALUE(ARM_INS_VREGABIS(ins)));
+  VirtualRegisterName(ARM_INS_VREG_TYPE(ARM_INS_VREGB(ins)), name);
+  sprintf(vregb, "(%s%06x)", name, ARM_INS_VREG_VALUE(ARM_INS_VREGB(ins)));
+  VirtualRegisterName(ARM_INS_VREG_TYPE(ARM_INS_VREGC(ins)), name);
+  sprintf(vregc, "(%s%06x)", name, ARM_INS_VREG_VALUE(ARM_INS_VREGC(ins)));
+  VirtualRegisterName(ARM_INS_VREG_TYPE(ARM_INS_VREGS(ins)), name);
+  sprintf(vregs, "(%s%06x)", name, ARM_INS_VREG_VALUE(ARM_INS_VREGS(ins)));
+  sprintf(usedefs, "U%02x/D%02x", ARM_INS_USE(ins), ARM_INS_DEF(ins));
+}
+
 /*!
  * \todo Document
  *
@@ -30,14 +78,22 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
   /* assume outputstring always has enough room - say at least 80 characters (this is way too much but it's safe */
   t_arm_ins * instruction=(t_arm_ins *) data;
 
-  char opcode[20]="";
-  char oper1[10]="", oper2[40]="\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", oper3[60]="\0", shift[6]="", shiftarg[10]="";
-  char operands[140]="";
+  char opcode[BUF_SZ]="";
+  char oper1[BUF_SZ]="", oper2[BUF_SZ]="\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", oper3[BUF_SZ]="\0", shift[BUF_SZ]="", shiftarg[BUF_SZ]="";
+  char operands[BUF_SZ]="";
 
   if (ARM_INS_FLAGS(instruction) & FL_THUMB) {
     ThumbInstructionPrint(data, outputstring);
     return;
   }
+  
+  char vrega[VREG_STR_SZ]="";
+  char vregabis[VREG_STR_SZ]="";
+  char vregb[VREG_STR_SZ]="";
+  char vregc[VREG_STR_SZ]="";
+  char vregs[VREG_STR_SZ]="";
+  char usedefs[VREG_STR_SZ]="";
+  VirtualRegisterInformation(instruction, vrega, vregabis, vregb, vregc, vregs, usedefs);
 
   /* ======================================================== VERY SPECIAL CASE: data in the code */
   if (ARM_INS_OPCODE(instruction) == ARM_DATA) {
@@ -89,9 +145,10 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
     sprintf(opcode, "%s%s", arm_opcode_table[ARM_INS_OPCODE(instruction)].desc,
                             Conditions[ARM_INS_CONDITION(instruction)]);
 
-    sprintf(operands, "%s", Regs[ARM_INS_REGA(instruction)]);
-    if (ARM_INS_OPCODE(instruction) != ARM_BFC)
-      sprintf(operands, "%s, %s", operands, Regs[ARM_INS_REGB(instruction)]);
+    sprintf(operands, "%s%s", Regs[ARM_INS_REGA(instruction)], vrega);
+    if (ARM_INS_OPCODE(instruction) != ARM_BFC) {
+      sprintf(operands, "%s, %s%s", operands, Regs[ARM_INS_REGB(instruction)], vregb);
+    }
 
     if (ARM_INS_OPCODE(instruction) != ARM_RBIT)
       sprintf(operands, "%s, #%d, #%d", operands, lsb, msb-lsb+1);
@@ -106,14 +163,14 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
     if(ARM_INS_OPCODE(instruction)==ARM_STREX || ARM_INS_OPCODE(instruction)==ARM_STREXB ||
        ARM_INS_OPCODE(instruction)==ARM_STREXH || ARM_INS_OPCODE(instruction)==ARM_STREXD)
     {
-      sprintf(operands, "%s, ", Regs[ARM_INS_REGC(instruction)]);
+      sprintf(operands, "%s%s, ", Regs[ARM_INS_REGC(instruction)], vregc);
     }
 
-    sprintf(operands, "%s%s, ", operands, Regs[ARM_INS_REGA(instruction)]);
+    sprintf(operands, "%s%s%s, ", operands, Regs[ARM_INS_REGA(instruction)], vrega);
     if(ARM_INS_OPCODE(instruction)==ARM_STREXD || ARM_INS_OPCODE(instruction)==ARM_LDREXD)
-      sprintf(operands, "%s%s, ", operands, Regs[ARM_INS_REGABIS(instruction)]);
+      sprintf(operands, "%s%s%s, ", operands, Regs[ARM_INS_REGABIS(instruction)], vregabis);
 
-    sprintf(operands, "%s[%s]", operands, Regs[ARM_INS_REGB(instruction)]);
+    sprintf(operands, "%s[%s%s]", operands, Regs[ARM_INS_REGB(instruction)], vregb);
   }
   /* ================================================================ various system instructions */
   else if(ARM_INS_OPCODE(instruction)==ARM_SMC || ARM_INS_OPCODE(instruction)==ARM_SETEND ||
@@ -150,11 +207,11 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
 
     if ((ARM_INS_SHIFTTYPE(instruction) >= ARM_SHIFT_TYPE_LSL_IMM) &&
         (ARM_INS_SHIFTTYPE(instruction) <= ARM_SHIFT_TYPE_ROR_IMM))
-      sprintf(operands, "%s, %s, #%d", Regs[ARM_INS_REGA(instruction)], Regs[ARM_INS_REGC(instruction)], ARM_INS_SHIFTLENGTH(instruction));
+      sprintf(operands, "%s%s, %s%s, #%d", Regs[ARM_INS_REGA(instruction)], vrega, Regs[ARM_INS_REGC(instruction)], vregc, ARM_INS_SHIFTLENGTH(instruction));
     else if (ARM_INS_REGS(instruction)==ARM_REG_NONE)
-      sprintf(operands, "%s, %s", Regs[ARM_INS_REGA(instruction)], Regs[ARM_INS_REGC(instruction)]);
+      sprintf(operands, "%s%s, %s%s", Regs[ARM_INS_REGA(instruction)], vrega, Regs[ARM_INS_REGC(instruction)], vregc);
     else
-      sprintf(operands, "%s, %s, %s", Regs[ARM_INS_REGA(instruction)], Regs[ARM_INS_REGC(instruction)], Regs[ARM_INS_REGS(instruction)]);
+      sprintf(operands, "%s%s, %s%s, %s%s", Regs[ARM_INS_REGA(instruction)], vrega, Regs[ARM_INS_REGC(instruction)], vregc, Regs[ARM_INS_REGS(instruction)], vregs);
   }
   /* ================================================================ other instructions, default */
   else
@@ -210,9 +267,9 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
           (ARM_INS_REGA(instruction)<ARM_REG_S0) ||
           (ARM_INS_REGA(instruction)>ARM_REG_S31)) &&
           !((ARM_REG_D16 <= ARM_INS_REGA(instruction)) && (ARM_INS_REGA(instruction) <= ARM_REG_D31)))
-        sprintf(oper1,"%s,",Regs[ARM_INS_REGA(instruction)]);
+        sprintf(oper1,"%s%s,",Regs[ARM_INS_REGA(instruction)],vrega);
       else
-        sprintf(oper1,"%s,",ArmDoubleRegToString(ARM_INS_REGA(instruction)));
+        sprintf(oper1,"%s%s,",ArmDoubleRegToString(ARM_INS_REGA(instruction)), vrega);
     }
 
     /* format operand 2 */
@@ -222,9 +279,9 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
           (ARM_INS_REGB(instruction)<ARM_REG_S0) ||
           (ARM_INS_REGB(instruction)>ARM_REG_S31)) &&
           !((ARM_REG_D16 <= ARM_INS_REGB(instruction)) && (ARM_INS_REGB(instruction) <= ARM_REG_D31)))
-        sprintf(oper2,"%s,",Regs[ARM_INS_REGB(instruction)]);
+        sprintf(oper2,"%s%s,",Regs[ARM_INS_REGB(instruction)], vregb);
       else
-        sprintf(oper2,"%s,",ArmDoubleRegToString(ARM_INS_REGB(instruction)));
+        sprintf(oper2,"%s%s,",ArmDoubleRegToString(ARM_INS_REGB(instruction)), vregb);
     }
     else if(ARM_INS_OPCODE(instruction) == ARM_SSAT ||
             ARM_INS_OPCODE(instruction) == ARM_SSAT16 ||
@@ -270,9 +327,9 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
             (ARM_INS_REGC(instruction)<ARM_REG_S0) ||
             (ARM_INS_REGC(instruction)>ARM_REG_S31)) &&
             !((ARM_REG_D16 <= ARM_INS_REGC(instruction)) && (ARM_INS_REGC(instruction) <= ARM_REG_D31)))
-          sprintf(oper3,"%s",Regs[ARM_INS_REGC(instruction)]);
+          sprintf(oper3,"%s%s",Regs[ARM_INS_REGC(instruction)], vregc);
         else
-          sprintf(oper3,"%s",ArmDoubleRegToString(ARM_INS_REGC(instruction)));
+          sprintf(oper3,"%s%s",ArmDoubleRegToString(ARM_INS_REGC(instruction)), vregc);
       }
       else
       {
@@ -286,7 +343,7 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
         sprintf(shift, ",%s ", Shifts[ARM_INS_SHIFTTYPE(instruction)]);
 
         if (ARM_INS_SHIFTTYPE(instruction) & 0x4)
-          sprintf(shiftarg, "%s",Regs[ARM_INS_REGS(instruction)]);
+          sprintf(shiftarg, "%s%s",Regs[ARM_INS_REGS(instruction)], vregs);
         else
           sprintf(shiftarg, "#%d",ARM_INS_SHIFTLENGTH(instruction));
       }
@@ -315,7 +372,7 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
           ARM_INS_OPCODE(instruction) == ARM_UMAAL ||
           ARM_INS_OPCODE(instruction) == ARM_UMLAL ||
           ARM_INS_OPCODE(instruction) == ARM_UMULL)
-        sprintf(oper3+strlen(oper3),",%s",Regs[ARM_INS_REGS(instruction)]);
+        sprintf(oper3+strlen(oper3),",%s%s",Regs[ARM_INS_REGS(instruction)], vregs);
     }
 
     /* SPECIAL CASE: MRS and MSR instructions use different registers */
@@ -364,8 +421,8 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
           (ARM_INS_IMMEDIATE(instruction) == 4))
       {
         /* push */
-        sprintf(opcode, "PUSH%s", Conditions[ARM_INS_CONDITION(instruction)]);
-        sprintf(operands, "{%s}", Regs[ARM_INS_REGA(instruction)]);
+        sprintf(opcode, "PUSH%s%s", Conditions[ARM_INS_CONDITION(instruction)], vregb);
+        sprintf(operands, "{%s%s}", Regs[ARM_INS_REGA(instruction)], vrega);
       }
       else if ((ARM_INS_TYPE(instruction) == IT_LOAD) &&
         (ARM_INS_REGB(instruction) == ARM_REG_R13) &&
@@ -373,8 +430,8 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
         (ARM_INS_IMMEDIATE(instruction) == 4))
       {
         /* pop */
-        sprintf(opcode, "POP%s", Conditions[ARM_INS_CONDITION(instruction)]);
-        sprintf(operands, "{%s}", Regs[ARM_INS_REGA(instruction)]);
+        sprintf(opcode, "POP%s%s", Conditions[ARM_INS_CONDITION(instruction)], vregb);
+        sprintf(operands, "{%s%s}", Regs[ARM_INS_REGA(instruction)], vrega);
       }
       else
       {
@@ -413,12 +470,12 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
       if ((ARM_INS_OPCODE(instruction) == ARM_LDM) &&
           (ARM_INS_REGB(instruction) == ARM_REG_R13) &&
           (fl & FL_DIRUP) && !(fl & FL_PREINDEX) && (fl & FL_WRITEBACK))
-        sprintf(opcode, "POP%s", Conditions[ARM_INS_CONDITION(instruction)]);
+        sprintf(opcode, "POP%s%s", Conditions[ARM_INS_CONDITION(instruction)], vregb);
 
       else if ((ARM_INS_OPCODE(instruction) == ARM_STM) &&
           (ARM_INS_REGB(instruction) == ARM_REG_R13) &&
           !(fl & FL_DIRUP) && (fl & FL_PREINDEX) && (fl & FL_WRITEBACK))
-        sprintf(opcode, "PUSH%s", Conditions[ARM_INS_CONDITION(instruction)]);
+        sprintf(opcode, "PUSH%s%s", Conditions[ARM_INS_CONDITION(instruction)], vregb);
 
       else
       {
@@ -428,7 +485,7 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
                   suffix);
 
         /* add a ! to operand 2 if writeback is enabled */
-        sprintf(oper2,"%s%s,",Regs[ARM_INS_REGB(instruction)],(fl & FL_WRITEBACK) ? "!" : "");
+        sprintf(oper2,"%s%s%s,",Regs[ARM_INS_REGB(instruction)],vregb,(fl & FL_WRITEBACK) ? "!" : "");
       }
 
 
@@ -454,7 +511,7 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
       int i;
       t_uint32 fl = ARM_INS_FLAGS(instruction);
 
-      sprintf(oper2,"%s%s",Regs[ARM_INS_REGB(instruction)],(fl & FL_WRITEBACK) ? "!" : "");
+      sprintf(oper2,"%s%s%s",Regs[ARM_INS_REGB(instruction)],vregb,(fl & FL_WRITEBACK) ? "!" : "");
 
       for (i = ARM_REG_F0; i < ARM_REG_F7+1; i++)
         if (RegsetIn(ARM_INS_MULTIPLE(instruction),i))
@@ -490,6 +547,7 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
     if(operands[strlen(operands)-1]==',')
       operands[strlen(operands)-1]='\0';
 
+  sprintf(operands, "%s %s", operands, usedefs);
   sprintf(outputstring,"%-10s %-69s",opcode,operands);
   StringTrim(outputstring);
 }
@@ -499,7 +557,14 @@ char *barierOptions[] = {"invalid", "invalid", "OSHST", "OSH", "invalid", "inval
 t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operands)
 {
   t_bool handled = FALSE;
-
+  
+  char vrega[VREG_STR_SZ]="";
+  char vregabis[VREG_STR_SZ]="";
+  char vregb[VREG_STR_SZ]="";
+  char vregc[VREG_STR_SZ]="";
+  char vregs[VREG_STR_SZ]="";
+  char usedefs[VREG_STR_SZ]="";
+  VirtualRegisterInformation(instruction, vrega, vregabis, vregb, vregc, vregs, usedefs);
 
   if((ARM_INS_OPCODE(instruction) == ARM_VMOV64_C2S) || (ARM_INS_OPCODE(instruction) == ARM_VMOV64_C2D))
   {
@@ -508,22 +573,22 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
     if((ARM_INS_REGA(instruction) >= ARM_REG_R0) && (ARM_INS_REGA(instruction) <= ARM_REG_R15))
     {
       /* to 2 core registers */
-      sprintf(operands, "%s, %s", Regs[ARM_INS_REGA(instruction)], Regs[ARM_INS_REGABIS(instruction)]);
+      sprintf(operands, "%s%s, %s%s", Regs[ARM_INS_REGA(instruction)], vrega, Regs[ARM_INS_REGABIS(instruction)], vregabis);
 
       if(ARM_INS_FLAGS(instruction) & FL_VFP_DOUBLE)
-        sprintf(operands, "%s, %s", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)));
+        sprintf(operands, "%s, %s%s", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)), vregb);
       else
-        sprintf(operands, "%s, %s, %s", operands, Regs[ARM_INS_REGB(instruction)], Regs[ARM_INS_REGC(instruction)]);
+        sprintf(operands, "%s, %s%s, %s%s", operands, Regs[ARM_INS_REGB(instruction)], vregb, Regs[ARM_INS_REGC(instruction)], vregc);
     }
     else
     {
       /* to double or single */
       if(ARM_INS_FLAGS(instruction) & FL_VFP_DOUBLE)
-        sprintf(operands, "%s", ArmDoubleRegToString(ARM_INS_REGA(instruction)));
+        sprintf(operands, "%s%s", ArmDoubleRegToString(ARM_INS_REGA(instruction)), vrega);
       else
-        sprintf(operands, "%s, %s", Regs[ARM_INS_REGA(instruction)], Regs[ARM_INS_REGABIS(instruction)]);
+        sprintf(operands, "%s%s, %s%s", Regs[ARM_INS_REGA(instruction)], vrega, Regs[ARM_INS_REGABIS(instruction)], vregabis);
 
-      sprintf(operands, "%s, %s, %s", operands, Regs[ARM_INS_REGB(instruction)], Regs[ARM_INS_REGC(instruction)]);
+      sprintf(operands, "%s, %s%s, %s%s", operands, Regs[ARM_INS_REGB(instruction)], vregb, Regs[ARM_INS_REGC(instruction)], vregc);
     }
 
     handled = TRUE;
@@ -534,15 +599,15 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
 
     if(ARM_INS_DATATYPE(instruction) == DT_F64 ||
        (ARM_INS_FLAGS(instruction) & FL_VFP_DOUBLE))
-      sprintf(operands, "%s", ArmDoubleRegToString(ARM_INS_REGA(instruction)));
+      sprintf(operands, "%s%s", ArmDoubleRegToString(ARM_INS_REGA(instruction)), vrega);
     else
-      sprintf(operands, "%s", Regs[ARM_INS_REGA(instruction)]);
+      sprintf(operands, "%s%s", Regs[ARM_INS_REGA(instruction)], vrega);
 
     if(ARM_INS_DATATYPEOP(instruction) == DT_F64 ||
        (ARM_INS_FLAGS(instruction) & FL_VFP_DOUBLE))
-      sprintf(operands, "%s, %s", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)));
+      sprintf(operands, "%s, %s%s", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)), vregb);
     else
-      sprintf(operands, "%s, %s", operands, Regs[ARM_INS_REGB(instruction)]);
+      sprintf(operands, "%s, %s%s", operands, Regs[ARM_INS_REGB(instruction)], vregb);
 
     if(ARM_INS_FLAGS(instruction) & FL_IMMED)
       sprintf(operands, "%s, #%"PRIu64"", operands, ARM_INS_IMMEDIATE(instruction));
@@ -591,10 +656,10 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
       }
       reglist[strlen(reglist) - 1] = '}';
 
-      sprintf(operands, "%s, %s, %s",
-        ArmDoubleRegToString(ARM_INS_REGA(instruction)),
+      sprintf(operands, "%s%s, %s, %s%s",
+        ArmDoubleRegToString(ARM_INS_REGA(instruction)), vrega,
         reglist,
-        ArmDoubleRegToString(ARM_INS_REGC(instruction)));
+        ArmDoubleRegToString(ARM_INS_REGC(instruction)), vregc);
 
       handled = TRUE;
     }
@@ -631,7 +696,7 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
       }
       reglist[strlen(reglist) - 1] = '}';
 
-      sprintf(operands, "%s, [%s", reglist, Regs[ARM_INS_REGB(instruction)]);
+      sprintf(operands, "%s, [%s%s", reglist, Regs[ARM_INS_REGB(instruction)], vregb);
 
       if(ARM_INS_MULTIPLEALIGNMENT(instruction) > 1)
         sprintf(operands, "%s:%u", operands, ARM_INS_MULTIPLEALIGNMENT(instruction));
@@ -639,7 +704,7 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
       sprintf(operands, "%s]%s", operands, (ARM_INS_FLAGS(instruction) & FL_WRITEBACK) ? "!" : "");
 
       if(ARM_INS_REGC(instruction) != ARM_REG_NONE)
-        sprintf(operands, "%s, %s", operands, Regs[ARM_INS_REGC(instruction)]);
+        sprintf(operands, "%s, %s%s", operands, Regs[ARM_INS_REGC(instruction)], vregc);
 
       handled = TRUE;
     }
@@ -650,19 +715,19 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
       if(ARM_INS_REGA(instruction) != ARM_REG_NONE)
       {
         if((ARM_INS_NEONFLAGS(instruction) & NEONFL_A_CORE) || (ARM_INS_NEONFLAGS(instruction) & NEONFL_A_SINGLE))
-          sprintf(operands, "%s", Regs[ARM_INS_REGA(instruction)]);
+          sprintf(operands, "%s%s", Regs[ARM_INS_REGA(instruction)], vrega);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_A_DOUBLE)
-          sprintf(operands, "%s", ArmDoubleRegToString(ARM_INS_REGA(instruction)));
+          sprintf(operands, "%s%s", ArmDoubleRegToString(ARM_INS_REGA(instruction)), vrega);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_A_QUAD)
-          sprintf(operands, "%s", ArmQuadRegToString(ARM_INS_REGA(instruction)));
+          sprintf(operands, "%s%s", ArmQuadRegToString(ARM_INS_REGA(instruction)), vrega);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_A_SCALAR)
           if (ARM_INS_OPCODE(instruction)==ARM_VMOV_C2SCALAR)
-            sprintf(operands, "%s[%u]", ArmDoubleRegToString(ARM_INS_REGA(instruction)), ARM_INS_REGASCALAR(instruction));
+            sprintf(operands, "%s%s[%u]", ArmDoubleRegToString(ARM_INS_REGA(instruction)), vrega, ARM_INS_REGASCALAR(instruction));
           else
-            sprintf(operands, "%s[]", ArmDoubleRegToString(ARM_INS_REGA(instruction)));
+            sprintf(operands, "%s%s[]", ArmDoubleRegToString(ARM_INS_REGA(instruction)), vrega);
 
         else
           FATAL(("illegal register type for destination register"));
@@ -672,19 +737,19 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
       if(ARM_INS_REGB(instruction) != ARM_REG_NONE)
       {
         if((ARM_INS_NEONFLAGS(instruction) & NEONFL_B_CORE) || (ARM_INS_NEONFLAGS(instruction) & NEONFL_B_SINGLE))
-          sprintf(operands, "%s, %s", operands, Regs[ARM_INS_REGB(instruction)]);
+          sprintf(operands, "%s, %s%s", operands, Regs[ARM_INS_REGB(instruction)], vregb);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_B_DOUBLE)
-          sprintf(operands, "%s, %s", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)));
+          sprintf(operands, "%s, %s%s", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)), vregb);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_B_QUAD)
-          sprintf(operands, "%s, %s", operands, ArmQuadRegToString(ARM_INS_REGB(instruction)));
+          sprintf(operands, "%s, %s%s", operands, ArmQuadRegToString(ARM_INS_REGB(instruction)), vregb);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_B_SCALAR)
           if (ARM_INS_OPCODE(instruction)==ARM_VMOV_SCALAR2C || ARM_INS_OPCODE(instruction)==ARM_VDUP_SCALAR)
-            sprintf(operands, "%s, %s[%u]", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)), ARM_INS_REGBSCALAR(instruction));
+            sprintf(operands, "%s, %s%s[%u]", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)), vregb, ARM_INS_REGBSCALAR(instruction));
           else
-            sprintf(operands, "%s, %s[]", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)));
+            sprintf(operands, "%s, %s%s[]", operands, ArmDoubleRegToString(ARM_INS_REGB(instruction)), vregb);
 
         else
           FATAL(("illegal register type for first operand register: %s", arm_opcode_table[ARM_INS_OPCODE(instruction)].desc));
@@ -694,19 +759,19 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
       if(ARM_INS_REGC(instruction) != ARM_REG_NONE)
       {
         if((ARM_INS_NEONFLAGS(instruction) & NEONFL_C_CORE) || (ARM_INS_NEONFLAGS(instruction) & NEONFL_A_SINGLE))
-          sprintf(operands, "%s, %s", operands, Regs[ARM_INS_REGC(instruction)]);
+          sprintf(operands, "%s, %s%s", operands, Regs[ARM_INS_REGC(instruction)], vregc);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_C_DOUBLE)
-          sprintf(operands, "%s, %s", operands, ArmDoubleRegToString(ARM_INS_REGC(instruction)));
+          sprintf(operands, "%s, %s%s", operands, ArmDoubleRegToString(ARM_INS_REGC(instruction)), vregc);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_C_QUAD)
-          sprintf(operands, "%s, %s", operands, ArmQuadRegToString(ARM_INS_REGC(instruction)));
+          sprintf(operands, "%s, %s%s", operands, ArmQuadRegToString(ARM_INS_REGC(instruction)), vregc);
 
         else if(ARM_INS_NEONFLAGS(instruction) & NEONFL_C_SCALAR)
           if ((ARM_SIMD2REGSSCALAR_FIRST<=ARM_INS_OPCODE(instruction)) && (ARM_INS_OPCODE(instruction)<=ARM_SIMD2REGSSCALAR_LAST))
-            sprintf(operands, "%s, %s[%u]", operands, ArmDoubleRegToString(ARM_INS_REGC(instruction)), ARM_INS_REGCSCALAR(instruction));
+            sprintf(operands, "%s, %s%s[%u]", operands, ArmDoubleRegToString(ARM_INS_REGC(instruction)), vregc, ARM_INS_REGCSCALAR(instruction));
           else
-            sprintf(operands, "%s, %s[]", operands, ArmDoubleRegToString(ARM_INS_REGC(instruction)));
+            sprintf(operands, "%s, %s%s[]", operands, ArmDoubleRegToString(ARM_INS_REGC(instruction)), vregc);
 
         else
           FATAL(("illegal register type for second operand register: %s", arm_opcode_table[ARM_INS_OPCODE(instruction)].desc));
@@ -763,6 +828,7 @@ t_bool ArmInsPrintSIMD(t_arm_ins * instruction, t_string opcode, t_string operan
     }
 
   }
+  sprintf(operands, "%s %s", operands, usedefs);
 
   return handled;
 }
@@ -885,11 +951,19 @@ t_bool ArmInsPrintCoproc(t_arm_ins * instruction, t_string opcode, t_string oper
 
 void ArmInsPrintVLoadStore(t_arm_ins * instruction, t_string opcode, t_string operands)
 {
-  char oper2[40] = "";
-  char reglist[100] = "{";
+  char oper2[BUF_SZ] = "";
+  char reglist[BUF_SZ] = "{";
   int i, regnum;
   int doubles = (ARM_INS_FLAGS(instruction) & FL_VFP_DOUBLE) != 0;
   t_uint32 fl = ARM_INS_FLAGS(instruction);
+  
+  char vrega[VREG_STR_SZ]="";
+  char vregabis[VREG_STR_SZ]="";
+  char vregb[VREG_STR_SZ]="";
+  char vregc[VREG_STR_SZ]="";
+  char vregs[VREG_STR_SZ]="";
+  char usedefs[VREG_STR_SZ]="";
+  VirtualRegisterInformation(instruction, vrega, vregabis, vregb, vregc, vregs, usedefs);
 
   if((ARM_INS_OPCODE(instruction) == ARM_VSTM) || (ARM_INS_OPCODE(instruction) == ARM_VLDM))
   {
@@ -905,7 +979,7 @@ void ArmInsPrintVLoadStore(t_arm_ins * instruction, t_string opcode, t_string op
   }
 
   if(!(ARM_INS_OPCODE(instruction) == ARM_VPUSH || ARM_INS_OPCODE(instruction) == ARM_VPOP))
-    sprintf(oper2,"%s%s",Regs[ARM_INS_REGB(instruction)],(fl & FL_WRITEBACK) ? "!" : "");
+    sprintf(oper2,"%s%s%s",Regs[ARM_INS_REGB(instruction)], vregb,(fl & FL_WRITEBACK) ? "!" : "");
 
   regnum = 0;
   for(i = ARM_REG_S0; i <= ARM_REG_D31; i++)
@@ -940,14 +1014,29 @@ void ArmInsPrintVLoadStore(t_arm_ins * instruction, t_string opcode, t_string op
     sprintf(operands,"%s,%s",
               oper2,
               reglist);
+
+  sprintf(operands, "%s %s", operands, usedefs);
 }
 
 t_bool ArmInsPrintDiabloSpecific(t_arm_ins * instruction, t_string opcode, t_string operands)
 {
   t_bool handled = TRUE;
+  
+  char vrega[VREG_STR_SZ]="";
+  char vregabis[VREG_STR_SZ]="";
+  char vregb[VREG_STR_SZ]="";
+  char vregc[VREG_STR_SZ]="";
+  char vregs[VREG_STR_SZ]="";
+  char usedefs[VREG_STR_SZ]="";
+  VirtualRegisterInformation(instruction, vrega, vregabis, vregb, vregc, vregs, usedefs);
+  
+  if (ARM_INS_OPCODE(instruction) == ARM_PSEUDO_SWAP)
+  {
+    sprintf(opcode, "SWAP r%d, r%d", ARM_INS_REGA(instruction), ARM_INS_REGB(instruction));
+  }
 
   /* ================================================================================ Pseudo call */
-  if (ARM_INS_OPCODE(instruction) == ARM_PSEUDO_CALL)
+  else if (ARM_INS_OPCODE(instruction) == ARM_PSEUDO_CALL)
   {
     sprintf(opcode,"CALL%s %s",
               Conditions[ARM_INS_CONDITION(instruction)],
@@ -958,8 +1047,8 @@ t_bool ArmInsPrintDiabloSpecific(t_arm_ins * instruction, t_string opcode, t_str
   {
     sprintf(opcode,"ADR%s",
               Conditions[ARM_INS_CONDITION(instruction)]);
-    sprintf(operands,"r%d %"PRIx64"",
-              ARM_INS_REGA(instruction), ARM_INS_IMMEDIATE(instruction));
+    sprintf(operands,"r%d%s %"PRIx64"",
+              ARM_INS_REGA(instruction), vrega, ARM_INS_IMMEDIATE(instruction));
 
   }
   /* ========================================================================== Constant producer */
@@ -967,8 +1056,8 @@ t_bool ArmInsPrintDiabloSpecific(t_arm_ins * instruction, t_string opcode, t_str
   {
     sprintf(opcode,"CONST%s",
               Conditions[ARM_INS_CONDITION(instruction)]);
-    sprintf(operands,"r%d %"PRIx64" (%"PRId64")",
-              ARM_INS_REGA(instruction),
+    sprintf(operands,"r%d%s %"PRIx64" (%"PRId64")",
+              ARM_INS_REGA(instruction),vrega,
               ARM_INS_IMMEDIATE(instruction),
               ARM_INS_IMMEDIATE(instruction));
   }
@@ -977,8 +1066,8 @@ t_bool ArmInsPrintDiabloSpecific(t_arm_ins * instruction, t_string opcode, t_str
   {
     sprintf(opcode,"FLOAT%s",
               Conditions[ARM_INS_CONDITION(instruction)]);
-    sprintf(operands,"f%d",
-              ARM_INS_REGA(instruction) - ARM_REG_F0);
+    sprintf(operands,"f%d%s",
+              ARM_INS_REGA(instruction) - ARM_REG_F0, vrega);
   }
   /* ========================================================================= VFP Float producer */
   else if (ARM_INS_OPCODE(instruction) == ARM_VFPFLOAT_PRODUCER)
@@ -987,12 +1076,13 @@ t_bool ArmInsPrintDiabloSpecific(t_arm_ins * instruction, t_string opcode, t_str
               Conditions[ARM_INS_CONDITION(instruction)]);
 
     if (!(ARM_INS_FLAGS(instruction)&FL_VFP_DOUBLE))
-      sprintf(operands,"%s,",Regs[ARM_INS_REGA(instruction)]);
+      sprintf(operands,"%s%s,",Regs[ARM_INS_REGA(instruction)], vrega);
     else
       sprintf(operands,"%s,",DoubleRegs[(ARM_INS_REGA(instruction)-ARM_REG_S0)/2]);
   }
   else
     handled = FALSE;
+  sprintf(operands, "%s %s", operands, usedefs);
 
   return handled;
 }

@@ -1223,6 +1223,7 @@ void ArmInlineFunAtCallsite(t_function * fun, t_bbl *call_site)
 	  BBL_SET_NEXT_IN_FUN(call_site,  i_bbl);
 	  BBL_SET_PREV_IN_FUN(i_bbl,  call_site);
 	  BBL_SET_FUNCTION(i_bbl, BBL_FUNCTION(call_site));
+	  BblSetOriginalFunctionUID(i_bbl, BblOriginalFunctionUID(call_site));
 	}
     }
 

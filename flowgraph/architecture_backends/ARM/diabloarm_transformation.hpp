@@ -16,7 +16,7 @@ public:
   virtual ~ARMArchitectureInfo() {}
 
   virtual t_reg getGenericRandomRegister(t_randomnumbergenerator* rng);
-  virtual void saveOrRestoreRegisters(const std::vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend=false);
+  virtual AddedInstructionInfo saveOrRestoreRegisters(const std::vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend=false);
 
   /* TODO: this is because of the hacky prepend=true above that needs to be fixed generically */
   virtual void popAppendRegisters(const std::vector<MaybeSaveRegister>& regs, t_bbl* bbl);

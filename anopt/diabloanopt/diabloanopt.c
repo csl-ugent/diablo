@@ -1,5 +1,4 @@
 #include <diabloanopt.h>
-
 	
 static int anopt_module_usecount = 0;
 	

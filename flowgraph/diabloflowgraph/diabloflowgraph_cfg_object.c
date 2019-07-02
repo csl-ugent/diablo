@@ -726,7 +726,8 @@ void ObjectDeflowgraph (t_object * obj)
   }
 
   DiabloBrokerCall("BeforeDeflowgraph", cfg);
-
+  SetTransformationIdForDeflowgraph();
+  DiabloBrokerCall("BeforeDeflowgraphNonTF", cfg);
   desc->Deflowgraph(obj);
 
   ComputeCodeSizeGain(obj);
@@ -737,6 +738,12 @@ void ObjectDeflowgraph (t_object * obj)
     SectionFiniDeflowgraph (sec);
   }
   DiabloBrokerCall ("AfterDeflowgraph");
+  DiabloBrokerCall ("PrintInstructions", cfg);
+  
+  if (diabloflowgraph_options.origin_tracking) {
+    TrackOriginInformation(cfg, ORIGIN_FINAL_DIRECTORY);
+    FinalizeObjectTracking(cfg);
+  }
 
   if (cfg)
     CfgFreeData (cfg);
@@ -1554,7 +1561,7 @@ void ObjectPrintListing(t_object *obj, t_string output_name)
         "========================[%s]========================\n",
         SECTION_NAME (sec));
     SECTION_FOREACH_INS (sec, ins)
-      FileIo (f, "@pxI\n", ins);
+      FileIo (f, "@pxtfI\n", ins);
   }
 
   OBJECT_FOREACH_SUBOBJECT(obj, sub_obj, tmp)

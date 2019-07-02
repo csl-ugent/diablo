@@ -32,30 +32,19 @@ extern "C"
 /* Diablo C++ headers */
 #include <diabloannotations.h>
 #include <diabloflowgraph_dwarf.h>
+#include <frontends/common.h>
 
 /* Aspire-specific headers */
 #include "aspire_options.h"
 #include "version.h"
 
-/* Create an array of (actually immutable) t_const_string's from a vector<string> */
-t_const_string* stringVectorToConstStringArray(const std::vector<std::string> &v)
+void
+BrokerFrontendId(int *result)
 {
-  if (!v.empty())
-  {
-    t_const_string* cc = new t_const_string[v.size()+1];
-    t_uint32 idx = 0;
-
-    for (const std::string& s : v)
-    {
-      cc[idx] = s.c_str();
-      idx++;
-    }
-
-    cc[idx] = NULL;
-
-    return cc;
-  }
-
-  return NULL;
+  *result = frontend_id;
 }
 
+void OutputFilenameBroker(t_string *result)
+{
+  *result = StringDup(global_options.output_name);
+}

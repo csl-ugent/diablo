@@ -261,6 +261,10 @@ CfgEstimateEdgeCounts (t_cfg * cfg)
 
     CFG_EDGE_SET_EXEC_COUNT(edge, -1LL);
 
+    if (!BBL_FUNCTION(tail))
+      CfgDrawFunctionGraphs(cfg, "tail-not-function");
+    ASSERT(BBL_FUNCTION(head), ("head not in function @eiB", head));
+    ASSERT(BBL_FUNCTION(tail), ("tail not in function @eiB", tail));
     if ((head != FunctionGetExitBlock (BBL_FUNCTION(head)) && BBL_EXEC_COUNT(head) == 0) || (tail != FunctionGetExitBlock (BBL_FUNCTION(tail)) && BBL_EXEC_COUNT(tail) == 0))
     {
       CFG_EDGE_SET_EXEC_COUNT(edge, 0LL);
@@ -291,8 +295,10 @@ CfgEstimateEdgeCounts (t_cfg * cfg)
   CFG_FOREACH_EDGE(cfg, edge)
     if (CfgEdgeIsBackwardInterproc (edge))
     {
-      if (!CFG_EDGE_CORR(edge))
+      if (!CFG_EDGE_CORR(edge)) {
+        CfgDrawFunctionGraphs(cfg, "forward");
         FATAL(("no forward edge for @E", edge));
+      }
       CFG_EDGE_SET_EXEC_COUNT(edge, CFG_EDGE_EXEC_COUNT(CFG_EDGE_CORR(edge)));
     }
 
@@ -561,7 +567,14 @@ CfgEstimateEdgeCounts (t_cfg * cfg)
           continue;
         if (CFG_EDGE_EXEC_COUNT(edge) >= 0LL)
           continue;
-        CFG_EDGE_SET_EXEC_COUNT(edge, (CFG_EDGE_EXEC_COUNT_MAX(edge) + CFG_EDGE_EXEC_COUNT_MIN(edge)) / 2);
+
+        /* integer divisiion rounds down to the lowest integer */
+        if (CFG_EDGE_EXEC_COUNT_MIN(edge) == 0
+            && CFG_EDGE_EXEC_COUNT_MAX(edge) == 1)
+          CFG_EDGE_SET_EXEC_COUNT(edge, 1);
+        else
+          CFG_EDGE_SET_EXEC_COUNT(edge, (CFG_EDGE_EXEC_COUNT_MAX(edge) + CFG_EDGE_EXEC_COUNT_MIN(edge)) / 2);
+
         VERBOSE(10, ("4 count know for edge @E\n", edge));
       }
     }
@@ -772,7 +785,6 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
 #ifdef BSEARCH
   t_uint32 nbbls;
   t_bbl **bblarr;
-  t_bbl *tempbbl = BblNew(cfg);
 #endif
 #ifndef OPTIMIZED_SEARCH
   t_bbl *last_found = CFG_NODE_FIRST(cfg);
@@ -829,6 +841,7 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
 #endif
 
 
+  t_bbl *tempbbl = BblNew(cfg);
 
   if (fp)
   {
@@ -1204,6 +1217,11 @@ BblIsAlmostHot (t_bbl * bbl)
 t_bool
 EdgeIsHot (t_cfg_edge * edge)
 {
+  /* this check is needed when using global branch target redirection,
+   * and more specifically in the case of a branch to a DATA BBL, which of course does not belong to any function. */
+  if (!BBL_FUNCTION(CFG_EDGE_TAIL(edge)))
+    return FALSE;
+
   t_cfg *cfg = FUNCTION_CFG(BBL_FUNCTION(CFG_EDGE_TAIL(edge)));
   t_int64 threshold = CFG_HOT_THRESHOLD_COUNT(cfg);
 

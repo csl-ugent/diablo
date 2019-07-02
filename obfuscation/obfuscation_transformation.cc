@@ -18,6 +18,8 @@ extern "C" {
 
 using namespace std;
 
+//#define DEBUG_OBFUSCATIONS diablosupport_options.debugcounter
+
 BBLObfuscationTransformation::BBLObfuscationTransformation() {
   RegisterTransformationType(this, name());
 }
@@ -437,7 +439,7 @@ void ObjectObfuscate(t_const_string filename, t_object* obj)
   i = 0;
   couldTransform = 0;
 
-//  CfgDrawFunctionGraphs(OBJECT_CFG(obj), "./dots_before");
+  //CfgDrawFunctionGraphs(OBJECT_CFG(obj), "./dots_before");
 
   if (ConstantPropagationInit(cfg))
     ConstantPropagation(cfg, CONTEXT_SENSITIVE);
@@ -464,7 +466,6 @@ void ObjectObfuscate(t_const_string filename, t_object* obj)
 
   if (bbl_obfuscators.size() > 0) {
     t_randomnumbergenerator *rng_apply_chance = RNGCreateChild(rng_bbl, "apply_chance");
-    RNGSetRange(rng_apply_chance, 0, 100);
 
     t_bool is_random = TRUE;
     t_randomnumbergenerator *rng_bbl_obfuscator = RNGCreateChild(rng_bbl, "bbl_obfuscator");
@@ -483,17 +484,32 @@ void ObjectObfuscate(t_const_string filename, t_object* obj)
 
       ASSERT(obfuscator, ("Expected that the obfuscator '%s' was a bbl_obfuscation, but it wasn't!", obfuscator_raw->name()));
 
-      if (RNGGenerate(rng_apply_chance) < 50) { /* Chance 50% */
-        if (obfuscator->canTransform(bbl) /*&& i < diablosupport_options.debugcounter*/) {
+      
+      if (obfuscator->canTransform(bbl)
+#ifdef DEBUG_OBFUSCATIONS
+          && i < DEBUG_OBFUSCATIONS
+#endif
+          ) {
+        if (RNGGeneratePercent(rng_apply_chance) <= static_cast<t_uint32>(obfuscator->CmdlineChance())) {
           fun = BBL_FUNCTION(bbl);
 
-          VERBOSE(0, ("Transforming a BBL of function %s with obfuscator %s", FUNCTION_NAME(fun), obfuscator->name()));
+          VERBOSE(0, ("Transforming %d a BBL of function %s with obfuscator %s, chance %d", i, FUNCTION_NAME(fun), obfuscator->name(), obfuscator->CmdlineChance()));
+          
+#ifdef DEBUG_OBFUSCATIONS
+          if (i+1 == DEBUG_OBFUSCATIONS)
+            CfgDrawFunctionGraphs(OBJECT_CFG(obj), "./dots_before");
+#endif
 
           //FunctionDrawGraph(fun, "before.dot");
           obfuscator->doTransform(bbl, rng_bbl);
           //FunctionDrawGraph(fun, "after.dot");
-          i++;
 
+#ifdef DEBUG_OBFUSCATIONS
+          if (i+1 == DEBUG_OBFUSCATIONS)
+            CfgDrawFunctionGraphs(OBJECT_CFG(obj), "./dots_after");
+#endif
+
+          i++;
 
           /*CfgComputeLiveness (cfg, TRIVIAL);
           CfgComputeSavedChangedRegisters (cfg);
@@ -513,8 +529,6 @@ void ObjectObfuscate(t_const_string filename, t_object* obj)
   } else {
     VERBOSE(0, ("No bbl_obfuscation found, skipping"));
   }
-
-  //CfgDrawFunctionGraphs(OBJECT_CFG(obj), "./dots_after");
 
 #endif
 

@@ -9,14 +9,48 @@
 #include <vector>
 #include <string>
 
+struct AddedInstructionInfo {
+  size_t nr_added_insns;
+  size_t nr_added_insns_dyn;
+  size_t nr_added_data;
+
+  AddedInstructionInfo() {
+    nr_added_insns = 0;
+    nr_added_insns_dyn = 0;
+    nr_added_data = 0;
+  }
+
+  void AddInstruction(t_ins *ins, int multiply = 1) {
+    nr_added_insns += multiply;
+    nr_added_insns_dyn += BBL_EXEC_COUNT(INS_BBL(ins)) * multiply;
+  }
+
+  void AddData(t_ins *ins, int multiply = 1) {
+    nr_added_data += multiply;
+  }
+
+  void Merge(AddedInstructionInfo& b) {
+    nr_added_insns += b.nr_added_insns;
+    nr_added_insns_dyn += b.nr_added_insns_dyn;
+    nr_added_data += b.nr_added_data;
+  }
+};
+
 class Transformation {
 public:
   virtual t_const_string name() const = 0;
   virtual void dumpStats(const std::string& prefix) {}
   virtual bool transformationIsAvailableInRandomizedList() { return true; }
   
-  Transformation() {}
+  Transformation() {
+    special_function_uid = FunctionUID_INVALID;
+  }
   virtual ~Transformation() {}
+
+  virtual int CmdlineChance() const { return 50; };
+
+protected:
+  FunctionUID special_function_uid;
 };
 
 struct BBLTransformation : public Transformation {
@@ -36,6 +70,7 @@ struct FunctionTransformation : public Transformation {
 
 std::vector<Transformation*> GetTransformationsForType(t_const_string type, bool is_for_randomized_list = false);
 void RegisterTransformationType(Transformation* transfo, t_const_string type);
+void UnregisterTransformationType(Transformation* transfo, t_const_string type);
 
 template<class T>
 T* GetRandomTypedTransformationForType(t_const_string type, t_randomnumbergenerator* rng, bool is_for_randomized_list = false) {
@@ -83,7 +118,7 @@ public:
   virtual MaybeSaveRegister getRandomRegister(t_ins* before, t_regset not_in, t_randomnumbergenerator* rng);
   virtual MaybeSaveRegister getRandomRegisterCustomLiveness(t_regset live, t_regset not_in, t_randomnumbergenerator* rng);
 
-  virtual void saveOrRestoreRegisters(const std::vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend=false) = 0; // prepend is a hack for ARM function flattening, TODO: make unneeded!
+  virtual AddedInstructionInfo saveOrRestoreRegisters(const std::vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend=false) = 0; // prepend is a hack for ARM function flattening, TODO: make unneeded!
 
   virtual void appendUnconditionalBranchInstruction(t_bbl* bbl) = 0;
   virtual t_bbl* splitBasicBlockWithJump(t_bbl* bbl, t_ins* ins, bool before);

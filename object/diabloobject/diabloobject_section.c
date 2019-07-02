@@ -368,6 +368,11 @@ t_section * ObjectNewSubsection(t_object * obj, t_address size, char section_typ
         sec=SectionGetFromObjectByName(obj,"ER_ZI");
       added=SectionCreateForObject(pobj, BSS_SECTION, sec, size, "__added_by_diablo__");
       break;
+    case TLSBSS_SECTION:
+      sec=SectionGetFromObjectByName(obj,".tbss");
+      ASSERT(sec, ("what?"));
+      added=SectionCreateForObject(pobj, TLSBSS_SECTION, sec, size, "__added_by_diablo__");
+      break;
     default:
       FATAL(("Only a rodata, data or bss section can be added\n"));
   }

@@ -1,12 +1,10 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
-
-#include <iostream>
-
 #include <obfuscation/obfuscation_architecture_backend.h>
 #include "opaque_predicate.h"
 #include "opaque_predicate_opt.h"
+using namespace std;
 
 LogFile* L_OBF_OOP = NULL;
 
@@ -27,7 +25,8 @@ bool OpaquePredicateTransformation::canTransform(const t_bbl* bbl) const {
   
   t_cfg_edge* edge;
   BBL_FOREACH_SUCC_EDGE(bbl, edge) {
-    if (CFG_EDGE_CAT(edge) == ET_SWITCH)
+    if (CFG_EDGE_CAT(edge) == ET_SWITCH
+        || CFG_EDGE_CAT(edge) == ET_IPSWITCH)
       return false;
   }
   
@@ -37,4 +36,8 @@ bool OpaquePredicateTransformation::canTransform(const t_bbl* bbl) const {
   }
 
   return BBL_NINS(bbl) > 1;
+}
+
+int OpaquePredicateTransformation::CmdlineChance() const {
+  return obfuscation_opaque_predicate_options.opaque_predicate_chance;
 }

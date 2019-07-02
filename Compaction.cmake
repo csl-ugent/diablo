@@ -21,7 +21,7 @@ if (CompactionI386)
 endif()
 
 if (CompactionARM)
-  add_executable (diablo-arm ${CMAKE_SOURCE_DIR}/frontends/diablo_arm_main.c)
+  add_executable (diablo-arm ${CMAKE_SOURCE_DIR}/frontends/diablo_arm_main.cc  ${CMAKE_CURRENT_SOURCE_DIR}/frontends/common.cc)
   target_link_libraries(diablo-arm
     PRIVATE AnoptARM
     PRIVATE FlowgraphARM

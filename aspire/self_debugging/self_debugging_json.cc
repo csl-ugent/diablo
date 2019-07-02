@@ -19,3 +19,16 @@ void SelfDebuggingAnnotationInfo::parseAnnotationContent(AnnotationRequests& res
 
   result.push_back(this);
 }
+
+void BblIsInSelfDebuggingRegionBroker(t_bbl *bbl, t_bool *result)
+{
+  *result = FALSE;
+
+  Region *region;
+  SelfDebuggingAnnotationInfo *info;
+  BBL_FOREACH_SELFDEBUGGING_REGION(bbl, region, info)
+  {
+  	*result = TRUE;
+  	break;
+  }
+}

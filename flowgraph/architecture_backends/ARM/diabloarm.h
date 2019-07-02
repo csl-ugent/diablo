@@ -31,7 +31,9 @@
 #include "diabloarm_thumb_assemble.h"
 #include "diabloarm_thumb_assemble_one.h"
 #include "diabloarm_utils.h"
+#include "diabloarm_tls.h"
 
+#ifndef DIABLOARM_INLINES
 #ifndef DIABLOARM_FUNCTIONS
 #ifndef DIABLOARM_TYPES
 #define TYPEDEFS
@@ -56,6 +58,7 @@
 #include "diabloarm_arm_ins.class.h"
 #undef CONSTRUCTORS
 #endif
+#endif
 
 
 #ifndef DIABLOARM_TYPES
@@ -75,11 +78,10 @@ void DiabloArmCppInit(int, char **);
 void DiabloArmCppFini();
 #endif
 
-#ifdef __cplusplus
-extern "C++"
-{
-#include "diabloarm.hpp"
-}
+#ifndef DIABLOARM_INLINES
+#define DIABLOARM_INLINES
+#undef DIABLOARM_H
+#include <diabloarm.h>
 #endif
 
 #endif

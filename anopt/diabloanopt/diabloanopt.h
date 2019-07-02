@@ -13,7 +13,9 @@
 #include "diabloanopt_extended_copy.h"
 #include "diabloanopt_copy_analysis.h"
 #include "diabloanopt_misc.h"
+#include "diabloanopt_factor_helpers.h"
 
+#define CONSTPROP_HELPERS 0
 
 
 #ifndef DIABLOANOPT_FUNCTIONS
@@ -50,5 +52,6 @@
 void DiabloAnoptInit(int, char **);
 void DiabloAnoptFini();
 #endif
+
 #endif
 /* vim: set shiftwidth=4 cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-2,+0.5s foldmethod=marker tw=78 cindent: */

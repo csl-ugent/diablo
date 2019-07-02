@@ -30,3 +30,16 @@ void CodeMobilityAnnotationInfo::parseAnnotationContent(AnnotationRequests& resu
 
   result.push_back(this);
 }
+
+void BblIsInCodeMobilityRegionBroker(t_bbl *bbl, t_bool *result)
+{
+  *result = FALSE;
+
+  Region *region;
+  CodeMobilityAnnotationInfo *info;
+  BBL_FOREACH_CODEMOBILITY_REGION(bbl, region, info)
+  {
+  	*result = TRUE;
+  	break;
+  }
+}

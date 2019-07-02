@@ -10,6 +10,22 @@
 
 using namespace std;
 
+map<t_bbl *, FunctionUID> gmrt_to_function_uid;
+
+SpecialFunctionTrackResults CodeMobilityTransformer_ObjectTrackingStatistics(t_bbl *bbl) {
+  SpecialFunctionTrackResults result;
+
+  result.associated_with_functions.clear();
+
+  t_bbl *b = FUNCTION_BBL_FIRST(BBL_FUNCTION(bbl));
+  if (gmrt_to_function_uid.find(b) != gmrt_to_function_uid.end()) {
+    result.associated_with_functions.insert(gmrt_to_function_uid[b]);
+    result.exec_per_function[BblOriginalFunctionUID(bbl)] = BBL_EXEC_COUNT(bbl);
+  }
+
+  return result;
+}
+
 /* Create a stub function that contains the index and uses it to call upon the Resolve function. Return the entrypoint for the stub.
  * The entrypoint of the mobile function is passed as an argument so we can determine which registers are live and thus should be
  * pushed and popped.
@@ -48,6 +64,9 @@ t_bbl* CodeMobilityTransformer::CreateGMRTStub (t_bbl* entry_bbl)
   char name[19];
   sprintf(name, "stub_gmrt_%08x", gmrt_index);
   t_function* fun = FunctionMake(entrypoint, name, FT_NORMAL);
+  ASSERT(special_function_uid != FunctionUID_INVALID, ("invalid special function uid!"));
+  BblSetOriginalFunctionUID(entrypoint, special_function_uid);
+  gmrt_to_function_uid[entrypoint] = BblOriginalFunctionUID(entry_bbl);
 
   /* Make second (exit) BBL and insert it in the function */
   t_bbl* second = BblNew(cfg);
@@ -83,6 +102,9 @@ CodeMobilityTransformer::CodeMobilityTransformer (t_object* obj, t_const_string 
   ASSERT(version == binder_version, ("The binder version is %d, but Diablo expected version %d.", version, binder_version));
 
   LOG(L_TRANSFORMS, "START OF CODE MOBILITY LOG\n");
+  
+  special_function_uid = RegisterSpecialFunctionType(CodeMobilityTransformer_ObjectTrackingStatistics);
+  DiabloBrokerCallInstall("BblIsInCodeMobilityRegion", "t_bbl *, t_bool *", (void *)BblIsInCodeMobilityRegionBroker, FALSE);
 }
 
 CodeMobilityTransformer::~CodeMobilityTransformer()
@@ -265,6 +287,9 @@ void CodeMobilityTransformer::PrepareCfg (t_cfg* cfg)
   /* Split all functions that have BBLs both in and out of a code mobility region. After this function has
    * been called all code mobility regions will exist out of functions that have no BBLs outside the region.
    */
+   CfgRemoveDeadCodeAndDataBlocks (cfg);
+   CfgPatchToSingleEntryFunctions (cfg);
+   CfgRemoveDeadCodeAndDataBlocks (cfg);
   CfgPartitionFunctions(cfg, cm_split_helper_IsStartOfPartition, cm_split_helper_CanMerge);
 
   /* Recompute liveness */

@@ -27,15 +27,10 @@
  *
  */
 /* }}} */
-
-extern "C" {
-#include <diabloanopti386.h>
-
-#include "i386_instructionselection_opt.h"
-}
-
-#include <obfuscation/obfuscation_architecture_backend.h>
+#include "i386_obfuscations.h"
 #include "i386_instructionselection.h"
+#include "i386_instructionselection_opt.h"
+using namespace std;
 
 /* TODO: for now, the framework randomizes all (possible) instructions in a BBL, rather than offering a randomization choice for each instruction */
 

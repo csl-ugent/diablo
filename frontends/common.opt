@@ -187,6 +187,14 @@ group "Optimization and analysis" bool_option branch_elimination
    description="Turn branch elimination on or off";
 }
 
+group "Optimization and analysis" bool_option branch_flipping
+{
+   short="Obranchflipping";
+   long= "branch_flipping";
+   default=on;
+   description="Turn branch flipping on or off";
+}
+
 group "Optimization and analysis" bool_option stack
 {
    short="Os";

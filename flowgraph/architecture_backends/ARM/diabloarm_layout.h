@@ -119,6 +119,7 @@ void ArmClusterDestroy(t_cluster * c);
 void ArmClusterChainDestroy(t_clusterchain * cc);
 void ArmClusterChainBblsByAddress(t_clustercollection * cc, t_chain_holder * ch);
 void ArmBblListAddBbl(t_bbllist * bl, t_bbl * b);
+t_cfg_edge *ArmGetFallThroughEdge(t_bbl *i_bbl);
 
 /* dynamic members of BBL's */
 BBL_DYNAMIC_MEMBER_GLOBAL(cluster, CLUSTER, Cluster, t_cluster *, NULL);

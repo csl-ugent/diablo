@@ -321,10 +321,12 @@ t_uint32
 RegsetCountRegs (t_regset r)
 {
   t_uint32 count = 0;
-  t_reg i;
 
-  REGSET_FOREACH_REG(r, i)
-    count++;
+  int i;
+  uint32_t x;
+  REGSET_FOREACH_SUBSET(r, x, i)
+    count += RegSubsetCountBits(x);
+
   return count;
 }
 

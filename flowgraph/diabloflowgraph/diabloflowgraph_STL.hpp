@@ -1,6 +1,5 @@
 #ifndef DIABLOFLOWGRAPH_STL_HPP
 #define DIABLOFLOWGRAPH_STL_HPP
-#include "diabloflowgraph.hpp"
 
 struct bblcmp {
   bool operator() (const t_bbl* lhs, const t_bbl* rhs) const
@@ -15,5 +14,12 @@ struct functioncmp {
 };
 typedef std::set<t_function *, functioncmp> FunctionSet;
 typedef std::vector<t_function *> FunctionVector;
+
+struct edgecmp {
+  bool operator() (const t_cfg_edge* lhs, const t_cfg_edge* rhs) const
+  {return CFG_EDGE_ID(lhs) < CFG_EDGE_ID(rhs);}
+};
+typedef std::set<t_cfg_edge*, edgecmp> CfgEdgeSet;
+typedef std::vector<t_cfg_edge*> CfgEdgeVector;
 
 #endif

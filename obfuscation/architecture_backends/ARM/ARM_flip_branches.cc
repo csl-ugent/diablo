@@ -1,19 +1,8 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
-
-#include <iostream>
-#include <map>
-#include <set>
-#include <vector>
-
 #include "ARM_obfuscations.h"
 #include "ARM_flip_branches.h"
-
-extern "C" {
-#include "diabloarm.h"
-}
-
 using namespace std;
 
 ArmFlipBranchesTransformation::ArmFlipBranchesTransformation() {
@@ -90,6 +79,7 @@ bool ArmFlipBranchesTransformation::doTransform(t_bbl* bbl, t_randomnumbergenera
     CfgEdgeCreate(BBL_CFG(bbl),split_off,target_bbl,ET_IPJUMP);
   else
     CfgEdgeCreate(BBL_CFG(bbl),split_off,target_bbl,ET_JUMP);
+  BblCopyExecInformation(target_bbl, split_off);
   
   VERBOSE(1, ("After: @eiB ; @eiB ; @eiB", bbl, split_off, target_bbl));
   
@@ -101,5 +91,3 @@ bool ArmFlipBranchesTransformation::doTransform(t_bbl* bbl, t_randomnumbergenera
 void ArmFlipBranchesTransformation::dumpStats(const std::string& prefix) {
   VERBOSE(0, ("%sBranchFlip_Stats,bbls_transformed,%i", prefix.c_str(), bblsTransformed));
 }
-
-

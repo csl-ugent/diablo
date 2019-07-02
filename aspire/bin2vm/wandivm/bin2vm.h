@@ -19,6 +19,9 @@ extern "C" {
   #define TRUE  !(FALSE)
 #endif
 
+#define BIN2VM_TESTING_HANDLE int
+#define BIN2VM_TESTING_INVALID_HANDLE -1
+
 struct Bin2Vm;
 typedef struct Bin2Vm Bin2Vm;
 
@@ -27,6 +30,7 @@ struct bin2vm_list_vmimages_arm; //Forward declartion, include bin2vm_list_vmima
 /* Typedefs for bin2vm_create_iselect, bin2vm_check_arm_instruction and bin2vm_destroy that
    make the use of dlopen/dlsym easier. */
 typedef enum bin2vm_status_codes (*bin2vm_create_iselect_t)( Bin2Vm** retSelf );
+typedef enum bin2vm_status_codes (*bin2vm_setTargetVmType_t)( Bin2Vm* self, enum bin2vm_vm_type vmType );
 typedef enum bin2vm_status_codes (*bin2vm_check_arm_instruction_t)( Bin2Vm* self, unsigned char* armInstruction, unsigned int sizeArmInstruction, bool* retIsSupported );
 typedef enum bin2vm_status_codes (*bin2vm_destroy_t)( Bin2Vm** pSelf );
 
@@ -47,11 +51,15 @@ BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_create_iselect( Bin2Vm** retSelf 
 BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_create( Bin2Vm** retSelf );
 
 
+//TODO: Rename bin2vm_setTargetVmType and bin2vm_setFlagTestMemory to not use camel case but underscores to be consistent. When you do this you must also inform Ghent, because they use these interfaces.
 //When you don't call this function, bin2vm defaults to BIN2VM_VM_TYPE_CLASSIC.
 BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_setTargetVmType( Bin2Vm* self, enum bin2vm_vm_type vmType );
 
 //When you don't call this frunction, bin2vm defaults to false.
 BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_setFlagTestMemory( Bin2Vm* self, bool useTestMemory );
+
+//When you don't call this frunction, bin2vm defaults to ".".
+BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_setMobileCodeOutputDir( Bin2Vm* self, const char* mobileCodeOutputDir );
 
 /** Release library resources.
     @param pSelf Address of the Bin2Vm pointer variable. After releasing the resources, the function will set *pSelf to NULL.
@@ -92,11 +100,11 @@ BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_diablo_phase2( Bin2Vm* self,
  */
 BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_free_vmimages_arm( struct bin2vm_list_vmimages_arm** pList );
 
-
 /* @param: retVmImages: If not null: returns the translated vmImages. This is only used for testing.
  *                      Use bin2vm_free_vmimages_arm to free the list. The list is defined in bin2vm_list_vmimages_arm.h.
  */
 BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_diablo_phase1( Bin2Vm* self,
+                                                              const char* generatedVMoutDir,
                                                               const char* readJsonFileName,
                                                               const char* writeAsmFilename,
                                                               bool ignoreAddresses,
@@ -111,13 +119,6 @@ BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_translate_arm( Bin2Vm* self,
                                                               unsigned char** retVmImage, unsigned int* retSizeVmImage
 );
 
-/* Caller must free the returned image using bin2vm_freeData( void** pData ); */
-BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_translate_arm_instruction( Bin2Vm* self,
-                                                                          unsigned char* armBuffer, unsigned int sizeArmBuffer,
-                                                                          unsigned char** retVmImage, unsigned int* retSizeVmImage
-); //Used for testing individual instructions.
-
-
 BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_translate( Bin2Vm* self,
                                                           unsigned char* x86buffer, unsigned int sizeX86buffer, unsigned int startAddress,
                                                           unsigned char** retVmImage, unsigned int* retSizeVmImage
@@ -125,7 +126,23 @@ BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_translate( Bin2Vm* self,
 
 BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_shutdown_llvm(); //Used to remove still-reachable blocks from valgrind output.
 
-BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_setMobileCodeOutputDir(Bin2Vm* self, const char* mobileCodeOutputDir);
+
+/* This function is used to enable the execution of ARMasm_runner testcases for static VMs. Use bin2vm_setTargetVmType to select the vmType. */
+/* Caller must free the returned image using bin2vm_freeData( void** pData ); */
+BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_testing_translate_arm_instruction( Bin2Vm* self,
+                                                                                  unsigned char* armBuffer, unsigned int sizeArmBuffer,
+                                                                                  unsigned char** retVmImage, unsigned int* retSizeVmImage
+); /* Used for testing individual instructions. */
+
+/* These functions are just used to enable the execution of ARMasm_runner testcases with --gen-VM: */
+BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_testing_add_arm_instruction_as_ir( Bin2Vm* self,
+                                                                                  unsigned char* armBuffer,
+                                                                                  unsigned int sizeArmBuffer,
+                                                                                  BIN2VM_TESTING_HANDLE* retIrHandle
+); /* Used for testing individual instructions with --gen-VM. */
+BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_testing_genVM( Bin2Vm* self, unsigned int seed, const char* generatedVMoutDir ); /* Used for testing individual instructions with --gen-VM. */
+/* Translate a previously with bin2vm_testing_add_arm_instruction_as_ir added ARM instruction to VM. Caller must free the returned image using bin2vm_freeData( void** pData ); */
+BIN2VM_LINKAGE enum bin2vm_status_codes bin2vm_testing_translate_ir( Bin2Vm* self, BIN2VM_TESTING_HANDLE irHandle, unsigned char** retVmImage, unsigned int* retSizeVmImage ); /* Used for testing individual instructions with --gen-VM. */
 
 #ifdef __cplusplus
 }

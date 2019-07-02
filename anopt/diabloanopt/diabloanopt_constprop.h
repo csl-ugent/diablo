@@ -9,8 +9,10 @@ void FunctionPropagateConstantsAfterIterativeSolution(t_function * fun, t_analys
 /* Add dynamic member testcondition to cfg edges */
 EDGE_DYNAMIC_MEMBER_GLOBAL(testcondition, TESTCONDITION, TestCondition, TestAndSetConditionFunction, NULL);
 EDGE_DYNAMIC_MEMBER_GLOBAL_BODY(procstate, PROCSTATE, Procstate, t_procstate *, { *valp=NULL; }, { if (*valp) { ProcStateFree(*valp); *valp = NULL; } }, {});
+EDGE_DYNAMIC_MEMBER_GLOBAL_BODY(conditional_procstate, CONDITIONAL_PROCSTATE, ConditionalProcstate, t_procstate *, { *valp=NULL; }, { if (*valp) { ProcStateFree(*valp); *valp = NULL; } }, {});
 
 BBL_DYNAMIC_MEMBER_GLOBAL_BODY(procstate_in, PROCSTATE_IN, ProcstateIn, t_procstate *, {*valp=NULL;}, {}, {});
+BBL_DYNAMIC_MEMBER_GLOBAL_BODY(procstate_out, PROCSTATE_OUT, ProcstateOut, t_procstate *, {*valp=NULL;}, {}, {});
 
 typedef void (*t_ConstantPropagationInsEmul)(t_ins *, t_procstate *, t_bool);
 typedef void (*t_EdgePropagator)(t_cfg_edge *, t_ins *);
@@ -41,7 +43,23 @@ void AddKnownConstantSym(t_symbol *sym);
 void KillKnownConstantSymTable(void);
 t_bool IsKnownToBeConstant(t_address address, t_reloc *rel);
 void BblPropagateConstants(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint_calculations, t_analysis_complexity complexity);
+void InsPropagateConstants(t_procstate *procstate, t_ins *ins);
 
 t_bool ConstantPropagationInit(t_cfg * cfg);
 void ConstantPropagationFini(t_cfg * cfg);
+
+void ConstantPropagationHelpers(t_bool state);
+void ConstantPropagationFast(t_bool state);
+void ConstantPropagationDisableTransformations(t_bool state);
+void ConstantPropagationAdvancedFactoringPhase(t_bool state);
+
+void CfgApplyConstantInformation(t_cfg * cfg, t_analysis_complexity complexity);
+
+void 
+FunctionPropagateConstantsDuringIterativeSolution(t_function * fun, 
+    t_cfg_edge * edge_in, 
+    t_analysis_complexity complexity
+  );
+
+void BblPropagateConstantInformation(t_bbl *i_bbl, t_analysis_complexity complexity, t_procstate *prev_state, t_procstate *next_state);
 #endif

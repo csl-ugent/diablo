@@ -7,5 +7,6 @@
 #include "diabloannotations_annotation_factory.h"
 #include "diabloannotations_regions.h"
 #include "diabloannotations_region_iterators.h"
+#include "diabloannotations_factoring.h"
 
 #endif /* DIABLOANNOTATIONS_H */

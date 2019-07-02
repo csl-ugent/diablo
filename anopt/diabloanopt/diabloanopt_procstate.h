@@ -10,6 +10,7 @@ typedef struct _t_procstate t_procstate;
 typedef struct _t_argstate t_argstate;
 /** \internal */
 typedef union  _t_register_content  t_register_content;
+typedef struct _t_register_helper t_register_helper;
 /** \internal */
 typedef struct _t_regstate t_regstate;
 /*! t_lattice_level is used to return information about the values,
@@ -30,7 +31,7 @@ typedef enum {CP_TOP=-1,CP_VALUE=0,CP_BOT=1} t_lattice_level;
 
 #include <diabloflowgraph.h>
 
-typedef void (*TestAndSetConditionFunction)(t_cfg_edge *,t_procstate*, t_procstate **, t_procstate **);
+typedef void (*TestAndSetConditionFunction)(t_cfg_edge *,t_procstate*, t_procstate **, t_procstate **, t_procstate **);
 
 /*! This union represents register contents on a generic target
 architecture. It can be integer (addresses) or floating-point
@@ -39,6 +40,12 @@ union _t_register_content
 {
   t_address i;
   /*  t_float f; */
+};
+
+struct _t_register_helper
+{
+  int nr_helpers;
+  t_ins **helpers;
 };
 
 /*! This struct holds processor states, i.e. the register contents
@@ -84,8 +91,11 @@ struct _t_procstate
 
   /*! In case there are known constant values propagated, they are stored in
    * this arrays. */
-  
+
   t_register_content* register_values;
+#if CONSTPROP_HELPERS
+  t_register_helper* register_helpers;
+#endif
 
   /*! A similar array is used to store the actual relocation tags in case they
    * are constant. */
@@ -111,7 +121,8 @@ void ProcStateSetTagTop(t_procstate* state, t_reg reg);
 void ProcStateSetTagBot(t_procstate* state, t_reg reg);
 void ProcStateSetCondTop(t_procstate* state, t_reg reg);
 void ProcStateSetCondBot(t_procstate* state, t_reg reg);
-void ProcStateSetReg(t_procstate* state, t_reg reg, t_register_content value); 
+void ProcStateSetReg(t_procstate* state, t_reg reg, t_register_content value);
+void ProcStateSwapRegisterInfo(t_procstate *state, t_reg rx, t_reg ry);
 t_string IoModifierProcState (t_const_string modifiers, va_list *ap);
 void ProcStateSetTag(t_procstate* state, t_reg reg, t_reloc* value);
 //void ProcStateSetCond(t_procstate* state, t_reg reg, t_bool value);
@@ -140,6 +151,7 @@ t_lattice_level ProcStateGetTag(t_procstate* state, t_reg reg, t_reloc ** value)
 t_lattice_level ProcStateGetCond(t_procstate* state, t_reg reg, t_bool * value);
 t_bool ProcStateJoinSimple(t_procstate* dest, t_procstate* src, t_regset regs, t_architecture_description * desc) ;
 void ProcStateDup(t_procstate *dest, t_procstate* src, t_architecture_description* desc);
+bool ProcStateEquals(t_procstate *a, t_procstate *b, t_architecture_description *desc);
 t_procstate * ProcStateNewDup(t_procstate* src);
 void ProcStateJoinTags(t_procstate * state, t_reg dest, t_reg src);
 

@@ -1,19 +1,8 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
-
-#include <iostream>
-#include <map>
-#include <vector>
-
 #include "ARM_obfuscations.h"
 #include "ARM_split_twoway_predicate.h"
-
-extern "C" {
-#include "diabloarm.h"
-#include "diabloanopt.h"
-}
-
 using namespace std;
 
 ARMSplitWithTwoWayPredicateTransformation::ARMSplitWithTwoWayPredicateTransformation() {
@@ -188,4 +177,3 @@ void ARMSplitWithTwoWayPredicateTransformation::dumpStats(const std::string& pre
   VERBOSE(0, ("%sTwoWaySplit_Stats,reused_flag_ins,%i", prefix.c_str(), reusedFlagIns));
   VERBOSE(0, ("%sTwoWaySplit_Stats,added_cmp,%i", prefix.c_str(), addedCmp));
 }
-

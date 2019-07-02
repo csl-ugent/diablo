@@ -30,21 +30,9 @@
  *
  */
 /* }}} */
-#include <set>
-#include <sstream>
-#include <climits>
-
-extern "C" {
-#include <diabloanopt.h>
-
-#include "flatten_function_opt.h"
-}
-
-#include <set>
-
 #include <obfuscation/obfuscation_architecture_backend.h>
 #include "flatten_function.h"
-
+#include "flatten_function_opt.h"
 using namespace std;
 
 LogFile* L_OBF_FF = NULL;
@@ -291,6 +279,7 @@ void FlattenFunctionTransformation::flattenBasicBlockSet(const std::vector<t_bbl
       continue;
 
     t_bbl* split = BblSplitBlock(bbl ,BBL_INS_FIRST(bbl), TRUE);
+    DiabloBrokerCall("AFAfterSplit", bbl, split);
 
     splitOffFunctionEntriesToRedirect.insert(bbl);
     transformPredecessorsSet.insert(split);
@@ -329,6 +318,8 @@ void FlattenFunctionTransformation::flattenBasicBlockSet(const std::vector<t_bbl
   t_string fun_name = StringConcat2("SwitchFunction_", nr_str);
 
   t_function* switch_block_function = FunctionMake(switch_bbl, fun_name, FT_NORMAL);
+  ASSERT(special_function_uid != FunctionUID_INVALID, ("invalid special function uid!"));
+  BblSetOriginalFunctionUID(switch_bbl, special_function_uid);
 
   Free (fun_name);
 

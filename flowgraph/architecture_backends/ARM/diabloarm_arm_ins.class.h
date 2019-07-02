@@ -26,7 +26,7 @@ DIABLO_CLASS_BEGIN
 /*! \brief The generic instruction */
 EXTENDS(t_ins)
 /*! \brief internal representation of the instruction's opcode */
-MEMBER(t_arm_opcode,opcode,OPCODE)
+IMEMBER(t_arm_opcode,opcode,OPCODE)
 MEMBER(t_thumb_opcode,thumbopcode,THUMBOPCODE)
 /*! \brief destination register */
 MEMBER(t_reg,rega,REGA)
@@ -34,6 +34,15 @@ MEMBER(t_reg,rega,REGA)
 MEMBER(t_reg,regb,REGB)
 /*! \brief operand register 2 */
 MEMBER(t_reg,regc,REGC)
+
+MEMBER(t_uint32,vrega,VREGA)
+MEMBER(t_uint32,vregb,VREGB)
+MEMBER(t_uint32,vregc,VREGC)
+MEMBER(t_uint32,vregabis,VREGABIS)
+MEMBER(t_uint32,vregs,VREGS)
+MEMBER(t_uint8,use,USE)
+MEMBER(t_uint8,def,DEF)
+
 /*! \brief shift register
  *
  * This field holds the distance over which the third operand has to be
@@ -53,7 +62,7 @@ MEMBER(t_regset,multiple,MULTIPLE)
  * \todo Enumerate and document flags */
 MEMBER(t_instruction_flags,flags,FLAGS)
 /*! \brief Condition code */
-MEMBER(t_arm_condition_code,condition,CONDITION)
+IMEMBER(t_arm_condition_code,condition,CONDITION)
 /*! \brief The type of shift applied to the second source operand */
 MEMBER(t_arm_shift_type,shifttype,SHIFTTYPE)
 /*! \brief immediate shift length
@@ -112,3 +121,42 @@ DIABLO_CLASS_END
 #define ARM_INS_SET_REGBSCALAR(x,y) ARM_INS_SET_REGASCALAR(x,y)
 #define ARM_INS_REGCSCALAR(x) ARM_INS_REGASCALAR(x)
 #define ARM_INS_SET_REGCSCALAR(x,y) ARM_INS_SET_REGASCALAR(x,y)
+
+#define ARM_INS_USEDEF_REGA     0x01
+#define ARM_INS_USEDEF_REGABIS  0x02
+#define ARM_INS_USEDEF_REGB     0x04
+#define ARM_INS_USEDEF_REGC     0x08
+#define ARM_INS_USEDEF_REGS     0x10
+
+#define ARM_INS_USES_REGA(ins) (ARM_INS_USE(ins) & ARM_INS_USEDEF_REGA)
+#define ARM_INS_USES_REGABIS(ins) (ARM_INS_USE(ins) & ARM_INS_USEDEF_REGABIS)
+#define ARM_INS_USES_REGB(ins) (ARM_INS_USE(ins) & ARM_INS_USEDEF_REGB)
+#define ARM_INS_USES_REGC(ins) (ARM_INS_USE(ins) & ARM_INS_USEDEF_REGC)
+#define ARM_INS_USES_REGS(ins) (ARM_INS_USE(ins) & ARM_INS_USEDEF_REGS)
+
+#define ARM_INS_DEFS_REGA(ins) (ARM_INS_DEF(ins) & ARM_INS_USEDEF_REGA)
+#define ARM_INS_DEFS_REGABIS(ins) (ARM_INS_DEF(ins) & ARM_INS_USEDEF_REGABIS)
+#define ARM_INS_DEFS_REGB(ins) (ARM_INS_DEF(ins) & ARM_INS_USEDEF_REGB)
+#define ARM_INS_DEFS_REGC(ins) (ARM_INS_DEF(ins) & ARM_INS_USEDEF_REGC)
+#define ARM_INS_DEFS_REGS(ins) (ARM_INS_DEF(ins) & ARM_INS_USEDEF_REGS)
+
+#define ARM_INS_SET_VREGA_TYPE(ins, t) ARM_INS_SET_VREGA(ins, (ARM_INS_VREGA(ins) & 0x00ffffff) | ((t) << 24))
+#define ARM_INS_SET_VREGABIS_TYPE(ins, t) ARM_INS_SET_VREGABIS(ins, (ARM_INS_VREGABIS(ins) & 0x00ffffff) | ((t) << 24))
+#define ARM_INS_SET_VREGB_TYPE(ins, t) ARM_INS_SET_VREGB(ins, (ARM_INS_VREGB(ins) & 0x00ffffff) | ((t) << 24))
+#define ARM_INS_SET_VREGC_TYPE(ins, t) ARM_INS_SET_VREGC(ins, (ARM_INS_VREGC(ins) & 0x00ffffff) | ((t) << 24))
+#define ARM_INS_SET_VREGS_TYPE(ins, t) ARM_INS_SET_VREGS(ins, (ARM_INS_VREGS(ins) & 0x00ffffff) | ((t) << 24))
+
+#define ARM_INS_SET_VREGA_VALUE(ins, v) ARM_INS_SET_VREGA(ins, (ARM_INS_VREGA(ins) & 0xff000000) | (v))
+#define ARM_INS_SET_VREGABIS_VALUE(ins, v) ARM_INS_SET_VREGABIS(ins, (ARM_INS_VREGABIS(ins) & 0xff000000) | (v))
+#define ARM_INS_SET_VREGB_VALUE(ins, v) ARM_INS_SET_VREGB(ins, (ARM_INS_VREGB(ins) & 0xff000000) | (v))
+#define ARM_INS_SET_VREGC_VALUE(ins, v) ARM_INS_SET_VREGC(ins, (ARM_INS_VREGC(ins) & 0xff000000) | (v))
+#define ARM_INS_SET_VREGS_VALUE(ins, v) ARM_INS_SET_VREGS(ins, (ARM_INS_VREGS(ins) & 0xff000000) | (v))
+
+#define ARM_INS_VREG_VALUE(x) ((x) & 0x00ffffff)
+#define ARM_INS_VREG_TYPE(x) (((x) >> 24) & 0xff)
+
+#define ARM_INS_VREG_VALUE_I(x)  ((x) & 0x000000ff)
+#define ARM_INS_VREG_VALUE_O(x) (((x) & 0x0000ff00) >> 8)
+#define ARM_INS_VREG_VALUE_i(x) (((x) & 0x00ff0000) >> 16)
+
+#define ARM_INS_CREATE_VREG(value, type) ((value) | ((type) << 24))

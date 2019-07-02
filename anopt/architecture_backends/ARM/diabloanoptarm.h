@@ -13,6 +13,7 @@
 #include "diabloanoptarm_stack.h"
 #include "diabloanoptarm_ls_fwd.h"
 #include "diabloanoptarm_pre.h"
+#include "diabloanoptarm_advanced_factor.h"
 
 #ifndef DIABLOANOPT_ARM_FUNCTIONS
 #ifndef DIABLOANOPT_ARM_TYPES
@@ -47,6 +48,11 @@
 
 void DiabloAnoptArmInit(int, char **);
 void DiabloAnoptArmFini();
+
+#ifdef __cplusplus
+extern "C"
+#endif
+void DiabloAnoptArmInitCfgCpp(void * vcfg, void * data);
 #endif
 #endif
 /* vim: set shiftwidth=4 cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-2,+0.5s foldmethod=marker tw=78 cindent: */

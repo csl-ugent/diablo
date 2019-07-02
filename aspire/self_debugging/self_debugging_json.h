@@ -42,4 +42,6 @@ struct SelfDebuggingAnnotationInfoFactory
   CFG_FOREACH_REGION(cfg, region)\
     for (auto request_it__ = CreateRegionIterator<SelfDebuggingAnnotationInfo>(region->requests); (request_it__ != region->requests.end()) ? (info = static_cast<SelfDebuggingAnnotationInfo *>(*request_it__), TRUE) : FALSE; ++request_it__)
 
+void BblIsInSelfDebuggingRegionBroker(t_bbl *bbl, t_bool *result);
+
 #endif

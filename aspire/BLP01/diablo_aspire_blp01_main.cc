@@ -1,12 +1,11 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
+int frontend_id = 1;
 #include "aspire_frontend_common.h"
 
 #include <diabloflowgraph_dwarf.h>
 #include <diablosoftvm.h>
 #include <diabloannotations.h>
-
-int frontend_id = 1;
 
 t_ptr_array chunks;
 void AfterLayoutBroker(t_cfg * cfg)
@@ -14,13 +13,14 @@ void AfterLayoutBroker(t_cfg * cfg)
   AspireSoftVMExport(cfg, &chunks);
 }
 
-LogFile* L_SOFTVM = NULL;
-
 /* MAIN */
 int
 main (int argc, char **argv)
 {
   t_object *obj;
+
+  /* print the command-line arguments */
+  PrintFullCommandline(argc, argv);
 
   /* Initialise used Diablo libraries */
   DiabloAnoptArmInit (argc, argv);
@@ -61,6 +61,8 @@ main (int argc, char **argv)
     return -1;
   }
 
+  DiabloBrokerCallInstall("FrontendId", "int*", (void*)BrokerFrontendId, FALSE);
+
   /* The real work: Link Emulate, Dissasemble, Flowgraph, Optimize, Deflowgraph, Assemble or just Dump {{{ */
   if (global_options.read)
   {
@@ -100,6 +102,8 @@ main (int argc, char **argv)
           initial_dot_path = global_options.dots_before_path;
         if (global_options.dots_after_path_set)
           final_dot_path = global_options.dots_after_path;
+
+        DiabloBrokerCallInstall("OutputFileName", "t_string *", (void *)OutputFilenameBroker, FALSE);
 
         NewDiabloPhase("Flowgraph");
         ObjectFlowgraph (obj, NULL, NULL, TRUE);
@@ -151,7 +155,7 @@ main (int argc, char **argv)
 
         NewDiabloPhase("SoftVM");
 
-        AspireSoftVMInit();
+        AspireSoftVMInit(argv[0]);
 
         CfgComputeLiveness (cfg, TRIVIAL);
         CfgComputeLiveness (cfg, CONTEXT_INSENSITIVE);

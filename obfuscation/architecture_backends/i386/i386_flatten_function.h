@@ -5,11 +5,6 @@
 #ifndef I386_FLATTEN_TRANSFORMATION_H
 #define I386_FLATTEN_TRANSFORMATION_H
 
-extern "C" {
-#include <diabloanopti386.h>
-}
-
-
 #include <obfuscation/generic/flatten_function.h>
 
 class I386FlattenFunctionTransformation : public FlattenFunctionTransformation {

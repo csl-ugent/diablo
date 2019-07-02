@@ -6,3 +6,357 @@ usage_option help
   description="Print this help message";
 }
 
+bool_option advanced_factoring
+{
+  short="afact";
+  long="advanced-factoring";
+  default=off;
+  description="Activate advanced factoring.";
+}
+
+int_option advanced_factoring_master_region_id
+{
+  short="afactmaster";
+  long="advanced-factoring-master";
+  default=0;
+  description="Advanced factoring master region ID.";
+}
+
+int_option af_weight_0
+{
+  short="af-weight0";
+  long="af-weight0";
+  default=100;
+}
+
+int_option af_weight_1
+{
+  short="af-weight1";
+  long="af-weight1";
+  default=100;
+}
+
+int_option af_weight_2
+{
+  short="af-weight2";
+  long="af-weight2";
+  default=100;
+}
+
+int_option af_weight_3
+{
+  short="af-weight3";
+  long="af-weight3";
+  default=100;
+}
+
+int_option af_weight_4
+{
+  short="af-weight4";
+  long="af-weight4";
+  default=100;
+}
+
+int_option af_weight_5
+{
+  short="af-weight5";
+  long="af-weight5";
+  default=100;
+}
+
+int_option af_weight_6
+{
+  short="af-weight6";
+  long="af-weight6";
+  default=100;
+}
+
+int_option af_weight_7
+{
+  short="af-weight7";
+  long="af-weight7";
+  default=100;
+}
+
+int_option af_weight_8
+{
+  short="af-weight8";
+  long="af-weight8";
+  default=100;
+}
+
+int_option af_weight_9
+{
+  short="af-weight9";
+  long="af-weight9";
+  default=100;
+}
+
+int_option advanced_factoring_transformation_chance
+{
+  short="af-transform-chance";
+  long="af-transform-chance";
+  default=100;
+}
+
+int_option advanced_factoring_max_set_size
+{
+  short="af-max-set-size";
+  long="af-max-set-size";
+  default=100000;
+}
+
+bool_option advanced_factoring_enable_sequence
+{
+  short="af-enable-sequences";
+  long="af-enable-sequences";
+  default=on;
+}
+
+bool_option advanced_factoring_enable_slice
+{
+  short="af-enable-slice";
+  long="af-enable-slice";
+  default=on;
+}
+
+bool_option af_enable_dispicondjp
+{
+  short="af-enable-dispicondjp";
+  long="af-enable-dispicondjp";
+  default=off;
+}
+
+bool_option af_enable_dispib
+{
+  short="af-enable-dispib";
+  long="af-enable-dispib";
+  default=off;
+}
+
+bool_option af_enable_dispswb
+{
+  short="af-enable-dispswb";
+  long="af-enable-dispswb";
+  default=off;
+}
+
+bool_option af_enable_dispswo
+{
+  short="af-enable-dispswo";
+  long="af-enable-dispswo";
+  default=off;
+}
+
+bool_option af_enable_dispcondjp
+{
+  short="af-enable-dispcondjp";
+  long="af-enable-dispcondjp";
+  default=off;
+}
+
+bool_option af_enable_dispdisttbl
+{
+  short="af-enable-dispdisttbl";
+  long="af-enable-dispdisttbl";
+  default=off;
+}
+
+bool_option af_stealthy_switches
+{
+  short="af-stealthy-switches";
+  long="af-stealthy-switches";
+  default=off;
+}
+
+bool_option af_stealthy_switches_optional
+{
+  short="af-stealthy-switches-optional";
+  long="af-stealthy-switches-optional";
+  default=off;
+}
+
+bool_option af_random_switch_check
+{
+  short="af-random-switch-check";
+  long="af-random-switch-check";
+  default=off;
+}
+
+bool_option af_only_executed
+{
+  short="af-only-executed";
+  long="af-only-executed";
+  default=off;
+}
+
+bool_option af_no_constprop
+{
+  short="af-no-constprop";
+  long="af-no-constprop";
+  default=off;
+}
+
+bool_option advanced_factoring_identical_sequences
+{
+  short="af-identical-sequences";
+  long="af-identical-sequences";
+  default=off;
+}
+
+bool_option advanced_factoring_include_addressproducers
+{
+  short="af-also-address";
+  long="af-also-address";
+  default=on;
+}
+
+bool_option advanced_factoring_addressproducers_updown
+{
+  short="af-address-updown";
+  long="af-address-updown";
+  default=off;
+}
+
+bool_option advanced_factoring_scoring_include_object
+{
+  short="af-scoring-include-object";
+  long="af-scoring-include-object";
+  default=on;
+}
+
+bool_option advanced_factoring_scoring_include_function
+{
+  short="af-scoring-include-function";
+  long="af-scoring-include-function";
+  default=on;
+}
+
+bool_option advanced_factoring_shuffle
+{
+  short="af-shuffle";
+  long="af-shuffle";
+  default=on;
+}
+
+bool_option advanced_factoring_leftbetter
+{
+  short="af-left-better";
+  long="af-left-better";
+  default=off;
+}
+
+bool_option advanced_factoring_rightbetter
+{
+  short="af-right-better";
+  long="af-right-better";
+  default=off;
+}
+
+bool_option advanced_factoring_emit_intermediate_scc
+{
+  short="af-emit-intermediate-scc";
+  long="af-emit-intermediate-scc";
+  default=off;
+}
+
+int_option advanced_factoring_branch_after_index
+{
+  short="af-branch-after-index";
+  long="af-branch-after-index";
+  default=100;
+}
+
+int_option af_fake_fallthrough_condbranch_chance
+{
+  short="af-conditional-fake-ft-chance";
+  long="af-conditional-fake-ft-chance";
+  default=100;
+}
+
+int_option af_fake_fallthrough_uncondbranch_chance
+{
+  short="af-unconditional-fake-ft-chance";
+  long="af-unconditional-fake-ft-chance";
+  default=100;
+}
+
+int_option af_dummy_entry_chance
+{
+  short="af-dummy-entry-chance";
+  long="af-dummy-entry-chance";
+  default=30;
+}
+
+int_option af_dtable_max_tables
+{
+  short="af-dtable-max-tables";
+  long="af-dtable-max-tables";
+  default=20;
+}
+
+int_option af_max_block_length
+{
+  short="af-max-block-length";
+  long="af-max-block-length";
+  default=10000;
+}
+
+int_option af_min_block_length
+{
+  short="af-min-block-length";
+  long="af-min-block-length";
+  default=1;
+}
+
+int_option af_dtable_rebase_chance
+{
+  short="af-dtable-rebase-chance";
+  long="af-dtable-rebase-chance";
+  default=30;
+}
+
+int_option af_hotness
+{
+  short="af-hotness";
+  long="af-hotness";
+  default=0;
+}
+
+bool_option af_hotness_nins
+{
+  short="af-hotness-nins";
+  long="af-hotness-nins";
+  default=on;
+}
+
+int_option af_max_combination_size
+{
+  short="af-max-combination-size";
+  long="af-max-combination-size";
+  default=1000;
+}
+
+string_option af_scoring_library
+{
+   short="af-scoring-library";
+   long="af-scoring-library";
+   default="afDefaultScore"
+   description="The scoring library to be used for advanced factoring.";
+}
+
+string_option af_scoring_compare_library
+{
+   short="af-scoring-compare-library";
+   long="af-scoring-compare-library";
+   default="afDefaultCompare"
+   description="The scoring compare library to be used for advanced factoring.";
+}
+
+string_option af_choose_dispatcher_library
+{
+   short="af-choose-dispatcher-library";
+   long="af-choose-dispatcher-library";
+   default="afRandomDispatcherChooser"
+   description="The dispatcher chooser library to be used for advanced factoring.";
+}

@@ -451,8 +451,8 @@ void ElfAddNeededLib (t_object * obj, t_string libname)
  * can result in an increase of the .fini_array or .dtors subsections it is advisible to call it after
  * linker emulation and before flowgraphing. This is because of possible issues later on during optimization.
  */
-void
-ElfAddFinalizationRoutine(t_object *obj, t_symbol *fini_routine_sym)
+static void
+_ElfAddFinalizationRoutine(t_object *obj, t_symbol *fini_routine_sym, t_relocatable *relocatable, t_address relocatable_offset)
 {
   /* We assume the fini_array or the dtors have been vectorized */
   t_object* linker_obj = ObjectGetLinkerSubObject(obj);
@@ -527,8 +527,8 @@ ElfAddFinalizationRoutine(t_object *obj, t_symbol *fini_routine_sym)
       AddressNullForObject(obj),
       T_RELOCATABLE(subsec),
       first,
-      SYMBOL_BASE(fini_routine_sym),
-      SYMBOL_OFFSET_FROM_START(fini_routine_sym),
+      fini_routine_sym ? SYMBOL_BASE(fini_routine_sym) : relocatable,
+      fini_routine_sym ? SYMBOL_OFFSET_FROM_START(fini_routine_sym) : relocatable_offset,
       FALSE,
       NULL,
       NULL,
@@ -542,12 +542,24 @@ ElfAddFinalizationRoutine(t_object *obj, t_symbol *fini_routine_sym)
   else FATAL(("No fini array or .dtors into which we can install the new finalization routine is present in the object!"));
 }
 
+void
+ElfAddFinalizationRoutine(t_object *obj, t_symbol *init_routine_sym)
+{
+  _ElfAddFinalizationRoutine(obj, init_routine_sym, NULL, AddressNew32(0));
+}
+
+void
+ElfAddFinalizationRoutineR(t_object *obj, t_relocatable *relocatable)
+{
+  _ElfAddFinalizationRoutine(obj, NULL, relocatable, AddressNew32(0));
+}
+
 /* This function makes sure that init_routine will be called at the beginning of the program. As this function
  * can result in an increase of the .init_array or .ctors subsections it is advisible to call it after
  * linker emulation and before flowgraphing. This is because of possible issues later on during optimization.
  */
-void
-ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym)
+static void
+_ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym, t_relocatable *relocatable, t_address relocatable_offset)
 {
   /* We assume the init_array or the ctors have been vectorized */
   t_object* linker_obj = ObjectGetLinkerSubObject(obj);
@@ -622,8 +634,8 @@ ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym)
       AddressNullForObject(obj),
       T_RELOCATABLE(subsec),
       first,
-      SYMBOL_BASE(init_routine_sym),
-      SYMBOL_OFFSET_FROM_START(init_routine_sym),
+      init_routine_sym ? SYMBOL_BASE(init_routine_sym) : relocatable,
+      init_routine_sym ? SYMBOL_OFFSET_FROM_START(init_routine_sym) : relocatable_offset,
       FALSE,
       NULL,
       NULL,
@@ -635,6 +647,18 @@ ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym)
       ElfAddDynamicRelativeRelocation(obj, T_RELOCATABLE(subsec), last);
   }
   else FATAL(("No init array or .ctors into which we can install the new initialization routine is present in the object!"));
+}
+
+void
+ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym)
+{
+  _ElfAddInitializationRoutine(obj, init_routine_sym, NULL, AddressNew32(0));
+}
+
+void
+ElfAddInitializationRoutineR(t_object *obj, t_relocatable *relocatable)
+{
+  _ElfAddInitializationRoutine(obj, NULL, relocatable, AddressNew32(0));
 }
 
 void DiabloElfInit(int argc, char ** argv)
@@ -689,7 +713,9 @@ void DiabloElfInit(int argc, char ** argv)
     DiabloBrokerCallInstall("AddNeededLib","t_object * obj, t_string libname", ElfAddNeededLib, FALSE);
     DiabloBrokerCallInstall("AddDynamicRelativeRelocation", "t_object * obj, t_relocatable * from, t_address from_offset", ElfAddDynamicRelativeRelocation, FALSE);
     DiabloBrokerCallInstall("AddFinalizationRoutine", "t_object * obj, t_symbol * fini_routine_sym", ElfAddFinalizationRoutine, FALSE);
+    DiabloBrokerCallInstall("AddFinalizationRoutineR", "t_object * obj, t_relocatable *", ElfAddFinalizationRoutineR, FALSE);
     DiabloBrokerCallInstall("AddInitializationRoutine", "t_object * obj, t_symbol * init_routine_sym", ElfAddInitializationRoutine, FALSE);
+    DiabloBrokerCallInstall("AddInitializationRoutineR", "t_object * obj, t_relocatable * relocatable", ElfAddInitializationRoutineR, FALSE);
   }
   elf_module_usecount++;
 }

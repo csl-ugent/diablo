@@ -99,6 +99,11 @@ struct _t_architecture_description
   void (*computeLiveRegsBeforeSwi) (t_regset *, t_ins *);
   t_bool (*IsCopy) (t_ins *, t_reg *, t_reg *);
   t_address (*Modus) (t_address x, t_reloc * rel);
+  bool (*InsIsInvariant)(t_ins *);
+
+  bool (*InsIsConstantProducer)(t_ins *);
+  t_int64 (*InsGetConstant)(t_ins *);
+  void (*InsSetConstant)(t_ins *, t_int64);
 };
 #endif
 /* }}} */

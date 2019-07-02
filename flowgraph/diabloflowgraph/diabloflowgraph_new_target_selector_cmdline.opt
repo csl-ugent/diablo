@@ -14,6 +14,54 @@ group "obfuscation" bool_option new_target_in_same_function
   default=on;
 }
 
+group "obfuscation" bool_option new_target_global
+{
+  short="ntg";
+  long="newTargetGlobal";
+  description="When chosing a fake target, redirect control flow globally using a postpass";
+  default=on;
+}
+
+group "obfuscation" bool_option new_target_all_global
+{
+  short="ntag";
+  long="nettargetallglobal";
+  description="When chosing a fake target, only redirect in the global target post pass";
+  default=off;
+}
+
+group "obfuscation" bool_option new_target_disable
+{
+  short="ntd";
+  long="nettargetdisable";
+  description="Disable target redirection";
+  default=off;
+}
+
+group "obfuscation" int_option fake_edge_cluster_size
+{
+  short="fecs";
+  long="fakeedgeclustersize";
+  description="Size of fake edge clusters, 0 to disable";
+  default=0;
+}
+
+group "obfuscation" int_option fake_edge_cluster_chance
+{
+  short="fecc";
+  long="fakeedgeclusterchance";
+  description="Chance of creating a cluster of fake edges, 0 to disable";
+  default=100;
+}
+
+group "obfuscation" int_option fake_cluster_backedge_chance
+{
+  short="febc";
+  long="fakeedgebackchance";
+  description="Chance of creating a back edge for a cluster of fake edges, 0 to disable";
+  default=100;
+}
+
 usage_option help
 {
    long="help";

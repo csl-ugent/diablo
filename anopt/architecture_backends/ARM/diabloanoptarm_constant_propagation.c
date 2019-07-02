@@ -120,7 +120,7 @@ static void ARMTestAndSetSingleCondition(t_cfg_edge* edge,t_procstate* state, t_
     }
 }
 
-static void ARMTestAndSetForCBZ(t_cfg_edge*edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void ARMTestAndSetForCBZ(t_cfg_edge*edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate** state_conditional)
 {
   t_arm_ins * last_arm_ins = T_ARM_INS(BBL_INS_LAST(CFG_EDGE_HEAD(edge)));
   t_reg reg = ARM_INS_REGB(last_arm_ins);
@@ -141,6 +141,10 @@ static void ARMTestAndSetForCBZ(t_cfg_edge*edge, t_procstate* state, t_procstate
       ProcStateDup(*state_true,state,&arm_description);
       content.i=AddressNew32(0);
       ProcStateSetReg(*state_true,reg,content);
+      
+      *state_conditional = ProcStateNew(&arm_description);
+      ProcStateSetAllBot(*state_conditional, (&arm_description)->all_registers);
+      ProcStateSetReg(*state_conditional, reg, content);
     }
   else if (G_T_UINT32(content.i)==0)
     {
@@ -154,7 +158,7 @@ static void ARMTestAndSetForCBZ(t_cfg_edge*edge, t_procstate* state, t_procstate
     }
 }
 
-static void ARMTestAndSetForCBNZ(t_cfg_edge*edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void ARMTestAndSetForCBNZ(t_cfg_edge*edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate** state_conditional)
 {
   t_arm_ins * last_arm_ins = T_ARM_INS(BBL_INS_LAST(CFG_EDGE_HEAD(edge)));
   t_reg reg = ARM_INS_REGB(last_arm_ins);
@@ -175,6 +179,10 @@ static void ARMTestAndSetForCBNZ(t_cfg_edge*edge, t_procstate* state, t_procstat
       ProcStateDup(*state_true,state,&arm_description);
       content.i=AddressNew32(0);
       ProcStateSetReg(*state_false,reg,content);
+      
+      *state_conditional = ProcStateNew(&arm_description);
+      ProcStateSetAllBot(*state_conditional, (&arm_description)->all_registers);
+      ProcStateSetReg(*state_conditional, reg, content);
     }
   else if (G_T_UINT32(content.i)!=0)
     {
@@ -188,7 +196,7 @@ static void ARMTestAndSetForCBNZ(t_cfg_edge*edge, t_procstate* state, t_procstat
     }
 }
 
-static void ARMTestAndSetSingleConditionExt(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_reg flag)
+static void ARMTestAndSetSingleConditionExt(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate** state_conditional, t_reg flag)
 {
   t_bool value;
   /*#define TEST*/
@@ -209,6 +217,10 @@ static void ARMTestAndSetSingleConditionExt(t_cfg_edge* edge,t_procstate* state,
       ProcStateDup(*state_true,state,&arm_description);
       ProcStateSetCond(*state_true,flag,TRUE);
       ProcStateSetCond(*state_false,flag,FALSE);
+      
+      *state_conditional = ProcStateNew(&arm_description);
+      ProcStateSetAllBot(*state_conditional, (&arm_description)->all_registers);
+      ProcStateSetReg(*state_conditional, reg, content);
 
 #ifdef TEST
       if (teller++<diablosupport_options.debugcounter)
@@ -230,6 +242,52 @@ static void ARMTestAndSetSingleConditionExt(t_cfg_edge* edge,t_procstate* state,
       *state_true = NULL;
     }
 }
+
+static void ARMTestAndSetConditionCN_ALExt(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional) {
+  switch (CFG_EDGE_CAT(edge)) {
+  case ET_FALLTHROUGH:
+  case ET_IPFALLTHRU:
+    break;
+  
+  default: FATAL(("unhandled edge type @E", edge));
+  }
+
+  t_arm_ins *last = T_ARM_INS(BBL_INS_LAST(CFG_EDGE_HEAD(edge)));
+  
+  if (last
+      && ArmIsControlflow(last)
+      && ArmInsIsConditional(last)) {
+    t_bool process = true;
+
+    switch (ARM_INS_CONDITION(last)) {
+    case ARM_CONDITION_EQ:
+      process = false;
+      break;
+
+    case ARM_CONDITION_NE:
+      break;
+
+    default: FATAL(("unhandled condition @I in @eiB", last, CFG_EDGE_HEAD(edge)));
+    }
+    
+    if (process) {
+      /* */
+      t_arm_ins * ins = FindCmpThatDeterminesJump(last);
+      t_uint32 value = ARM_INS_IMMEDIATE(ins);
+      t_reg reg = ARM_INS_REGB(ins);
+      t_register_content content;
+      content.i=AddressNew32(value);
+      
+      *state_conditional = ProcStateNew(&arm_description);
+      ProcStateSetAllBot(*state_conditional, (&arm_description)->all_registers);
+      ProcStateSetReg(*state_conditional, reg, content);
+    }
+  }
+  
+  /* regular ARMTestAndSetConditionCN_AL functionality */
+  *state_true = state;
+  *state_false = NULL;
+}
 /* }}} */
 /*!
  *
@@ -244,14 +302,14 @@ static void ARMTestAndSetSingleConditionExt(t_cfg_edge* edge,t_procstate* state,
  * \return void
  */
 /* ARMTestAndSetConditionCN_EQ {{{ */
-void ARMTestAndSetConditionCN_EQ(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_EQ(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   ARMTestAndSetSingleCondition(edge,state, state_true, state_false, ARM_REG_Z_CONDITION);
 }
 
-void ARMTestAndSetConditionCN_EQExt(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_EQExt(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate** state_conditional)
 {
-  ARMTestAndSetSingleConditionExt(edge,state, state_true, state_false, ARM_REG_Z_CONDITION);
+  ARMTestAndSetSingleConditionExt(edge,state, state_true, state_false, state_conditional, ARM_REG_Z_CONDITION);
 }
 
 
@@ -269,14 +327,14 @@ void ARMTestAndSetConditionCN_EQExt(t_cfg_edge* edge,t_procstate* state, t_procs
  * \return void
  */
 /* ARMTestAndSetConditionCN_NE {{{ */
-void ARMTestAndSetConditionCN_NE(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_NE(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   ARMTestAndSetSingleCondition(edge,state, state_false, state_true, ARM_REG_Z_CONDITION);
 }
 
-void ARMTestAndSetConditionCN_NEExt(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_NEExt(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate** state_conditional)
 {
-  ARMTestAndSetSingleConditionExt(edge,state, state_false, state_true, ARM_REG_Z_CONDITION);
+  ARMTestAndSetSingleConditionExt(edge,state, state_false, state_true, state_conditional, ARM_REG_Z_CONDITION);
 }
 /* }}} */
 /*!
@@ -292,7 +350,7 @@ void ARMTestAndSetConditionCN_NEExt(t_cfg_edge* edge,t_procstate* state, t_procs
  * \return void
  */
 /* ARMTestAndSetConditionCN_CS {{{ */
-void ARMTestAndSetConditionCN_CS(t_cfg_edge * edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_CS(t_cfg_edge * edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   ARMTestAndSetSingleCondition(edge,state, state_true, state_false, ARM_REG_C_CONDITION);
 }
@@ -310,7 +368,7 @@ void ARMTestAndSetConditionCN_CS(t_cfg_edge * edge, t_procstate* state, t_procst
  * \return void
  */
 /* ARMTestAndSetConditionCN_CC {{{ */
-void ARMTestAndSetConditionCN_CC(t_cfg_edge * edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_CC(t_cfg_edge * edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   ARMTestAndSetSingleCondition(edge,state, state_false, state_true, ARM_REG_C_CONDITION);
 }
@@ -328,7 +386,7 @@ void ARMTestAndSetConditionCN_CC(t_cfg_edge * edge, t_procstate* state, t_procst
  * \return void
  */
 /* ARMTestAndSetConditionCN_MI {{{ */
-void ARMTestAndSetConditionCN_MI(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_MI(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   ARMTestAndSetSingleCondition(edge, state, state_true, state_false, ARM_REG_N_CONDITION);
 }
@@ -346,7 +404,7 @@ void ARMTestAndSetConditionCN_MI(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_PL {{{ */
-void ARMTestAndSetConditionCN_PL(t_cfg_edge * edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_PL(t_cfg_edge * edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   ARMTestAndSetSingleCondition(edge, state, state_false, state_true, ARM_REG_N_CONDITION);
 }
@@ -364,7 +422,7 @@ void ARMTestAndSetConditionCN_PL(t_cfg_edge * edge, t_procstate* state, t_procst
  * \return void
  */
 /* ARMTestAndSetConditionCN_VS {{{ */
-void ARMTestAndSetConditionCN_VS(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_VS(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   ARMTestAndSetSingleCondition(edge,state, state_true, state_false, ARM_REG_V_CONDITION);
 }
@@ -382,7 +440,7 @@ void ARMTestAndSetConditionCN_VS(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_VC {{{ */
-void ARMTestAndSetConditionCN_VC(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_VC(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   ARMTestAndSetSingleCondition(edge,state, state_false, state_true, ARM_REG_V_CONDITION);
 }
@@ -400,7 +458,7 @@ void ARMTestAndSetConditionCN_VC(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_HI {{{ */
-void ARMTestAndSetConditionCN_HI(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_HI(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 { 
   t_bool c_flag;
   t_bool z_flag;
@@ -472,9 +530,9 @@ void ARMTestAndSetConditionCN_HI(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_LS {{{ */
-void ARMTestAndSetConditionCN_LS(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_LS(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  ARMTestAndSetConditionCN_HI(edge,state, state_false, state_true);
+  ARMTestAndSetConditionCN_HI(edge,state, state_false, state_true, state_conditional);
 }
 /* }}} */
 /*!
@@ -490,7 +548,7 @@ void ARMTestAndSetConditionCN_LS(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_GE {{{ */
-void ARMTestAndSetConditionCN_GE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_GE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_bool n_flag;
   t_bool v_flag;
@@ -563,9 +621,9 @@ void ARMTestAndSetConditionCN_GE(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_LT {{{ */
-void ARMTestAndSetConditionCN_LT(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_LT(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  ARMTestAndSetConditionCN_GE(edge,state, state_false, state_true);
+  ARMTestAndSetConditionCN_GE(edge,state, state_false, state_true, state_conditional);
 }
 /* }}} */
 /*!
@@ -581,14 +639,14 @@ void ARMTestAndSetConditionCN_LT(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_GT {{{ */
-void ARMTestAndSetConditionCN_GT(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_GT(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_bool z_flag;
   t_lattice_level z_level = ProcStateGetCond(state,ARM_REG_Z_CONDITION,&z_flag);
 
   if (CP_BOT==z_level)
     {
-      ARMTestAndSetConditionCN_GE(edge,state, state_true, state_false);
+      ARMTestAndSetConditionCN_GE(edge,state, state_true, state_false, state_conditional);
 
       if (*state_true)
 	ProcStateSetCond(*state_true,ARM_REG_Z_CONDITION,FALSE);
@@ -600,7 +658,7 @@ void ARMTestAndSetConditionCN_GT(t_cfg_edge * edge,t_procstate* state, t_procsta
     }
   else
     {
-      ARMTestAndSetConditionCN_GE(edge,state, state_true, state_false);
+      ARMTestAndSetConditionCN_GE(edge,state, state_true, state_false, state_conditional);
     }
 }
 /* }}} */
@@ -617,9 +675,9 @@ void ARMTestAndSetConditionCN_GT(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_LE {{{ */
-void ARMTestAndSetConditionCN_LE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_LE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  ARMTestAndSetConditionCN_GT(edge,state, state_false, state_true);
+  ARMTestAndSetConditionCN_GT(edge,state, state_false, state_true, state_conditional);
 }
 /* }}} */
 /*!
@@ -635,7 +693,7 @@ void ARMTestAndSetConditionCN_LE(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_AL {{{ */
-void ARMTestAndSetConditionCN_AL(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_AL(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   *state_true = state;
   *state_false = NULL;
@@ -654,7 +712,7 @@ void ARMTestAndSetConditionCN_AL(t_cfg_edge * edge,t_procstate* state, t_procsta
  * \return void
  */
 /* ARMTestAndSetConditionCN_NV {{{ */
-void ARMTestAndSetConditionCN_NV(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionCN_NV(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   *state_false = state;
   *state_true = NULL;
@@ -704,7 +762,7 @@ void ARMTestAndSetConditionSetAllToBot(t_cfg_edge * edge,t_procstate* state, t_p
  * \return void
  */
 /* ARMTestAndSetConditionAllPaths {{{ */
-void ARMTestAndSetConditionAllPaths(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void ARMTestAndSetConditionAllPaths(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   *state_true  = state;
   *state_false = state;
@@ -744,7 +802,7 @@ TestAndSetConditionFunction ARMTestAndSetConditionFunctionsArrayExt [] = { &ARMT
 									&ARMTestAndSetConditionCN_LT,
 									&ARMTestAndSetConditionCN_GT,
 									&ARMTestAndSetConditionCN_LE,
-									&ARMTestAndSetConditionCN_AL,
+									&ARMTestAndSetConditionCN_ALExt,
 									&ARMTestAndSetConditionCN_NV
 };
 
@@ -785,6 +843,7 @@ void ArmEdgePropagator(t_cfg_edge * edge, t_arm_ins * last_arm_ins)
 #endif
     case ET_CALL:
     case ET_IPJUMP:
+      ASSERT(last_arm_ins, ("what? @E", edge));
       if (ARM_INS_OPCODE(last_arm_ins)==ARM_T2CBZ)
         {
           CFG_EDGE_SET_TESTCONDITION(edge,  ARMTestAndSetForCBZ);
@@ -818,8 +877,13 @@ void ArmEdgePropagator(t_cfg_edge * edge, t_arm_ins * last_arm_ins)
 	 edge, and if the propagated state could be evaluated to
 	 "always take the branch", PropOverEdge() will not even be
 	 called for the fall-through edges.  */
-
-      CFG_EDGE_SET_TESTCONDITION(edge,  ARMTestAndSetConditionFunctionsArray[ARM_CONDITION_AL]);
+      if (last_arm_ins
+          && BblEndsWithConditionalBranchAfterCMP(ARM_INS_BBL(last_arm_ins))) {
+        CFG_EDGE_SET_TESTCONDITION(edge, ARMTestAndSetConditionFunctionsArrayExt[ARM_CONDITION_AL]);
+      }
+      else {
+        CFG_EDGE_SET_TESTCONDITION(edge,  ARMTestAndSetConditionFunctionsArray[ARM_CONDITION_AL]);
+      }
       break;
     case ET_SWITCH:
     case ET_RETURN:

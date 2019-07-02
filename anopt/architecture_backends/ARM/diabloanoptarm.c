@@ -100,13 +100,13 @@ ArmPrecomputeCopyPropEvaluation(t_cfg * cfg)
       ArmInsPrecomputeCopyPropEvaluation(T_ARM_INS(i_ins));
 }
 
-static int anoptarm_cfg_usecount = 0;
+int anoptarm_cfg_usecount = 0;
 
-void 
+void
 DiabloAnoptArmInitCfg(void * vcfg, void * data)
 {
   t_cfg * cfg=vcfg;
-  
+
   if(!anoptarm_cfg_usecount)
   {
     DiabloBrokerCallInstall("MergeBbls", "const t_cfg *" , MergeBbls, TRUE, cfg);
@@ -122,7 +122,7 @@ DiabloAnoptArmInitCfg(void * vcfg, void * data)
     DiabloBrokerCallInstall("OptCopyPropagation", "const t_cfg *" , ArmOptCopyPropagation,TRUE, cfg);
     DiabloBrokerCallInstall("ArmLoadStoreFwd", "const t_cfg *" , ArmLoadStoreFwd,TRUE, cfg);
     DiabloBrokerCallInstall("ArmLoadStoreFwdNoDom", "const t_cfg *" , ArmLoadStoreFwdNoDom,TRUE, cfg);
-    
+
     DiabloBrokerCallInstall("ConstantPropagationInit", "const t_cfg *" , ArmConstantPropagationInit,TRUE, cfg);
     DiabloBrokerCallInstall("CopyAnalysisInit", "const t_cfg *" , ArmCopyAnalysisInit,TRUE, cfg);
     DiabloBrokerCallInstall("BblFactorInit", "const t_cfg *" , ArmBblFactorInit,TRUE, cfg);
@@ -158,7 +158,12 @@ DiabloAnoptArmInitCfg(void * vcfg, void * data)
 
     /* Minimizing ARM instruction size is a sort of optimalization pass that should happen right before deflowgraphing */
     DiabloBrokerCallInstall("BeforeDeflowgraph", "t_cfg *", ArmMinimizeThumbInstructionSize, FALSE);
+
+    /* advanced factoring helpers */
+    DiabloBrokerCallInstall("BblConstructCompareMatrices", "const t_cfg *, t_string", ConstructBblCompareMatrices, TRUE, cfg);
   }
+
+  DiabloAnoptArmInitCfgCpp(vcfg, data);
 
   /* Do dynamic member initialization */
   BblInitEqsIn(cfg);
@@ -204,26 +209,27 @@ DiabloAnoptArmInit (int argc, char **argv)
   {
     DiabloAnoptInit(argc, argv);
     DiabloArmInit(argc, argv);
-    // DiabloAnoptArmCmdlineInit ();
-    // OptionParseCommandLine (diabloanoptarm_option_list, argc, argv,FALSE);
-    // OptionGetEnvironment (diabloanoptarm_option_list);
-    // DiabloAnoptArmCmdlineVerify ();
-    // OptionDefaults (diabloanoptarm_option_list);
-    //
+
+    DiabloAnoptArmCmdlineInit ();
+    OptionParseCommandLine (diabloanoptarm_option_list, argc, argv,FALSE);
+    OptionGetEnvironment (diabloanoptarm_option_list);
+    DiabloAnoptArmCmdlineVerify ();
+    OptionDefaults (diabloanoptarm_option_list);
+
     DiabloBrokerCallInstall("AfterObjectRead","t_object *",DiabloAnoptArmObjectNewCallback,FALSE);
   }
 
   anoptarm_module_usecount++;
 }
 
-void 
+void
 DiabloAnoptArmFini()
 {
-//  DiabloAnoptArmCmdlineFini();
   anoptarm_module_usecount--;
 
   if (!anoptarm_module_usecount)
   {
+    DiabloAnoptArmCmdlineFini();
     DiabloArmFini();
     DiabloAnoptFini();
   }

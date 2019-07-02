@@ -5,10 +5,16 @@
 #ifndef ARM_OBFUSCATIONS
 #define ARM_OBFUSCATIONS
 
-#include "ARM_architecture_backend.h"
-
 #define ARM_REG_SP ARM_REG_R13
 #define ARM_REG_LR ARM_REG_R14
 #define ARM_REG_PC ARM_REG_R15
+
+extern "C" {
+#include <diabloarm.h>
+#include <diabloanoptarm.h>
+}
+#include <diabloarm.hpp>
+
+#include <obfuscation/obfuscation_architecture_backend.h>
 
 #endif /* ARM_OBFUSCATIONS */

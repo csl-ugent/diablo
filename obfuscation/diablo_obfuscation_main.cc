@@ -220,7 +220,7 @@ main (int argc, char **argv)
   ATTACH_LOGGING(L_OBF_FF, L_OBF);
   ATTACH_LOGGING(L_OBF_OOP, L_OBF);
 
-  LOG(L_OBF, ("START OF OBFUSCATION LOG\n"));
+  LOG(L_OBF, ("# START OF OBFUSCATION LOG\n"));
 
   if (global_options.read)
   {
@@ -240,6 +240,7 @@ main (int argc, char **argv)
     if (global_options.annotation_file)
     {
       RegisterAnnotationInfoFactory(obfuscations_token, new ObfuscationAnnotationInfoFactory());
+      RegisterAnnotationInfoFactory(factoring_token, new FactoringAnnotationInfoFactory());
       ReadAnnotationsFromJSON(global_options.annotation_file, annotations);
     }
 
@@ -304,11 +305,29 @@ main (int argc, char **argv)
         CfgComputeDynamicComplexity(cfg);
 
         //CfgDrawFunctionGraphsWithHotness (OBJECT_CFG(obj), "./dots-before");
+        DiabloBrokerCall("BblConstructCompareMatrices", cfg);
 
         if (global_options.annotation_file == NULL)
           ObjectObfuscate(global_options.objectfilename, obj);
         else
           CfgObfuscateRegions(cfg);
+
+        if (!diabloanopt_options.rely_on_calling_conventions
+            && global_options.factoring && (global_options.epilogue_factoring || global_options.bbl_factoring))
+        {
+          if (BblFactorInit(cfg))
+          {
+            if (global_options.epilogue_factoring)
+              FunctionEpilogueFactoring (cfg);
+
+            CfgPatchToSingleEntryFunctions (cfg);
+
+            if (global_options.bbl_factoring)
+              BblFactoring (cfg, NULL);
+          }
+
+          BblFactorFini(cfg);
+        }
 
         VERBOSE(0,("FINAL PROGRAM COMPLEXITY REPORT"));
 
@@ -418,7 +437,7 @@ main (int argc, char **argv)
   PrintRemainingBlocks ();
 #endif
 
-  LOG(L_OBF,("END OF OBFUSCATION LOG\n"));
+  LOG(L_OBF,("# END OF OBFUSCATION LOG\n"));
   FINI_LOGGING(L_OBF);
   FINI_LOGGING(L_OBF_BF);
   FINI_LOGGING(L_OBF_FF);

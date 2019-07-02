@@ -5,8 +5,6 @@
 #ifndef GEN_OPAQUE_PREDICATE_TRANSFORMATION_H
 #define GEN_OPAQUE_PREDICATE_TRANSFORMATION_H
 
-#include <obfuscation/obfuscation_transformation.h>
-
 #include <map>
 
 class OpaquePredicateTransformation : public BBLObfuscationTransformation {
@@ -14,6 +12,8 @@ class OpaquePredicateTransformation : public BBLObfuscationTransformation {
 public:
   OpaquePredicateTransformation();
   virtual bool canTransform(const t_bbl* bbl) const;
+
+  virtual int CmdlineChance() const;
 };
 
 extern LogFile* L_OBF_OOP;

@@ -1,29 +1,19 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
-
-#include <map>
-#include <vector>
-
-extern "C" {
-#include <diabloanopt.h>
-#include <diabloi386.h>
-#include <diabloanopti386.h>
-}
-
-#include <obfuscation/generic/flatten_function_opt.h>
-
+#include "i386_obfuscations.h"
 #include "i386_architecture_backend.h"
-#include "i386_flatten_function.h"
-#include "i386_branch_function.h"
 
+/* for the initializers */
+#include "i386_branch_function.h"
+#include "i386_flatten_function.h"
 #include "i386_flip_branches.h"
+#include "i386_opaque_predicates.h"
+#include "i386_schedule_instructions.h"
 #include "i386_split_twoway_predicate.h"
 
-#include "i386_opaque_predicates.h"
-#include "i386_inline_function.h"
-#include "i386_instructionselection.h"
-#include "i386_schedule_instructions.h"
+/* for the command-line options */
+#include <obfuscation/generic/flatten_function_opt.h>
 
 using namespace std;
 

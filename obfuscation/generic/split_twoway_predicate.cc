@@ -1,16 +1,10 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
-
-#include <iostream>
-
-extern "C" {
-#include <diabloanopt.h>
-}
-
 #include <obfuscation/obfuscation_architecture_backend.h>
 #include "split_twoway_predicate.h"
 #include "split_twoway_predicate_opt.h"
+using namespace std;
 
 SplitWithTwoWayPredicateTransformation::SplitWithTwoWayPredicateTransformation() {
   AddOptionsListInitializer(obfuscation_split_twoway_predicate_option_list); SplitTwoWayPredicateOptInit();

@@ -66,6 +66,7 @@ void EquationsFree(t_equations eq);
 void EquationsRealFree(void);
 void EquationsSetAllBot(t_cfg *, t_equations eqs);
 void EquationsSetAllTop(t_cfg *,t_equations eqs);
+t_equation EquationNormalize(t_equation* eq, t_reg index);
 
 void EquationsCopy(t_cfg *, t_equations src, t_equations dest);
 void EquationsPrint(t_cfg *, t_equations eqs);

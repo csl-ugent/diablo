@@ -3,6 +3,13 @@
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
 
 #include <diabloflowgraph.h>
+
+/* This counter is increased every time a new edge is created and serves to
+ * give every edge a unique ID, allowing t_cfg_edge's to be ordered in a way that is
+ * not address-dependent.
+ */
+t_uint32 cfg_edge_global_id = 0;
+
 /* Query functions {{{ */
 
 void
@@ -127,6 +134,8 @@ CfgEdgeCreateSwi (t_cfg * cfg, t_bbl * from, t_bbl * ret)
 void
 CfgEdgeRelKill (t_cfg_edge * edge, t_bool killrel)
 {
+  UpdateObjectTrackingBeforeKillingEdge(edge);
+
   dominator_info_correct = FALSE;
   CFG_EDGE_SET_REFCOUNT(edge, CFG_EDGE_REFCOUNT(edge) - 1);
   if (CFG_EDGE_REFCOUNT(edge) == 0)
@@ -427,7 +436,9 @@ void CfgEdgeChangeHeadIntern(t_cfg_edge * edge, t_bbl *new_head, t_bool
     ASSERT(fun, ("BBL not in function @eiB", new_head));
 
     new_head = FunctionGetExitBlock(fun);
-    ASSERT(new_head,("exit block expected for @F", fun));
+    if (!new_head)
+      CfgDrawFunctionGraphs(BBL_CFG(old_head), "exit-block");
+    ASSERT(new_head,("exit block expected @E for @F", edge, fun));
   }
 
   /* move the edge */
@@ -505,7 +516,7 @@ void CfgEdgeChangeTail(t_cfg_edge * edge, t_bbl *new_tail)
   t_bool updateCorr = TRUE;
 
   if(CFG_EDGE_CAT(edge) == ET_COMPENSATING)
-    FATAL(("Attempt to change the tail of a compensating edge in function CfgEdgeChangeTail()"));
+    FATAL(("Attempt to change the tail of a compensating edge in function CfgEdgeChangeTail(@E)", edge));
 
   /* When changing the tail of a backward interprocedural edge (e.g. a return) we should't change
    * the head of the corresponding forward edge (e.g. a call).

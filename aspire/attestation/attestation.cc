@@ -11,6 +11,8 @@ using namespace std;
 t_const_string AttestationAnnotationInfo::AID_string = NULL;
 t_const_string AttestationAnnotationInfo::output_name = NULL;
 
+static LogFile* L_ATT = NULL;
+
 static void AddAttestation(t_cfg* cfg)
 {
   /* We don't need to attest mobile objects */
@@ -18,6 +20,9 @@ static void AddAttestation(t_cfg* cfg)
     return;
 
   STATUS(START, ("Adding Attestation"));
+
+  t_const_string logging_att_filename = StringConcat2 (OutputFilename(), ".diablo.attestation.log");
+  INIT_LOGGING(L_ATT, logging_att_filename);
 
   t_object* obj = CFG_OBJECT(cfg);
   const t_section* unified = OBJECT_CODE(obj)[0];
@@ -44,6 +49,8 @@ static void AddAttestation(t_cfg* cfg)
     /* Unpack information about attestator */
     t_const_string name = pair.first.c_str();
     Attestator* attestator = &(pair.second);
+
+    START_LOGGING_TRANSFORMATION(L_ATT, "attestator \"%s\"", name);
 
     t_const_string tmpstr = StringConcat2("base_address_", name);
     const t_symbol* base_address_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), tmpstr);
@@ -91,6 +98,7 @@ static void AddAttestation(t_cfg* cfg)
     if (attestation_annots.empty())
     {
       SectionSetData32(data_sec, SYMBOL_OFFSET_FROM_START(blob_sym), 0);
+      STOP_LOGGING_TRANSFORMATION(L_ATT);
       continue;/* My work here is done */
     }
 
@@ -219,8 +227,12 @@ static void AddAttestation(t_cfg* cfg)
     Free(tmpstr);
     fwrite(SECTION_DATA(ads), sizeof(char), SECTION_CSIZE(ads), fp);
     fclose(fp);
+
+    STOP_LOGGING_TRANSFORMATION(L_ATT);
   }
   fclose(f_metric);
+
+  FINI_LOGGING(L_ATT);
 
   STATUS(STOP, ("Adding Attestation"));
 }
@@ -416,4 +428,20 @@ void Attestator::ReserveChecksumSpace(t_object* obj, t_const_string name)
   t_section* checksum_subsec = T_SECTION(SYMBOL_BASE(checksum_sym));
   SECTION_SET_DATA(checksum_subsec, Realloc (SECTION_DATA(checksum_subsec), checksum_size * this->areas.size()));
   SECTION_SET_CSIZE(checksum_subsec, checksum_size * this->areas.size());
+}
+
+void AttestationActivate(t_cfg *cfg) {
+  auto description = CFG_DESCRIPTION(cfg);
+
+  t_bbl *bbl;
+  CFG_FOREACH_BBL(cfg, bbl) {
+    t_ins *ins;
+    BBL_FOREACH_INS(bbl, ins) {
+      if (description->InsIsConstantProducer(ins)
+          && description->InsGetConstant(ins) == 0x4a454e53) {
+        DEBUG(("WARNING replacing magic constant to activate code guards: @I", ins));
+        description->InsSetConstant(ins, 0xcafebabe);
+      }
+    }
+  }
 }

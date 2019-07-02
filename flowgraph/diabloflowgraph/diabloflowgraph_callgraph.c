@@ -283,6 +283,9 @@ MarkAndStartWith (t_function * fun)
 
   FUNCTION_FOREACH_SUCC_EDGE(fun, edge)
   {
+    if (FUNCTION_IS_HELL(CG_EDGE_TAIL(edge)))
+      continue;
+
     if (!(FUNCTION_FLAGS(((t_function *) CG_EDGE_TAIL(edge))) & FF_IS_MARKED2))
     {
       FUNCTION_SET_FLAGS(((t_function *) CG_EDGE_TAIL(edge)), FUNCTION_FLAGS(((t_function *) CG_EDGE_TAIL(edge))) | FF_IS_MARKED2);
@@ -306,8 +309,9 @@ IndicateAllReachableFunctions (t_function * fun)
     cg = CFG_CG(cfg);
   }
 
-  CFG_FOREACH_FUN(cfg, fun)
-    FUNCTION_SET_FLAGS(fun, FUNCTION_FLAGS(fun) & (~FF_IS_MARKED2));
+  t_function *fun2;
+  CFG_FOREACH_FUN(cfg, fun2)
+    FUNCTION_SET_FLAGS(fun2, FUNCTION_FLAGS(fun2) & (~FF_IS_MARKED2));
 
   return MarkAndStartWith (fun);
 }

@@ -673,7 +673,6 @@ BblsInSameChainsSlow(t_bbl *bbl1, t_bbl *bbl2)
 }
 
 
-static
 t_cfg_edge *ArmGetFallThroughEdge(t_bbl *i_bbl)
 {
   t_cfg_edge * ft=NULL;
@@ -689,8 +688,10 @@ t_cfg_edge *ArmGetFallThroughEdge(t_bbl *i_bbl)
     }
     else if (CFG_EDGE_CAT(i_edge) == ET_FALLTHROUGH || CFG_EDGE_CAT(i_edge) == ET_IPFALLTHRU)
     {
-      if (ft)
-	FATAL(("Two true fallthrough edges: @E and @E",ft,i_edge));
+      if (ft) {
+        CfgDrawFunctionGraphs(BBL_CFG(i_bbl), "ft");
+	FATAL(("Two true fallthrough edges: @eiB @E and @E",i_bbl,ft,i_edge));
+      }
       ft = i_edge;
     }
     else if ((CFG_EDGE_CAT(i_edge) == ET_CALL ||
@@ -723,8 +724,10 @@ t_cfg_edge *ArmGetFallThroughEdge(t_bbl *i_bbl)
 	if (RegsetIn(ARM_INS_REGS_DEF(ins),ARM_REG_R14))
 	  break;
       if (!ins ||
-	  ARM_INS_OPCODE(ins) != ARM_ADDRESS_PRODUCER)
-	FATAL(("Inconsistent fallthrough situation"));
+	          ARM_INS_OPCODE(ins) != ARM_ADDRESS_PRODUCER) {
+        CfgDrawFunctionGraphsWithHotness(BBL_CFG(i_bbl), "inconsistent-ft");
+	      FATAL(("Inconsistent fallthrough situation @I @eiB", ins, i_bbl));
+      }
     }
   }
 
@@ -1508,9 +1511,10 @@ void ArmCreateChains(t_cfg * cfg, t_chain_holder *ch)
       {
         VERBOSE(0,("@ieB -> @ieB",CFG_EDGE_HEAD(ft),j_bbl));
         VERBOSE(0,("Previous = @ieB",BBL_PREV_IN_CHAIN(j_bbl)));
+        CfgDrawFunctionGraphsWithHotness(cfg, "prev");
         FATAL(("Already prev for @B, i.e. @B != @B",j_bbl,BBL_PREV_IN_CHAIN(j_bbl),i_bbl));
       }
-      //VERBOSE(0,("CHAINING FT @E",ft));
+      //VERBOSE(0,("CHAINING FT @E for @eiB",ft, i_bbl));
       BBL_SET_NEXT_IN_CHAIN(i_bbl, j_bbl);
       BBL_SET_PREV_IN_CHAIN(j_bbl, i_bbl);
     }
@@ -1608,6 +1612,173 @@ void ArmCreateChains(t_cfg * cfg, t_chain_holder *ch)
       changed = TRUE;
     }
 
+    if ((switch_bbl || (BBL_INS_LAST(i_bbl) && (ARM_INS_ATTRIB(T_ARM_INS(BBL_INS_LAST(i_bbl))) & IF_SWITCHJUMP)))
+        && !strcmp(GetDiabloPhaseName(INS_PHASE(BBL_INS_LAST(i_bbl))), "AdvancedFactoring"))
+    {
+      ASSERT(!changed, ("this switch statement has already been changed! @eiB", i_bbl));
+
+      t_arm_ins *last = T_ARM_INS(BBL_INS_LAST(i_bbl));
+      t_arm_ins *prev1 = ARM_INS_IPREV(last);
+
+      if (!prev1) {
+        t_uint32 nr_incoming_real = 0;
+
+        t_cfg_edge *e;
+        BBL_FOREACH_PRED_EDGE(i_bbl, e) {
+          if (!CfgEdgeIsFake(e))
+            nr_incoming_real++;
+
+          if (CFG_EDGE_CAT(e) == ET_FALLTHROUGH
+              || CFG_EDGE_CAT(e) == ET_IPFALLTHRU)
+            prev1 = T_ARM_INS(BBL_INS_LAST(CFG_EDGE_HEAD(e)));
+        }
+
+        /* invalid results */
+        if (nr_incoming_real != 1)
+          prev1 = NULL;
+      }
+
+      t_bbl *databbl = NULL;
+      t_bool have_databbl = TRUE;
+
+      if (!switch_bbl)
+      {
+        VERBOSE(1, ("found bogus switch! @eiB", i_bbl));
+
+        t_arm_ins *ins;
+        BBL_FOREACH_ARM_INS(i_bbl, ins) {
+          if (ARM_INS_OPCODE(ins) == ARM_STR
+              && ARM_INS_REGB(ins) == ARM_REG_R15) {
+            t_arm_ins *ins2 = ARM_INS_INEXT(ins);
+            while (ins2) {
+              if (ARM_INS_OPCODE(ins2) == ARM_LDR
+                  && ARM_INS_REGB(ins2) == ARM_REG_R15
+                  && ARM_INS_REGA(ins2) == ARM_INS_REGA(ins))
+                break;
+
+              ins2 = ARM_INS_INEXT(ins2);
+            }
+
+            if (ins2)
+              break;
+          }
+        }
+
+        ASSERT(ins, ("found instruction! @I", ins));
+
+        t_reloc *rel = RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins));
+        databbl = T_BBL(RELOC_TO_RELOCATABLE(rel)[0]);
+      }
+      else if (ARM_INS_OPCODE(last) == ARM_ADD
+          && prev1
+          && ARM_INS_OPCODE(prev1) == ARM_LDR
+          && ARM_INS_REGB(prev1) == ARM_REG_R15)
+      {
+        /* LDR rX, [pc, rX LSL 2]
+         * ADD pc, pc, rX */
+        t_reloc *rel = RELOC_REF_RELOC(ARM_INS_REFERS_TO(last));
+        databbl = T_BBL(RELOC_TO_RELOCATABLE(rel)[0]);
+
+        t_bbl *ft_bbl = NULL;
+        t_cfg_edge *e;
+        BBL_FOREACH_SUCC_EDGE(i_bbl, e)
+        {
+          if (CFG_EDGE_CAT(e) == ET_SWITCH || CFG_EDGE_CAT(e) == ET_IPSWITCH)
+            continue;
+          else if (CFG_EDGE_CAT(e) == ET_FALLTHROUGH || CFG_EDGE_CAT(e) == ET_IPFALLTHRU)
+            ft_bbl = CFG_EDGE_TAIL(e);
+          else
+            FATAL(("expected switch or fallthrough edge @E @eiB", e, i_bbl));
+        }
+
+        t_bbl *first_in_chain = ft_bbl ? ft_bbl : i_bbl;
+        ASSERT(!BBL_NEXT_IN_CHAIN(first_in_chain) || (BBL_NEXT_IN_CHAIN(first_in_chain) == databbl), ("Already next for @eiB: @eiB", first_in_chain, BBL_NEXT_IN_CHAIN(i_bbl)));
+        ASSERT(!BBL_PREV_IN_CHAIN(databbl) || (BBL_PREV_IN_CHAIN(databbl) == first_in_chain), ("Already prev for @eiB: @eiB != @eiB", databbl, BBL_PREV_IN_CHAIN(first_in_chain), first_in_chain));
+        BBL_SET_NEXT_IN_CHAIN(first_in_chain, databbl);
+        BBL_SET_PREV_IN_CHAIN(databbl, first_in_chain);
+      }
+      else if (ARM_INS_OPCODE(last) == ARM_ADD
+                && ARM_INS_REGA(last) == ARM_REG_R15
+                && ARM_INS_REGB(last) == ARM_REG_R15
+                && ARM_INS_SHIFTTYPE(last) == ARM_SHIFT_TYPE_LSL_IMM
+                && ARM_INS_SHIFTLENGTH(last) == 2)
+      {
+        /* ADD pc, pc, rX LSL 2 */
+        t_cfg_edge *e;
+
+        /* count the number of switch edges */
+        t_uint32 nr_switch_edges = 0;
+        t_bbl *ft_bbl = NULL;
+        BBL_FOREACH_SUCC_EDGE(i_bbl, e)
+        {
+          if (CFG_EDGE_CAT(e) == ET_SWITCH || CFG_EDGE_CAT(e) == ET_IPSWITCH)
+            nr_switch_edges++;
+          else if (CFG_EDGE_CAT(e) == ET_FALLTHROUGH && ArmInsIsConditional(last))
+            ft_bbl = CFG_EDGE_TAIL(e);
+          else
+            FATAL(("expected switch or fallthrough edge @E @eiB", e, i_bbl));
+        }
+
+        /* put all the switch edges in an array */
+        t_cfg_edge **switch_edges = Malloc(sizeof(t_cfg_edge *) * nr_switch_edges);
+        BBL_FOREACH_SUCC_EDGE(i_bbl, e) {
+          if (CFG_EDGE_CAT(e) == ET_SWITCH || CFG_EDGE_CAT(e) == ET_IPSWITCH)
+            switch_edges[CFG_EDGE_SWITCHVALUE(e)] = e;
+        }
+
+        if (ft_bbl)
+          databbl = ft_bbl;
+        else {
+          databbl = BblNew(cfg);
+          if (BBL_FUNCTION(i_bbl))
+            BblInsertInFunction(databbl, BBL_FUNCTION(i_bbl));
+          t_arm_ins *noop_ins;
+          ArmMakeInsForBbl(Noop, Append, noop_ins, databbl, FALSE);
+        }
+
+        /* chain the subsequent branch BBLs */
+        t_bbl *prev_in_chain = databbl;
+        for (t_uint32 i = 0; i < nr_switch_edges; i++)
+        {
+          ASSERT(switch_edges[i], ("what?? case %d, @eiB", i, i_bbl));
+          t_bbl *next_in_chain = CFG_EDGE_TAIL(switch_edges[i]);
+
+          if (!(!BBL_NEXT_IN_CHAIN(prev_in_chain) || (BBL_NEXT_IN_CHAIN(prev_in_chain) == next_in_chain)))
+            CfgDrawFunctionGraphs(cfg, "already-next");
+
+          ASSERT(!BBL_NEXT_IN_CHAIN(prev_in_chain) || (BBL_NEXT_IN_CHAIN(prev_in_chain) == next_in_chain),
+                  ("Already next for @eiB: @eiB", prev_in_chain, BBL_NEXT_IN_CHAIN(prev_in_chain)));
+          BBL_SET_NEXT_IN_CHAIN(prev_in_chain, next_in_chain);
+
+          if (!(!BBL_PREV_IN_CHAIN(next_in_chain) || (BBL_PREV_IN_CHAIN(next_in_chain) == prev_in_chain)))
+            CfgDrawFunctionGraphs(cfg, "already-prev");
+
+          ASSERT(!BBL_PREV_IN_CHAIN(next_in_chain) || (BBL_PREV_IN_CHAIN(next_in_chain) == prev_in_chain),
+                  ("Already prev for @eiB: @eiB != @eiB", next_in_chain, BBL_PREV_IN_CHAIN(prev_in_chain), prev_in_chain));
+          BBL_SET_PREV_IN_CHAIN(next_in_chain, prev_in_chain);
+
+          prev_in_chain = next_in_chain;
+        }
+
+        ASSERT(!BBL_NEXT_IN_CHAIN(i_bbl) || (BBL_NEXT_IN_CHAIN(i_bbl) == databbl), ("Already next for @eiB: @eiB", i_bbl, BBL_NEXT_IN_CHAIN(i_bbl)));
+        ASSERT(!BBL_PREV_IN_CHAIN(databbl) || (BBL_PREV_IN_CHAIN(databbl) == i_bbl), ("Already prev for @eiB: @eiB != @eiB", databbl, BBL_PREV_IN_CHAIN(i_bbl), i_bbl));
+        BBL_SET_NEXT_IN_CHAIN(i_bbl, databbl);
+        BBL_SET_PREV_IN_CHAIN(databbl, i_bbl);
+      }
+      else if (ARM_INS_OPCODE(last) == ARM_ADD
+                && ARM_INS_REGA(last) == ARM_REG_R15
+                && ARM_INS_REGB(last) == ARM_REG_R15)
+      {
+        /* add pc, pc, <offset> */
+        /* add pc, pc, <register> (for distributed tables) */
+        have_databbl = FALSE;
+      }
+      else
+        FATAL(("unhandled switch statement created by Advanced Factoring! @eiB", i_bbl));
+
+      changed = TRUE;
+    }
+
     /* Thumb compact switch tables are handled after regular chaining
      * (in the function ArmChainThumbSwitchTables in this file),
      * because on the one hand their bbls should follow the "add"
@@ -1615,7 +1786,7 @@ void ArmCreateChains(t_cfg * cfg, t_chain_holder *ch)
      * paths between the different target blocks should also be
      * respected.
      */
-    if (switch_bbl && (ARM_INS_OPCODE(T_ARM_INS(BBL_INS_LAST(i_bbl)))==ARM_ADD) &&
+    else if (switch_bbl && (ARM_INS_OPCODE(T_ARM_INS(BBL_INS_LAST(i_bbl)))==ARM_ADD) &&
 	!(ARM_INS_FLAGS(T_ARM_INS(BBL_INS_LAST(i_bbl))) & FL_THUMB))
     /* {{{ Handle switch statements */
     {
@@ -1659,6 +1830,7 @@ void ArmCreateChains(t_cfg * cfg, t_chain_holder *ch)
           array[tel]=BblNew(cfg);
           if (BBL_FUNCTION(i_bbl))
             BblInsertInFunction(array[tel],BBL_FUNCTION(i_bbl));
+          BblInheritSetInformation(array[tel], i_bbl);
           noop=ArmInsNewForBbl(array[tel]);
           ArmInsMakeMov(noop,ARM_REG_R0,ARM_REG_R0,0,ARM_CONDITION_AL);
           ArmInsAppendToBbl(noop,array[tel]);
@@ -2050,7 +2222,7 @@ t_clustercollection * ArmClusterChains(t_cfg * cfg, t_chain_holder * ch)
 
         /* create a new instance of t_clustercollection,
          * which holds information of and references to all clusters. */
-        t_clustercollection * clustercoll = ArmClusterCollectionCreate();
+        t_clustercollection * clustercoll = ArmClusterCollectionCreateSized(1000);
 
         /* PHASE 1 ################################################################################ */
         /* Initially, put each chain in its own cluster */
@@ -2300,7 +2472,7 @@ void ArmClusterPrint(t_cluster * c)
         }
 }
 
-#define INIT_CLUSTER_ARRAY_SIZE 1000
+#define INIT_CLUSTER_ARRAY_SIZE 1
 t_clustercollection * ArmClusterCollectionCreate()
 {
         return ArmClusterCollectionCreateSized(INIT_CLUSTER_ARRAY_SIZE);
@@ -2409,7 +2581,7 @@ t_cluster * ArmClusterMerge(t_cluster * a, t_cluster * b)
         return newc;
 }
 
-#define INIT_CHAIN_ARRAY_SIZE 100
+#define INIT_CHAIN_ARRAY_SIZE 1
 t_cluster * ArmClusterCreate()
 {
         t_cluster * cluster = Malloc(sizeof(t_cluster));
@@ -4987,6 +5159,7 @@ restart_search:
             if (RELOCATABLE_RELOCATABLE_TYPE(RELOC_FROM(rel)) != RT_INS) continue;
             if ((ins2 = T_ARM_INS(RELOC_FROM(rel))) == ins) continue;
             if (ARM_INS_OPCODE(ins2) != ARM_ADDRESS_PRODUCER) continue;
+            if (cfg != BBL_CFG(ARM_INS_BBL(ins2))) continue;
 	    /* limit the amount of comparisons for structures with many
 	     * references: a structure that is referenced n times has n^2
 	     * comparisons, which is way too slow for big n */
@@ -5178,9 +5351,9 @@ void ScheduleCfg(t_cfg * cfg)
 	      if (diabloflowgraph_options.blockprofilefile && BblIsHot(bbl))
 		VERBOSE(0,("AFTER @iB",bbl));
 #endif
-	      goto restart;
-	    }
-	}
+        goto restart;
+      }
     }
+  }
 }
 /* vim: set shiftwidth=2 foldmethod=marker : */

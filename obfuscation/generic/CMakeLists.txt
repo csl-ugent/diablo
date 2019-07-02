@@ -13,4 +13,5 @@ target_link_libraries(DiabloObfuscationGeneric
   PUBLIC Anopt
   PRIVATE DiabloAnnotations
   PRIVATE m
+  PUBLIC DiabloObfuscationBase
 )

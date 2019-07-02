@@ -14,14 +14,30 @@ using namespace std;
 
 static vector<t_symbol*> reaction_syms;
 
+static LogFile* L_REACTIONS = NULL;
+
 void AddReactions(t_object* obj)
 {
+  auto has_incoming_switch = [] (t_bbl *bbl) {
+    t_cfg_edge *e;
+    BBL_FOREACH_PRED_EDGE(bbl, e) {
+      if (CFG_EDGE_CAT(e) == ET_SWITCH
+          || CFG_EDGE_CAT(e) == ET_IPSWITCH)
+        return true;
+    }
+
+    return false;
+  };
+
   /* If there's no reaction mechanisms available, we can't add any */
   if (reaction_syms.empty())
     return;
 
   STATUS(START, ("Adding Reactions"));
   NewDiabloPhase("Reactions");
+
+  t_const_string logging_reactions_filename = StringConcat2 (OutputFilename(), ".diablo.reactions.log");
+  INIT_LOGGING(L_REACTIONS, logging_reactions_filename);
 
   t_cfg* cfg = OBJECT_CFG(obj);
 
@@ -102,10 +118,36 @@ void AddReactions(t_object* obj)
           {
             DEBUG(("Threshold: %u. BBL: @eiB.\nInstruction: @I", threshold, bbl, ins));
 
-            /* Split the BBL before the instruction */
-            t_bbl* bbl_split = BblSplitBlock(bbl, ins, TRUE);
-            BblMark(bbl_split);/* We won't consider the newly created BBL in the future */
+            t_string xxx = StringIo("@I", ins);
+            START_LOGGING_TRANSFORMATION(L_REACTIONS, "reactions \"%s\"", xxx);
+            Free(xxx);
+
+            /* */
+            bool split_before = TRUE;
+            if (BBL_NINS(bbl) == 1
+                && CFG_DESCRIPTION(cfg)->InsIsUnconditionalJump(BBL_INS_FIRST(bbl))
+                && has_incoming_switch(bbl))
+              split_before = FALSE;
+
             t_bool isThumb = ArmBblIsThumb(bbl);
+
+            /* Split the BBL before the instruction */
+            t_bbl *call_site = NULL;
+            t_bbl *return_site = NULL;
+            if (split_before) {
+              call_site = bbl;
+              return_site = BblSplitBlock(bbl, ins, TRUE);
+              BblMark(return_site);
+            }
+            else {
+              DEBUG(("doing after branch @eiB", bbl));
+
+              call_site = BblSplitBlockNoTestOnBranches(bbl, ins, FALSE);
+              return_site = CFG_EDGE_TAIL(BBL_SUCC_FIRST(call_site));
+
+              /* fallthrough edge to jump edge */
+              CFG_EDGE_SET_CAT(BBL_SUCC_FIRST(bbl), ET_JUMP);
+            }
 
             /* Choose a reaction mechanism by chance */
             t_function* reaction = reaction_funs[RNGGenerate(rng_fun)];
@@ -114,12 +156,15 @@ void AddReactions(t_object* obj)
              * the BBL and add a genuine call edge to a reaction mechanism.
              */
             t_arm_ins* arm_ins;
-            ArmMakeInsForBbl(CondBranchAndLink, Append, arm_ins, bbl, isThumb, ARM_CONDITION_AL);
-            CfgEdgeKill(BBL_SUCC_FIRST(bbl));
-            CfgEdgeCreateCall(cfg, bbl, FUNCTION_BBL_FIRST(reaction), bbl_split, FunctionGetExitBlock(reaction));
+            ArmMakeInsForBbl(CondBranchAndLink, Append, arm_ins, call_site, isThumb, ARM_CONDITION_AL);
+            CfgEdgeKill(BBL_SUCC_FIRST(call_site));
+            CfgEdgeCreateCall(cfg, call_site, FUNCTION_BBL_FIRST(reaction), return_site, FunctionGetExitBlock(reaction));
 
             /* Exit loop, we don't want to insert another call in the same BBL */
             insertions++;
+
+            STOP_LOGGING_TRANSFORMATION(L_REACTIONS);
+
             break;
           }
         }
@@ -132,6 +177,8 @@ void AddReactions(t_object* obj)
   RNGDestroy(rng_fun);
 
   STATUS(STOP, ("Adding Reactions"));
+
+  FINI_LOGGING(L_REACTIONS);
 }
 
 void AddReactionForceReachables(const t_object* obj, std::vector<std::string>& reachable_vector)

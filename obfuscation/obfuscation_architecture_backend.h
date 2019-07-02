@@ -10,6 +10,7 @@
 extern "C" {
 #include <diablosupport.h>
 }
+#include <diabloflowgraph.hpp>
 
 #include "obfuscation_transformation.h"
 

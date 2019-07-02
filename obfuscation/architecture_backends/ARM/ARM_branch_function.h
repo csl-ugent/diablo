@@ -5,10 +5,7 @@
 #ifndef ARM_BRANCH_FUNCTION_H
 #define ARM_BRANCH_FUNCTION_H
 
-#include <map>
-
 #include <obfuscation/generic/branch_function.h>
-
 
 class AbstractARMRegisterBasedBranchFunctionTransformation : public BranchFunctionTransformation {
   std::map< std::pair<t_bool, t_reg> , t_bbl*> reg_stackbranchfunction_map;
@@ -28,7 +25,7 @@ class ARMRegisterBasedBranchFunctionTransformation : public AbstractARMRegisterB
 protected:
   virtual t_bbl* createStackBranchFunctionForRegister(t_cfg* cfg, t_bool isThumb, t_reg reg);
 public:
-  ARMRegisterBasedBranchFunctionTransformation() { insts_in_bbls = 0; possibleSplitPoints = 0; bblsTransformed = 0; RegisterTransformationType(this, _name); }
+  ARMRegisterBasedBranchFunctionTransformation();
   virtual const char* name() const { return _name; }
   virtual bool canTransform(const t_bbl* bbl) const;
   virtual bool doTransform(t_bbl* bbl, t_randomnumbergenerator * rng);
@@ -47,7 +44,7 @@ class ARMCallFunctionTransformation : public CallFunctionTransformation {
   t_bbl* jumpAndPopStubFor(t_cfg* cfg, t_bool isThumb, t_reg reg, t_bbl* target);
   void transformCallIntoRetFunction(t_bbl * bbl_1, t_randomnumbergenerator* rng);
 public:
-  ARMCallFunctionTransformation() { RegisterTransformationType(this, _name); }
+  ARMCallFunctionTransformation();
   virtual const char* name() const { return _name; }
   virtual bool canTransform(const t_bbl* bbl) const;
   virtual bool doTransform(t_bbl* bbl, t_randomnumbergenerator * rng);

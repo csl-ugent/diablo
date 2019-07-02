@@ -11,6 +11,7 @@ t_bool ArmInsPrintSIMD(t_arm_ins * ins, t_string opcode, t_string operands);
 t_bool ArmInsPrintCoproc(t_arm_ins * ins, t_string opcode, t_string operands);
 t_bool ArmInsPrintDiabloSpecific(t_arm_ins * instruction, t_string opcode, t_string operands);
 void ArmInsPrintVLoadStore(t_arm_ins * ins, t_string opcode, t_string operands);
+void ArmPrintVirtualRegisters(t_bool b);
 #endif
 #endif
 /* vim: set shiftwidth=2 foldmethod=marker: */

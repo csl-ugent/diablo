@@ -7,6 +7,24 @@
 
 extern void CfgEdgeChangeHeadIntern(t_cfg_edge * edge, t_bbl *new_head, t_bool updateCorr);
 
+static t_cfg *main_cfg = NULL;
+
+void SetMainCfg(t_cfg *cfg) {
+  main_cfg = cfg;
+}
+
+t_cfg *GetMainCfg() {
+  return main_cfg;
+}
+
+t_string TruncateFunctionName(t_string fun)
+{
+#define TRUNCATED_LENGTH 80
+  char *result = (char *)Malloc(TRUNCATED_LENGTH);
+  snprintf(result, TRUNCATED_LENGTH, "%s", fun ? fun : "no_name__");
+  return result;
+}
+
 t_cfg *CfgCreate(t_object *obj)
 {
   t_cfg *cfg = CfgNew(obj);
@@ -45,6 +63,7 @@ CfgFreeData (t_cfg * cfg)
 
     while (BBL_INS_FIRST(bbl))
       InsKill (BBL_INS_FIRST(bbl));
+    DiabloBrokerCall("RemoveBblFromCfg", bbl);
     BblKill (bbl);
   }
 
@@ -135,26 +154,35 @@ EdgeMakeIntraProcedural(t_cfg_edge *edge)
   if (!ffrom || !fto)
     return false;
 
-  if (CFG_EDGE_CORR(edge))
-    CfgEdgeKill(CFG_EDGE_CORR(edge));
-
-  switch(CFG_EDGE_CAT(edge))
+  int new_cat;
+  switch (CFG_EDGE_CAT(edge))
   {
     case ET_IPUNKNOWN:
-      CFG_EDGE_SET_CAT(edge, ET_UNKNOWN);
+      new_cat = ET_UNKNOWN;
       break;
     case ET_IPFALLTHRU:
-      CFG_EDGE_SET_CAT(edge, ET_FALLTHROUGH);
+      new_cat = ET_FALLTHROUGH;
       break;
     case ET_IPJUMP:
-      CFG_EDGE_SET_CAT(edge, ET_JUMP);
+      new_cat = ET_JUMP;
       break;
     case ET_IPSWITCH:
-      CFG_EDGE_SET_CAT(edge, ET_SWITCH);
+      new_cat = ET_SWITCH;
       break;
+
     default:
-      FATAL(("Uncaught! @E", edge));
+      new_cat = -1;
   }
+
+  if (new_cat == -1)
+    return false;
+
+  if (CFG_EDGE_CORR(edge)) {
+    CfgEdgeKill(CFG_EDGE_CORR(edge));
+    CFG_EDGE_SET_CORR(edge, NULL);
+  }
+
+  CFG_EDGE_SET_CAT(edge, new_cat);
 
   return true;
 }
@@ -210,6 +238,7 @@ CfgPatchNormalEdges (t_cfg * cfg)
     tail = CFG_EDGE_TAIL(CFG_EDGE_CORR(edge));
 
     new = BblNew (cfg);
+    BblCopyExecInformation(head, new);
     if (BBL_FUNCTION(head))
       BblInsertInFunction (new, BBL_FUNCTION(head));
     else
@@ -231,9 +260,12 @@ CfgPatchNormalEdges (t_cfg * cfg)
   } /* }}} */
 
   STATUS(START, ("Patching normal edges"));
-  CFG_FOREACH_EDGE(cfg, edge)
+  CFG_FOREACH_EDGE(cfg, edge) {
     if (EdgeMakeInterprocedural(edge))
       ret++;
+    if (EdgeMakeIntraProcedural(edge))
+      ret++;
+  }
   STATUS(STOP, ("Patching normal edges"));
 
   return ret;
@@ -297,10 +329,11 @@ CfgPartitionFunctions (
   char outerloop;
   t_uint32 innerloop = 0;
   static int execcount = 0;
-  char buffy[80];
+  t_string strbuf;
 
-  sprintf (buffy, "./pardots-%d", ++execcount);
-  DirMake (buffy, FALSE);
+  strbuf = StringIo("./pardots-%d", ++execcount);
+  DirMake (strbuf, FALSE);
+  Free(strbuf);
 #endif
 
   CFG_FOREACH_FUN(cfg, fun)
@@ -342,11 +375,12 @@ CfgPartitionFunctions (
       continue;
 
 #ifdef VERBOSE_PART
-    sprintf (buffy, "./pardots-%d/%s-0x%x.dot",
+    strbuf = StringIo("./pardots-%d/%s-0x@G.dot",
              execcount,
-             FUNCTION_NAME(fun),
+             TruncateFunctionName(FUNCTION_NAME(fun)),
              BBL_OLD_ADDRESS(FUNCTION_BBL_FIRST(fun)));
-    FunctionDrawGraph (fun, buffy);
+    FunctionDrawGraph (fun, strbuf);
+    Free(strbuf);
 #endif
 
     /* Now partition the basic blocks into single entry partitions: if a bbl
@@ -607,18 +641,30 @@ CfgPartitionFunctions (
 
         /* {{{ adjust the corresponding edges whenever necessary */
         BBL_FOREACH_PRED_EDGE(ibbl, iedge)
-          if (CfgEdgeIsForwardInterproc (iedge) &&
-              CFG_EDGE_CAT(iedge) != ET_CALL)
-            if (CFG_EDGE_CORR(iedge))
+        {
+          if (CfgEdgeIsForwardInterproc (iedge)
+              && CFG_EDGE_CORR(iedge))
+          {
+            if (CFG_EDGE_CAT(iedge) != ET_CALL)
             {
               CfgEdgeKill (CFG_EDGE_CORR(iedge));
               CFG_EDGE_SET_CORR(iedge, NULL);
               CfgEdgeCreateCompensating (cfg, iedge);
             }
+            else
+            {
+              /* different for CALL edges; need to adjust the return edge */
+              t_bbl *olddest = CFG_EDGE_TAIL(CFG_EDGE_CORR(iedge));
+              ASSERT(CFG_EDGE_CAT(CFG_EDGE_CORR(iedge)) == ET_RETURN, ("expected CORR edge to be of type ET_RETURN, but got @E", iedge));
+              CfgEdgeChangeHeadIntern(CFG_EDGE_CORR(iedge), FunctionGetExitBlock(BBL_FUNCTION(ibbl)), FALSE);
+            }
+          }
+        }
 
         if (orig_exit)
           BBL_FOREACH_PRED_EDGE_SAFE(orig_exit, iedge, iedge_safe)
             if (CFG_EDGE_CAT(iedge) == ET_COMPENSATING &&
+                CFG_EDGE_CORR(iedge) &&
                 BBL_FUNCTION(CFG_EDGE_HEAD(CFG_EDGE_CORR(iedge))) == new_fun)
             {
               t_cfg_edge *jedge = CFG_EDGE_CORR(iedge);
@@ -629,20 +675,22 @@ CfgPartitionFunctions (
         /* }}} */
 
 #ifdef VERBOSE_PART
-        sprintf (buffy, "./pardots-%d/%s-0x%x-AFTER.dot",
+        strbuf = StringIo("./pardots-%d/%s-0x@G-AFTER.dot",
                  execcount,
-                 FUNCTION_NAME(new_fun),
+                 TruncateFunctionName(FUNCTION_NAME(fun)),
                  BBL_OLD_ADDRESS(FUNCTION_BBL_FIRST(new_fun)));
-        FunctionDrawGraph (new_fun, buffy);
+        FunctionDrawGraph (new_fun, strbuf);
+        Free(strbuf);
 #endif
       }
     }
 #ifdef VERBOSE_PART
-    sprintf (buffy, "./pardots-%d/%s-0x%x-AFTER.dot",
+    strbuf = StringIo("./pardots-%d/%s-0x%x-AFTER.dot",
              execcount,
-             FUNCTION_NAME(fun),
+             TruncateFunctionName(FUNCTION_NAME(fun)),
              BBL_OLD_ADDRESS(FUNCTION_BBL_FIRST(fun)));
-    FunctionDrawGraph (fun, buffy);
+    FunctionDrawGraph (fun, strbuf);
+    Free(strbuf);
 #endif
     /* }}} */
 
@@ -660,10 +708,14 @@ CfgPartitionFunctions (
       if (ibbl == FUNCTION_BBL_FIRST(fun))
         continue;
 
+      if (BblIsExitBlock(ibbl))
+        continue;
+
       BBL_FOREACH_PRED_EDGE(ibbl, iedge)
       {
         if (!CfgEdgeIsForwardInterproc (iedge))
           continue;
+
         FunctionDrawGraph (fun, "FATAL.dot");
         FATAL(("Fun %s not completely single entry! @E\n A graph of the function has been created.",
                FUNCTION_NAME(fun), iedge));
@@ -731,8 +783,8 @@ CfgPatchToSingleEntryFunctions (t_cfg * cfg)
     if (!ibbl)
       continue; /* no incoming interproc edges at all */
 
-    ASSERT(BBL_PREV_IN_FUN(ibbl) && BBL_NEXT_IN_FUN(ibbl),
-           ("ibbl should not be first or last"));
+    ASSERT(BBL_PREV_IN_FUN(ibbl), ("ibbl should not be first @eiB", ibbl));
+    ASSERT(BBL_NEXT_IN_FUN(ibbl), ("ibbl should not be last @eiB", ibbl));
 
     /* Unlink */
     BBL_SET_NEXT_IN_FUN(BBL_PREV_IN_FUN(ibbl), BBL_NEXT_IN_FUN(ibbl));
@@ -1032,7 +1084,7 @@ SectionRecalculateSizeDeflowgraphing (t_section * sec, t_relocatable_address_typ
       endaddr += AddressExtractUint64 (BBL_CSIZE(bbl));
     nins += BBL_NINS(bbl);
   }
-  
+
   /*DEBUG(("size %x =?= %x - %x = %x",(t_uint32) endaddr,G_T_UINT32(endaddr1),G_T_UINT32(SECTION_CADDRESS (sec)),(G_T_UINT32(endaddr1) - G_T_UINT32(SECTION_CADDRESS (sec)))));*/
 
   /* if we're adding padding bytes to align data blocks, the above computation
@@ -1044,7 +1096,7 @@ SectionRecalculateSizeDeflowgraphing (t_section * sec, t_relocatable_address_typ
 }
 
 /* Flowgraph export functions: use gviz to convert the output to PostScript
- * files 
+ * files
  * for Export_Flowgraph (icfg = interprocedural control flow graph)
  *
  * {{{ */
@@ -1386,7 +1438,7 @@ CfgCreateBasicBlocks (t_object *obj)
     }
     ASSERT(i < nsyms, ("no handwritten mapping for this code section"));
     /* }}} */
-    
+
     ovlsec = NULL;
     for (ovl = OBJECT_OVERLAYS(obj); ovl && !ovlsec; ovl = ovl->next)
       for (ovlseci = ovl->sec; ovlseci; ovlseci = ovlseci->next)
@@ -1410,7 +1462,7 @@ CfgCreateBasicBlocks (t_object *obj)
             }
         }
 
-      if (i < nsyms && 
+      if (i < nsyms &&
           AddressIsEq(INS_CADDRESS(i_ins),
                       RELOCATABLE_CADDRESS(SYMBOL_BASE(symarr[i]))))
       {
@@ -1436,7 +1488,7 @@ CfgCreateBasicBlocks (t_object *obj)
           {
             /*            if (newstate==COMPILER)
               DEBUG(("setting state to COMPILER for @I for symbol",i_ins));
-            else 
+            else
               DEBUG(("setting state to HANDWRITTEN for @I for symbol",i_ins));
             */
             state = newstate;
@@ -1504,7 +1556,7 @@ CfgCreateBasicBlocks (t_object *obj)
       if (AddressIsEq(INS_CADDRESS(i_ins), OBJECT_ENTRY(obj)) || (INS_ATTRIB(i_ins) & IF_BBL_LEADER))
       {
         bbl = INS_BBL(i_ins);
-        if  (INS_TYPE(i_ins) == IT_DATA) 
+        if  (INS_TYPE(i_ins) == IT_DATA)
         {
 
           t_section * subsec = NULL;
@@ -1526,19 +1578,19 @@ CfgCreateBasicBlocks (t_object *obj)
           if (SECTION_ALIGNMENT(subsec)==4 && BBL_CSIZE(bbl)>=4)
           {
             BBL_SET_ALIGNMENT(bbl,4);
-            BBL_SET_ALIGNMENT_OFFSET(bbl,G_T_UINT32(INS_CADDRESS(i_ins)) & 0x3); 
+            BBL_SET_ALIGNMENT_OFFSET(bbl,G_T_UINT32(INS_CADDRESS(i_ins)) & 0x3);
           }
           else if (SECTION_ALIGNMENT(subsec)==8)
           {
             if (BBL_CSIZE(bbl)>=8)
               {
                 BBL_SET_ALIGNMENT(bbl,8);
-                BBL_SET_ALIGNMENT_OFFSET(bbl,G_T_UINT32(INS_CADDRESS(i_ins)) & 0x7); 
+                BBL_SET_ALIGNMENT_OFFSET(bbl,G_T_UINT32(INS_CADDRESS(i_ins)) & 0x7);
               }
             else if (BBL_CSIZE(bbl)>=4)
               {
                 BBL_SET_ALIGNMENT(bbl,4);
-                BBL_SET_ALIGNMENT_OFFSET(bbl,G_T_UINT32(INS_CADDRESS(i_ins)) & 0x3); 
+                BBL_SET_ALIGNMENT_OFFSET(bbl,G_T_UINT32(INS_CADDRESS(i_ins)) & 0x3);
               }
           }
           else if (SECTION_ALIGNMENT(subsec)==16)
@@ -1580,7 +1632,7 @@ CfgCreateBasicBlocks (t_object *obj)
    * a BBL leader, and we still want the relocation to point to that code sequence (BBL) even
    * if the first instruction is removed later on...
    */
-  
+
   OBJECT_FOREACH_RELOC(obj, reloc)
   {
     t_uint32 i;
@@ -1784,6 +1836,32 @@ t_bbl *CfgGetDynamicCallHell(t_cfg *cfg, t_string fname)
 /* Structural optimizations on flowgraphs: {{{ */
 
 /* Remove dead code and data blocks {{{ */
+static inline
+t_bool FunctionIsAF(t_function *fun) {
+  t_bool result = false;
+  //DiabloBrokerCall("FunctionIsAF", fun, &result);
+  return result;
+}
+
+static inline
+t_bool CfgEdgeIsAF(t_cfg_edge *edge) {
+  t_bool result = false;
+  //DiabloBrokerCall("EdgeIsAF", edge, &result);
+  return result;
+}
+
+static inline
+t_cfg_edge *AFCorrespondingEdge(t_cfg_edge *edge) {
+  ASSERT(!FunctionIsAF(BBL_FUNCTION(CFG_EDGE_HEAD(edge))), ("head of @E should not be in AF function", edge));
+  ASSERT( FunctionIsAF(BBL_FUNCTION(CFG_EDGE_TAIL(edge))), ("tail of @E should be in AF function", edge));
+
+  t_cfg_edge *result = NULL;
+  //DiabloBrokerCall("AFCorrespondingEdge", edge, &result);
+  ASSERT( FunctionIsAF(BBL_FUNCTION(CFG_EDGE_HEAD(result))), ("head of @E should be in AF function", result));
+  ASSERT(!FunctionIsAF(BBL_FUNCTION(CFG_EDGE_TAIL(result))), ("tail of @E should not be in AF function", result));
+
+  return result;
+}
 
 void
 MarkFrom (t_cfg * cfg, t_bbl * from)
@@ -1794,7 +1872,7 @@ MarkFrom (t_cfg * cfg, t_bbl * from)
 
   if (!BBL_FUNCTION(from))
     FATAL(("BBL @ieB marked by dead code and data removal, but not in function!", from));
-    
+
   CfgMarkFun (cfg, BBL_FUNCTION(from));
   FunctionMarkBbl (BBL_FUNCTION(from), from);
 
@@ -1811,13 +1889,34 @@ MarkFrom (t_cfg * cfg, t_bbl * from)
       {
         BBL_FOREACH_SUCC_EDGE(bbl, edge)
         {
+          /* AF outgoing dispatch edges should be skipped,
+           * as the tail will already have been marked when looking at the entry edge */
+          if (CfgEdgeIsForwardInterproc(edge) && FunctionIsAF(BBL_FUNCTION(bbl)))
+            continue;
+
           if (!CfgEdgeIsBackwardInterproc (edge) || (CFG_EDGE_CORR(edge) && CfgEdgeIsMarked (CFG_EDGE_CORR(edge))))
           {
             if (!CfgEdgeIsMarked (edge))
             {
               CfgEdgeMark (edge);
 
-              if (CfgEdgeIsForwardInterproc (edge) && CFG_EDGE_CORR(edge) && (BBL_IS_HELL (CFG_EDGE_TAIL(edge)) || BblIsMarked2 (CFG_EDGE_HEAD(CFG_EDGE_CORR(edge)))))
+              if (CfgEdgeIsAF(edge)) {
+                /* mark the corresponding landing site */
+                t_cfg_edge *outgoing_af_edge = AFCorrespondingEdge(edge);
+                if (!CfgEdgeIsMarked(outgoing_af_edge)) {
+                  CfgEdgeMark(outgoing_af_edge);
+                  if (!BblIsMarked2(CFG_EDGE_TAIL(outgoing_af_edge)))
+                  {
+                    FunctionMarkBbl(fun, CFG_EDGE_TAIL(outgoing_af_edge));
+                    BblMark2 (CFG_EDGE_TAIL(outgoing_af_edge));
+                    VERBOSE(2,("MARKED-AF 2 @iB\n", CFG_EDGE_TAIL(outgoing_af_edge)));
+                    if (CfgEdgeIsInterproc (edge))
+                      CfgMarkFun (cfg, BBL_FUNCTION(CFG_EDGE_TAIL(outgoing_af_edge)));
+                  }
+                }
+              }
+
+              if (CfgEdgeIsForwardInterproc (edge) && CFG_EDGE_CORR(edge) && (BBL_IS_HELL (CFG_EDGE_TAIL(edge)) || BblIsMarked2 (CFG_EDGE_HEAD(CFG_EDGE_CORR(edge))))) {
                 if (!CfgEdgeIsMarked (CFG_EDGE_CORR(edge)))
                 {
                   CfgEdgeMark (CFG_EDGE_CORR(edge));
@@ -1828,13 +1927,14 @@ MarkFrom (t_cfg * cfg, t_bbl * from)
                     VERBOSE(2,("MARKED 2 @iB\n",CFG_EDGE_TAIL(CFG_EDGE_CORR(edge))));
                   }
                 }
+              }
             }
 
             if (!BblIsMarked2 (CFG_EDGE_TAIL(edge)))
             {
               FunctionMarkBbl (BBL_FUNCTION(CFG_EDGE_TAIL(edge)), CFG_EDGE_TAIL(edge));
               BblMark2 (CFG_EDGE_TAIL(edge));
-              VERBOSE(2,("MARKED 1 @iB\n",CFG_EDGE_TAIL(edge))); 
+              VERBOSE(2,("MARKED 1 @iB\n",CFG_EDGE_TAIL(edge)));
               if (CfgEdgeIsInterproc (edge))
                 CfgMarkFun (cfg, BBL_FUNCTION(CFG_EDGE_TAIL(edge)));
 
@@ -1848,7 +1948,7 @@ MarkFrom (t_cfg * cfg, t_bbl * from)
 
 static t_bool
 Reviver (t_object * obj, t_cfg * fg, t_reloc * reloc);
-static t_bool 
+static t_bool
 ReviveRelocatable(t_object * obj, t_cfg * fg, t_relocatable * points_to, t_bool reloc_hell)
 {
   t_bool ret = FALSE;
@@ -2003,6 +2103,7 @@ CfgRemoveDeadCodeAndDataBlocks (t_cfg * fg)
   int total = 0;
 
   STATUS(START, ("Remove Dead Code And Data Blocks"));
+  
   CfgUnmarkAllFun (fg);
 
   CFG_FOREACH_FUN(fg, fun)
@@ -2145,6 +2246,7 @@ CfgRemoveDeadCodeAndDataBlocks (t_cfg * fg)
       VERBOSE(1,("-Killing @ieB", bbl));
       BBL_FOREACH_INS_SAFE(bbl, ins, tmp)
       {
+        LogKilledInstruction(INS_OLD_ADDRESS(ins));
         InsKill (ins); /* this automatically kills relocs */
         killed_ins++;
       }
@@ -2214,7 +2316,7 @@ CfgRemoveDeadCodeAndDataBlocks (t_cfg * fg)
               && !BblIsMarked2 (OBJECT_RODATA(sub)[tel])
               && !(SECTION_FLAGS(OBJECT_RODATA(sub)[tel]) & SECTION_FLAG_KEEP))
           {
-            VERBOSE(1, ("Killing @T", OBJECT_RODATA(sub)[tel])); 
+            VERBOSE(1, ("Killing @T", OBJECT_RODATA(sub)[tel]));
             SectionKill(OBJECT_RODATA(sub)[tel]);
             killed_sec ++ ;
             restart=TRUE;
@@ -2232,7 +2334,7 @@ CfgRemoveDeadCodeAndDataBlocks (t_cfg * fg)
               && !BblIsMarked2 (OBJECT_DATA(sub)[tel])
               && !(SECTION_FLAGS(OBJECT_DATA(sub)[tel]) & SECTION_FLAG_KEEP))
           {
-            VERBOSE(1, ("Killing @T", OBJECT_DATA(sub)[tel])); 
+            VERBOSE(1, ("Killing @T", OBJECT_DATA(sub)[tel]));
             SectionKill(OBJECT_DATA(sub)[tel]);
             killed_sec ++ ;
             restart=TRUE;
@@ -2250,7 +2352,7 @@ CfgRemoveDeadCodeAndDataBlocks (t_cfg * fg)
               && !BblIsMarked2 (OBJECT_TLSDATA(sub)[tel])
               && !(SECTION_FLAGS(OBJECT_TLSDATA(sub)[tel]) & SECTION_FLAG_KEEP))
           {
-            VERBOSE(1, ("Killing @T", OBJECT_TLSDATA(sub)[tel])); 
+            VERBOSE(1, ("Killing @T", OBJECT_TLSDATA(sub)[tel]));
             SectionKill(OBJECT_TLSDATA(sub)[tel]);
             killed_sec ++ ;
             restart=TRUE;
@@ -2268,7 +2370,7 @@ CfgRemoveDeadCodeAndDataBlocks (t_cfg * fg)
               && !BblIsMarked2 (OBJECT_BSS(sub)[tel])
               && !(SECTION_FLAGS(OBJECT_BSS(sub)[tel]) & SECTION_FLAG_KEEP))
           {
-            VERBOSE(1, ("Killing @T", OBJECT_BSS(sub)[tel])); 
+            VERBOSE(1, ("Killing @T", OBJECT_BSS(sub)[tel]));
             SectionKill(OBJECT_BSS(sub)[tel]);
             killed_sec ++ ;
             restart=TRUE;
@@ -2366,6 +2468,7 @@ CfgRemoveDeadCodeAndDataBlocks (t_cfg * fg)
 
     if (!BBL_PRED_FIRST(bbl) && !BBL_SUCC_FIRST(bbl))
     {
+      DiabloBrokerCall("BblKill", bbl);
       BblKill (bbl);
       killed_bbl++;
     }
@@ -2769,7 +2872,7 @@ CfgDetectSimpleInfiniteLoops (t_cfg * cfg, t_loopref ** inf_list)
           if (!loop)
             FATAL(("No loop"));
         }
-        else 
+        else
         {
           /* This loop is a recursive loop, but there is no exit block in the
            * function where the backedge arrives. This means that upon exit of

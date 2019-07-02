@@ -22,6 +22,8 @@ IoModifierIns (t_const_string modifiers, va_list * ap)
   t_bool print_phase = FALSE;
   t_bool print_phase_extended = FALSE;
   t_bool print_debug_info = FALSE;
+  t_bool print_transformation = FALSE;
+  t_bool print_flags = FALSE;
 
   array = StringArrayNew ();
 
@@ -31,6 +33,8 @@ IoModifierIns (t_const_string modifiers, va_list * ap)
     if ((*modifiers) == 'p') print_phase = TRUE;
     if ((*modifiers) == 'x') print_phase_extended = TRUE;
     if ((*modifiers) == 'g') print_debug_info = TRUE;
+    if ((*modifiers) == 't') print_transformation = TRUE;
+    if ((*modifiers) == 'f') print_flags = TRUE;
   }
 
   if (print_debug_info && diabloobject_options.read_debug_info)
@@ -72,6 +76,7 @@ IoModifierIns (t_const_string modifiers, va_list * ap)
   }
 
   StringArrayAppendString (array, StringDup (buffer));
+  DiabloBrokerCall("IoModifierInsAF", ins, array);
 
   if (print_phase){
     if (print_phase_extended)
@@ -80,6 +85,13 @@ IoModifierIns (t_const_string modifiers, va_list * ap)
       StringArrayAppendString (array, StringIo ("(phase: %d)", INS_PHASE(ins)));
   }
 
+  if (print_transformation){
+    StringArrayAppendString(array, StringIo("(transformation: 0x%016" PRIx64 ")", INS_TRANSFORMATION_ID(ins)));
+  }
+
+  if (print_flags){
+    StringArrayAppendString(array, StringIo("(flags: 0x%x)", INS_ATTRIB(ins)));
+  }
 
   ret = StringArrayJoin (array, " ");
   StringArrayFree (array);
@@ -146,16 +158,20 @@ IoModifierBbl (t_const_string modifiers, va_list * ap)
     StringArrayAppendString (array, StringDup ("\\l"));
 
   DiabloBrokerCall("IoModifierBbl", bbl, array);
+  DiabloBrokerCall("IoModifierAF", bbl, array);
+  DiabloBrokerCall("IoModifierBblNonZero", bbl, array);
+  DiabloBrokerCall("IoModifierBblTracking", bbl, array);
 
   for (; *modifiers != 0; modifiers++)
   {
     if ((*modifiers) == 'i')
     {
       t_ins *ins;
-      char insformat[8] = {'@','I','\n','\0'};
+      char insformat[8] = {'@','t','I','\n','\0'};
       t_const_string tmp_modif = orig_modifiers;
 
-      for (; *tmp_modif != 0; tmp_modif++) if ((*tmp_modif) == 'a') sprintf(insformat,"@aI\n");
+      for (; *tmp_modif != 0; tmp_modif++)
+        if ((*tmp_modif) == 'a') sprintf(insformat,"@atI\n");
 
       StringArrayAppendString (array, StringDup ("Instructions:\n"));
       BBL_FOREACH_INS(bbl, ins)
@@ -224,6 +240,8 @@ IoModifierCfgEdge (t_const_string modifiers, va_list * ap)
   t_address addr2 = BBL_OLD_ADDRESS(CFG_EDGE_TAIL(edge));
 
   StringArrayAppendString (array, StringIo ("Old: @G New: @G", addr1, BBL_CADDRESS(CFG_EDGE_HEAD(edge))));
+  if (CfgEdgeIsFake(edge))
+    StringArrayAppendString(array, StringDup("FAKE"));
 #ifdef PRINT_EDGE_POINTER
   StringArrayAppendString (array, StringIo (" [%p]", CFG_EDGE_HEAD(edge)));
 #endif
@@ -286,6 +304,8 @@ IoModifierCfgEdge (t_const_string modifiers, va_list * ap)
 
   if (CFG_EDGE_EXEC_COUNT(edge) != 0)
     StringArrayAppendString (array, StringIo (" and exec %lld", CFG_EDGE_EXEC_COUNT(edge)));
+
+  DiabloBrokerCall("IoModifierEdgeAF", edge, array);
 
   ret = StringArrayJoin (array, "");
   StringArrayFree (array);

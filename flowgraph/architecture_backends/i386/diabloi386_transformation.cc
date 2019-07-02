@@ -19,8 +19,9 @@ t_reg I386ArchitectureInfo::getGenericRandomRegister(t_randomnumbergenerator* rn
   return RNGGenerateWithRange(rng, I386_REG_EAX, I386_REG_EBP);
 }
 
-void I386ArchitectureInfo::saveOrRestoreRegisters(const vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend) {
+AddedInstructionInfo I386ArchitectureInfo::saveOrRestoreRegisters(const vector<MaybeSaveRegister>& regs, t_bbl* bbl, bool push, bool prepend) {
   FATAL(("To implement: I386ArchitectureInfo::saveOrRestoreRegisters"));
+  return AddedInstructionInfo();
 }
 
 void I386ArchitectureInfo::appendUnconditionalBranchInstruction(t_bbl* bbl) {

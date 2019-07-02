@@ -1150,134 +1150,137 @@ RealOptimizeAddressProducersForChain (t_bbl *chain, t_bool optimize, t_bool do_l
 
   STATUS(START,("Optimizing LDRs of const/address producers"));
 
-  /* Optimization number 1: turn loads into add/sub from pc */
-  CHAIN_FOREACH_BBL (chain, bbl)
+  if (!diabloarm_options.noaddraddsub)
   {
-    BBL_FOREACH_ARM_INS(bbl, ins)
+    /* Optimization number 1: turn loads into add/sub from pc */
+    CHAIN_FOREACH_BBL (chain, bbl)
     {
-      if (ARM_INS_ATTRIB(ins) & IF_ADDRESS_PRODUCER)
+      BBL_FOREACH_ARM_INS(bbl, ins)
       {
-	t_bool to_intra_chain_bbl = TRUE;
-	t_uint32 i;
-	t_reloc_ref *to_ref = ARM_INS_REFERS_TO(T_ARM_INS(RELOC_TO_RELOCATABLE(RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins)))[0]));
-	t_reloc *apreloc = to_ref ? RELOC_REF_RELOC(to_ref) : NULL;
-
-	if (to_ref)
-	{
-	  for (i=0; i<RELOC_N_TO_RELOCATABLES(apreloc); i++)
-	  {
-	    if ((RELOCATABLE_RELOCATABLE_TYPE(RELOC_TO_RELOCATABLE(apreloc)[i]) == RT_BBL) &&
-		((BBL_FIRST_IN_CHAIN(T_BBL(RELOC_TO_RELOCATABLE(apreloc)[i]))) == chain))
-	    {
-
-	    }
-	    else
-	    {
-	      to_intra_chain_bbl = FALSE;
-	    }
-	  }
-	}
-
-        /* Don't try to convert producers referring to more than one relocatable.
-         * For producers referring to more relocatables, the distance between the two relocatables
-         * is calculated. At this point in the code, this distance can still change (e.g., by removing
-         * address pool entries further on in this function). As a consequence, it can happen that the
-         * converted instruction is encodable at this point in time, but not after all address pool
-         * optimizations have been done because the distance between the two relocatables has been
-         * enlarged. */
-        if (apreloc
-            && RELOC_N_TO_RELOCATABLES(apreloc) > 1)
-          continue;
-
-        if ((to_ref)&&(to_intra_chain_bbl))
+        if (ARM_INS_ATTRIB(ins) & IF_ADDRESS_PRODUCER)
         {
-	  /* address producer to basic block in same chain */
-          t_int32 range = (ARM_INS_FLAGS(ins) & FL_THUMB)? -1: 0x3ff;
-          t_address relval=StackExecConst(RELOC_CODE(apreloc), apreloc, NULL, 0, obj);
-          t_int32 offset=G_T_UINT32(AddressSub(relval,ARM_INS_CADDRESS(ins)))-8;
-          t_bbl * i_bbl = bbl;
+    t_bool to_intra_chain_bbl = TRUE;
+    t_uint32 i;
+    t_reloc_ref *to_ref = ARM_INS_REFERS_TO(T_ARM_INS(RELOC_TO_RELOCATABLE(RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins)))[0]));
+    t_reloc *apreloc = to_ref ? RELOC_REF_RELOC(to_ref) : NULL;
 
-          if (range>0)
-            {
-              /* we have to make the range smaller whenever there are aligned data blocks in the range
-                 because those might lead to padding words being inserted, causing the target to be
-                 moved out of the range */
-              t_bbl * data = INS_BBL(T_INS(RELOC_TO_RELOCATABLE(RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins)))[0]));
+    if (to_ref)
+    {
+      for (i=0; i<RELOC_N_TO_RELOCATABLES(apreloc); i++)
+      {
+        if ((RELOCATABLE_RELOCATABLE_TYPE(RELOC_TO_RELOCATABLE(apreloc)[i]) == RT_BBL) &&
+      ((BBL_FIRST_IN_CHAIN(T_BBL(RELOC_TO_RELOCATABLE(apreloc)[i]))) == chain))
+        {
 
-              if (offset>0)
-                {
-                  i_bbl = BBL_NEXT_IN_CHAIN(i_bbl);
-                  while (i_bbl)
-                    {
-                      t_address al = BBL_ALIGNMENT(i_bbl);
-                      if (al>4)
-                        {
-                          range -= al - 4;
-                        }
-                      if (i_bbl==data) break;
-                      i_bbl = BBL_NEXT_IN_CHAIN(i_bbl);
-                    }
-                }
-              if (offset<0)
-                {
-                  
-                  i_bbl = BBL_PREV_IN_CHAIN(i_bbl);
-                  while (i_bbl)
-                    {
-                            t_address al = BBL_ALIGNMENT(i_bbl);
-                      if (al>4)
-                        {
-                          range -= al - 4;
-                        }
-                      if (i_bbl==data) break;
-                      i_bbl = BBL_PREV_IN_CHAIN(i_bbl);
-                    }
-                }
-            }
-
-          /* For Thumb instructions, range == -1 */
-          if ((0<=offset && offset<range)&&((offset & 0xfffffffc)==offset))
-          {
-	    /* make add rX, pc, offset */
-            t_reloc * copy=RelocTableDupReloc(OBJECT_RELOC_TABLE(obj), apreloc);
-            t_string_array * sa=StringDivide(RELOC_CODE(apreloc), "\\", TRUE, TRUE);
-            Free(RELOC_CODE(copy));
-
-            /* Some magic happens here in the relocation code:
-             *  * We calculate the immediate we want to encode in the instruction;
-             *  * We shift that immediate right by 2 bits;
-             *  * By setting bits 8-11 to 1, the ArmExpandImm pseudo-function (see ARM ARM on modified immediates),
-             *    the encoded immediate will be rotated right by 30 bits (2 x 15), which is the same as a left shift
-             *    by 2. This results in the original immeidate, which we want to encode.
-             */
-            RELOC_SET_CODE(copy, StringIo("%sP-s0008-\\s0002>s0f00|lifffff000&|w\\s0000$",sa->first->string));
-            ArmInsMakeAdd(ins, ARM_INS_REGA(ins), ARM_REG_R15, ARM_REG_NONE, 0x0, ARM_INS_CONDITION(ins));
-            RelocSetFrom(copy, T_RELOCATABLE(ins));
-            StringArrayFree(sa);
-            ARM_INS_SET_ATTRIB(ins,  ARM_INS_ATTRIB(ins) & ~IF_ADDRESS_PRODUCER);
-          }
-          /* there is no sub rX, pc, offset thumb instruction */
-          else if ((-range<=offset && offset<0)&&((offset & 0xfffffffc)==offset) &&
-                   !(ARM_INS_FLAGS(ins) & FL_THUMB))
-          {
-	    /* make sub rX, pc, offset */
-            t_reloc * copy = RelocTableDupReloc(OBJECT_RELOC_TABLE(obj), apreloc);
-            t_string_array * sa = StringDivide(RELOC_CODE(apreloc), "\\", TRUE, TRUE);
-            Free(RELOC_CODE(copy));
-
-            /* See comment for the "add rX, pc, offset" case above. */
-            RELOC_SET_CODE(copy, StringIo("P%s-s0008+\\s0002>s0f00|lifffff000&|w\\s0000$", sa->first->string));
-            ArmInsMakeSub(ins, ARM_INS_REGA(ins), ARM_REG_R15, ARM_REG_NONE, 0x0, ARM_INS_CONDITION(ins));
-            RelocSetFrom(copy, T_RELOCATABLE(ins));
-            StringArrayFree(sa);
-            ARM_INS_SET_ATTRIB(ins,  ARM_INS_ATTRIB(ins) & ~IF_ADDRESS_PRODUCER);
-          }
         }
-	else if (!to_ref)
+        else
         {
-	  /* constant producer  or FVPFLOAT producer which we cannot optimize*/
-          //        if (ARM_INS_OPCODE(ins)==ARM_LDR)
-          //        GenerateInstructionsForConstProdIfPossible(ins, ARM_INS_IMMEDIATE(T_ARM_INS(RELOC_TO_RELOCATABLE(RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins)))[0])));
+          to_intra_chain_bbl = FALSE;
+        }
+      }
+    }
+
+          /* Don't try to convert producers referring to more than one relocatable.
+          * For producers referring to more relocatables, the distance between the two relocatables
+          * is calculated. At this point in the code, this distance can still change (e.g., by removing
+          * address pool entries further on in this function). As a consequence, it can happen that the
+          * converted instruction is encodable at this point in time, but not after all address pool
+          * optimizations have been done because the distance between the two relocatables has been
+          * enlarged. */
+          if (apreloc
+              && RELOC_N_TO_RELOCATABLES(apreloc) > 1)
+            continue;
+
+          if ((to_ref)&&(to_intra_chain_bbl))
+          {
+      /* address producer to basic block in same chain */
+            t_int32 range = (ARM_INS_FLAGS(ins) & FL_THUMB)? -1: 0x3ff;
+            t_address relval=StackExecConst(RELOC_CODE(apreloc), apreloc, NULL, 0, obj);
+            t_int32 offset=G_T_UINT32(AddressSub(relval,ARM_INS_CADDRESS(ins)))-8;
+            t_bbl * i_bbl = bbl;
+
+            if (range>0)
+              {
+                /* we have to make the range smaller whenever there are aligned data blocks in the range
+                  because those might lead to padding words being inserted, causing the target to be
+                  moved out of the range */
+                t_bbl * data = INS_BBL(T_INS(RELOC_TO_RELOCATABLE(RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins)))[0]));
+
+                if (offset>0)
+                  {
+                    i_bbl = BBL_NEXT_IN_CHAIN(i_bbl);
+                    while (i_bbl)
+                      {
+                        t_address al = BBL_ALIGNMENT(i_bbl);
+                        if (al>4)
+                          {
+                            range -= al - 4;
+                          }
+                        if (i_bbl==data) break;
+                        i_bbl = BBL_NEXT_IN_CHAIN(i_bbl);
+                      }
+                  }
+                if (offset<0)
+                  {
+                    
+                    i_bbl = BBL_PREV_IN_CHAIN(i_bbl);
+                    while (i_bbl)
+                      {
+                              t_address al = BBL_ALIGNMENT(i_bbl);
+                        if (al>4)
+                          {
+                            range -= al - 4;
+                          }
+                        if (i_bbl==data) break;
+                        i_bbl = BBL_PREV_IN_CHAIN(i_bbl);
+                      }
+                  }
+              }
+
+            /* For Thumb instructions, range == -1 */
+            if ((0<=offset && offset<range)&&((offset & 0xfffffffc)==offset))
+            {
+        /* make add rX, pc, offset */
+              t_reloc * copy=RelocTableDupReloc(OBJECT_RELOC_TABLE(obj), apreloc);
+              t_string_array * sa=StringDivide(RELOC_CODE(apreloc), "\\", TRUE, TRUE);
+              Free(RELOC_CODE(copy));
+
+              /* Some magic happens here in the relocation code:
+              *  * We calculate the immediate we want to encode in the instruction;
+              *  * We shift that immediate right by 2 bits;
+              *  * By setting bits 8-11 to 1, the ArmExpandImm pseudo-function (see ARM ARM on modified immediates),
+              *    the encoded immediate will be rotated right by 30 bits (2 x 15), which is the same as a left shift
+              *    by 2. This results in the original immeidate, which we want to encode.
+              */
+              RELOC_SET_CODE(copy, StringIo("%sP-s0008-\\s0002>s0f00|lifffff000&|w\\s0000$",sa->first->string));
+              ArmInsMakeAdd(ins, ARM_INS_REGA(ins), ARM_REG_R15, ARM_REG_NONE, 0x0, ARM_INS_CONDITION(ins));
+              RelocSetFrom(copy, T_RELOCATABLE(ins));
+              StringArrayFree(sa);
+              ARM_INS_SET_ATTRIB(ins,  ARM_INS_ATTRIB(ins) & ~IF_ADDRESS_PRODUCER);
+            }
+            /* there is no sub rX, pc, offset thumb instruction */
+            else if ((-range<=offset && offset<0)&&((offset & 0xfffffffc)==offset) &&
+                    !(ARM_INS_FLAGS(ins) & FL_THUMB))
+            {
+        /* make sub rX, pc, offset */
+              t_reloc * copy = RelocTableDupReloc(OBJECT_RELOC_TABLE(obj), apreloc);
+              t_string_array * sa = StringDivide(RELOC_CODE(apreloc), "\\", TRUE, TRUE);
+              Free(RELOC_CODE(copy));
+
+              /* See comment for the "add rX, pc, offset" case above. */
+              RELOC_SET_CODE(copy, StringIo("P%s-s0008+\\s0002>s0f00|lifffff000&|w\\s0000$", sa->first->string));
+              ArmInsMakeSub(ins, ARM_INS_REGA(ins), ARM_REG_R15, ARM_REG_NONE, 0x0, ARM_INS_CONDITION(ins));
+              RelocSetFrom(copy, T_RELOCATABLE(ins));
+              StringArrayFree(sa);
+              ARM_INS_SET_ATTRIB(ins,  ARM_INS_ATTRIB(ins) & ~IF_ADDRESS_PRODUCER);
+            }
+          }
+    else if (!to_ref)
+          {
+      /* constant producer  or FVPFLOAT producer which we cannot optimize*/
+            //        if (ARM_INS_OPCODE(ins)==ARM_LDR)
+            //        GenerateInstructionsForConstProdIfPossible(ins, ARM_INS_IMMEDIATE(T_ARM_INS(RELOC_TO_RELOCATABLE(RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins)))[0])));
+          }
         }
       }
     }

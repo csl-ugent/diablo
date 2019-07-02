@@ -35,6 +35,8 @@ struct Annotation {
 
   /* index in the JSON file, multiple AbstractAnnotationInfos can share the same index if they originate from a single JSON line, this allows us to keep track of this. */
   t_uint32 index;
+
+  std::string Print() const;
 };
 
 struct AbstractAnnotationInfo {
@@ -70,6 +72,8 @@ struct AbstractAnnotationInfo {
    * if *any* of the AbstractAnnotationInfos of a JSON annotation have been set to successfully_applied.
    */
   bool successfully_applied;
+
+  std::string Print() const;
 };
 
 void ReadAnnotationsFromJSON(t_const_string annotation_file, Annotations& annotations);

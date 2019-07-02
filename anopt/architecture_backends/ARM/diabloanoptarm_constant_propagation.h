@@ -13,5 +13,7 @@ unsigned int ArmInsDefinedRegCount(t_arm_ins * ins);
 void RenameLocalAddressProducers(t_cfg * cfg);
 void MakeConstProducers(t_cfg * cfg);
 void ArmConstantPropagationInit(t_cfg * cfg);
+t_bool BblEndsWithConditionalBranchAfterCMP(t_bbl * bbl);
+t_arm_ins * FindCmpThatDeterminesJump(t_arm_ins * ins);
 #endif
 /* vim: set shiftwidth=2 foldmethod=marker: */

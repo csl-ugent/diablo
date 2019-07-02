@@ -21,7 +21,7 @@ static t_equations eqs_for_BblCopyAnalysis = NULL;
 static t_equations eqs_for_BblCopyAnalysis_after_split = NULL; 
 
 static void FunctionCopyAnalysis(t_function* fun, t_cfg_edge* edge_in, t_bool during_fixpoint_calculations);
-static void BblCopyAnalysis(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint_calculations);
+void BblCopyAnalysis(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint_calculations);
 void CfgStoreCPInfoInEquations(t_object * obj, t_section * sec);
 
 static t_equations GetAugmentedReturnEqs(t_cfg_edge * ret_edge)
@@ -149,7 +149,6 @@ t_bool CopyAnalysisInit(t_cfg * cfg)
   Perform copy-analysis on the flowgraph of section sec.
 */
 
-
 void CopyAnalysis(t_cfg * cfg)
 {
   /* iterators */
@@ -179,7 +178,6 @@ void CopyAnalysis(t_cfg * cfg)
 
   CfgUnmarkAllFun(cfg);
 
-
   DiabloBrokerCall("PrecomputeCopyPropEvaluation",cfg);
   CFG_FOREACH_FUN(cfg,i_fun)
     {
@@ -190,8 +188,8 @@ void CopyAnalysis(t_cfg * cfg)
 	  BBL_SET_REGS_DEFINED_IN(i_bbl, BblRegsLiveBefore(i_bbl));
 	  if(!BBL_EQS_IN(i_bbl))
 	    BBL_SET_EQS_IN(i_bbl,  EquationsNew(cfg));
-	  else 
-	    FATAL(("Not null? @B",i_bbl));
+	  else
+            EquationsSetAllBot(cfg, BBL_EQS_IN(i_bbl));
 	}
     }
 
@@ -593,7 +591,7 @@ static void PropOverEdge(t_cfg_edge * edge, t_equations eqs, t_bool during_fixpo
 /* }}} */
 
 /* {{{ Propagate a state over a bbl and to the successor edges */
-static void BblCopyAnalysis(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint_calculations)
+void BblCopyAnalysis(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint_calculations)
 {
   t_cfg * cfg=BBL_CFG(bbl);
   t_cfg_edge * i_edge;

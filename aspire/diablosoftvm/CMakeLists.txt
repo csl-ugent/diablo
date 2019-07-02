@@ -11,5 +11,6 @@ target_link_libraries(DiabloSoftVM
   PUBLIC FlowgraphARM
   PUBLIC jansson
   PUBLIC CodeMobility
+  PUBLIC SoftVMProxy
   PRIVATE dl
 )

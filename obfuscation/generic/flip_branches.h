@@ -5,8 +5,6 @@
 #ifndef GEN_FLIP_BRANCHES_TRANSFORMATION_H
 #define GEN_FLIP_BRANCHES_TRANSFORMATION_H
 
-#include <obfuscation/obfuscation_transformation.h>
-
 class FlipBranchesTransformation : public BBLObfuscationTransformation {
   static constexpr const char* _name = "flip_branch";
 public:

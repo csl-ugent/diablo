@@ -8,6 +8,7 @@ extern "C" {
 #include <string>
 #include <map>
 #include <fstream>
+#include <iostream>
 
 using namespace std;
 
@@ -44,6 +45,25 @@ struct t_randomnumbergenerator_ {
 
 	string name;
 };
+
+ofstream dumpfile;
+
+static
+void DumpRNG(t_randomnumbergenerator *rng) {
+	if (!dumpfile.is_open())
+		return;
+
+	/*dumpfile << "# '" << rng->name << "', seed " << rng->seed;
+	if (rng->range)
+		dumpfile << ", range " << rng->min << "-" << rng->max;
+	dumpfile << endl;*/
+
+	dumpfile << rng->name << " " << rng->seed << endl;
+}
+
+t_RNG &RNGGetGenerator(t_randomnumbergenerator *rng) {
+	return rng->generator;
+}
 
 static
 string concatNameRegion(t_const_string name, t_const_string region_name) {
@@ -83,6 +103,16 @@ string getFullRNGName(const string name) {
 		return name;
 
 	return root_rng->name + "_" + name;
+}
+
+void RNGInitialise() {
+	if (diablosupport_options.rng_dump_generators)
+		dumpfile.open(diablosupport_options.rng_dump_generators);
+}
+
+void RNGFinalise() {
+	if (dumpfile.is_open())
+		dumpfile.close();
 }
 
 void RNGInit(t_randomnumbergenerator *rng, t_uint32 seed) {
@@ -178,6 +208,7 @@ t_randomnumbergenerator *RNGCreate(t_randomnumbergenerator *parent, t_uint32 see
 
 	VERBOSE(RANDOM_VERBOSITY, ("created rng with name \"%s\"", rng_name.c_str()));
 
+	DumpRNG(ret);
 	return ret;
 }
 
@@ -245,6 +276,10 @@ t_uint32 RNGGenerateWithRange(t_randomnumbergenerator *rng, t_uint32 min, t_uint
 
 t_bool RNGGenerateBool(t_randomnumbergenerator *rng) {
 	return ((RNGGenerate(rng) % 2) == 1) ? TRUE : FALSE;
+}
+
+t_uint32 RNGGeneratePercent(t_randomnumbergenerator *rng) {
+	return RNGGenerateWithRange(rng, 1, 100);
 }
 
 void RNGReset(t_randomnumbergenerator *rng) {

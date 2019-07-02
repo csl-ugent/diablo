@@ -28,6 +28,8 @@ AbstractTransformer::AbstractTransformer(t_object* obj, t_const_string output_na
   t_symbol* binary_base_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), "__text_start");
   ASSERT(SYMBOL_OFFSET_FROM_START(binary_base_sym) == 0, ("This symbol should be at the start of the .text-section!"));
   binary_base_sec = T_SECTION(SYMBOL_BASE(binary_base_sym));
+  
+  special_function_uid = FunctionUID_INVALID;
 }
 
 /* Cleanup of everything created/started in the constructor */
@@ -76,6 +78,8 @@ t_bbl* AbstractTransformer::CreateIndirectionStub(t_bbl* dest)
   char name[23];
   sprintf(name, "stub_indirect_%08x", transform_index);
   t_function* fun = FunctionMake(entrypoint, name, FT_NORMAL);
+  ASSERT(special_function_uid != FunctionUID_INVALID, ("invalid special function uid!"));
+  BblSetOriginalFunctionUID(entrypoint, special_function_uid);
 
   /* Model the control flow, start by adding an IPJUMP to the destination and model the control flow in and out of the stub */
   t_cfg_edge* ip1 = CfgEdgeCreate (cfg, entrypoint, dest, ET_IPJUMP);
@@ -546,6 +550,7 @@ void AbstractTransformer::TransformFunction (t_function* fun, t_bool split_funct
       /* Move BBL to new CFG */
       if (BBL_CFG(bbl) != new_cfg)
       {
+        DiabloBrokerCall("RemoveBblFromCfg", bbl);
         CfgUnlinkNodeFromGraph(cfg, bbl);
         CfgInsertNodeInGraph(new_cfg, bbl);
         BBL_SET_CFG(bbl, new_cfg);
@@ -675,6 +680,15 @@ void AbstractTransformer::TransformFunction (t_function* fun, t_bool split_funct
             CfgEdgeChangeTail(edge, CFG_CALL_HELL_NODE(new_cfg));
           else if (orig_tail == CFG_HELL_NODE(cfg))
             CfgEdgeChangeTail(edge, CFG_HELL_NODE(new_cfg));
+          else {
+            t_bbl *result = NULL;
+            DiabloBrokerCall("RedirectGlobalTargetHellEdgeToCfg", edge, &result);
+
+            if (result) {
+              /* global target hell */
+              CfgEdgeChangeTail(edge, result);
+            }
+          }
         }
       }
       /* Else, check if we're dealing with an edge that exits the function */

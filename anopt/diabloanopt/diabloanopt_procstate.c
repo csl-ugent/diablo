@@ -2,6 +2,31 @@
 
 #include <diabloanopt.h>
 
+#if CONSTPROP_HELPERS
+static
+void FreeHelpers(t_register_helper *helpers)
+{
+  for (int i = 0; i < MAX_NR_REG_SUBSETS*REG_SUBSET_SIZE; i++)
+    if (helpers[i]->nr_helpers > 0)
+      Free(helpers[i]->helpers);
+
+  Free(helpers);
+}
+
+static
+void ResetHelpers(t_register_helper *helpers)
+{
+  for (int i = 0; i < MAX_NR_REG_SUBSETS*REG_SUBSET_SIZE; i++)
+  {
+    if (helpers[i]->nr_helpers > 0)
+    {
+      Free(helpers[i]->helpers);
+      helpers[i]->nr_helpers = 0;
+    }
+  }
+}
+#endif
+
 /*! Used to see whether or not two propagated relocs point to the same
   block (basic block or data block) */
 t_bool TwoRelocsInSameBlock(t_reloc * reloc1, t_reloc* reloc2)
@@ -26,6 +51,7 @@ t_procstate* ProcStateNew(t_architecture_description * desc)
 {
   t_procstate * state;
   t_register_content * rc;
+  t_register_helper *helpers;
   t_reloc ** tags;
 
   if (pslist)
@@ -45,6 +71,10 @@ t_procstate* ProcStateNew(t_architecture_description * desc)
     state->register_values = rc;
     tags = Malloc(MAX_NR_REG_SUBSETS*REG_SUBSET_SIZE*sizeof(t_reloc *));
     state->register_tags = tags;
+#if CONSTPROP_HELPERS
+    helpers = Calloc(MAX_NR_REG_SUBSETS*REG_SUBSET_SIZE*sizeof(t_register_helper));
+    state->register_helpers = helpers;
+#endif
   }
 
   RegsetSetDup(state->top, desc->all_registers);
@@ -71,6 +101,9 @@ void ProcStateFree(t_procstate* state)
   } else {
     Free(state->register_tags);
     Free(state->register_values);
+#if CONSTPROP_HELPERS
+    FreeHelpers(state->register_helpers);
+#endif
     Free(state);
   }
 #ifdef DEBUG_PROCSTATE_FREE
@@ -94,6 +127,10 @@ void ProcStateRealFree(void)
     pslist = *pslist;
     Free(ps->register_values);
     Free(ps->register_tags);
+#if CONSTPROP_HELPERS
+    FreeHelpers(ps->register_helpers);
+#endif
+
     Free(ps);
   }
 }
@@ -107,6 +144,9 @@ void ProcStateSetAllTop(t_procstate* state, t_regset regs)
   RegsetSetDiff(state->tag_bot,regs);
   RegsetSetDiff(state->cond_true,regs);
   RegsetSetDiff(state->cond_false,regs);
+#if CONSTPROP_HELPERS
+  ResetHelpers(state->helpers);
+#endif
 }
 
 /** Set all propagated items in a state to Bot (value, reloc tag, cond bits */
@@ -118,6 +158,9 @@ void ProcStateSetAllBot(t_procstate* state, t_regset regs)
   RegsetSetDiff(state->tag_top,regs);
   RegsetSetUnion(state->cond_true,regs);
   RegsetSetUnion(state->cond_false,regs);
+#if CONSTPROP_HELPERS
+  ResetHelpers(state->helpers);
+#endif
 }
 
 
@@ -228,6 +271,57 @@ void ProcStateSetTag(t_procstate* state, t_reg reg, t_reloc* value)
   RegsetSetSubReg(state->tag_bot,reg);
   RegsetSetSubReg(state->tag_top,reg);
   state->register_tags[reg] = value;
+}
+
+void ProcStateSwapRegisterInfo(t_procstate *state, t_reg rx, t_reg ry) {
+  /* reset x */
+  t_register_content x_content;
+  t_reloc *x_tag = NULL;
+
+  t_lattice_level x_level_reg = ProcStateGetReg(state, rx, &x_content);
+  RegsetSetSubReg(state->bot, rx);
+  RegsetSetSubReg(state->top, rx);
+
+  t_lattice_level x_level_tag = ProcStateGetTag(state, rx, &x_tag);
+  RegsetSetSubReg(state->tag_bot, rx);
+  RegsetSetSubReg(state->tag_top, rx);
+  
+  /* reset y */
+  t_register_content y_content;
+  t_reloc *y_tag = NULL;
+
+  t_lattice_level y_level_reg = ProcStateGetReg(state, ry, &y_content);
+  RegsetSetSubReg(state->bot, ry);
+  RegsetSetSubReg(state->top, ry);
+
+  t_lattice_level y_level_tag = ProcStateGetTag(state, ry, &y_tag);
+  RegsetSetSubReg(state->tag_bot, ry);
+  RegsetSetSubReg(state->tag_top, ry);
+  
+  /* update necessary info */
+  state->register_tags[rx] = y_tag;
+  state->register_tags[ry] = x_tag;
+  
+  state->register_values[rx] = y_content;
+  state->register_values[ry] = x_content;
+  
+  if (x_level_reg == CP_BOT)
+    RegsetSetAddReg(state->bot, ry);
+  else if (x_level_reg == CP_TOP)
+    RegsetSetAddReg(state->top, ry);
+  if (x_level_tag == CP_BOT)
+    RegsetSetAddReg(state->tag_bot, ry);
+  else if (x_level_tag == CP_TOP)
+    RegsetSetAddReg(state->tag_top, ry);
+    
+  if (y_level_reg == CP_BOT)
+    RegsetSetAddReg(state->bot, rx);
+  else if (y_level_reg == CP_TOP)
+    RegsetSetAddReg(state->top, rx);
+  if (y_level_tag == CP_BOT)
+    RegsetSetAddReg(state->tag_bot, rx);
+  else if (y_level_tag == CP_TOP)
+    RegsetSetAddReg(state->tag_top, rx);
 }
 
 #if 0
@@ -388,7 +482,10 @@ t_bool ProcStateJoinSimple(t_procstate* dest, t_procstate* src, t_regset regs, t
 	continue;
       }
 
-      if (AddressIsEq(src_ptr->i,dest_ptr->i))
+      bool tag_in_src = !RegsetIn(src->tag_bot, reg) && !RegsetIn(src->tag_top, reg);
+      bool tag_in_dest = !RegsetIn(dest->tag_bot, reg) && !RegsetIn(dest->tag_top, reg);
+      if (AddressIsEq(src_ptr->i,dest_ptr->i)
+      		&& !(tag_in_src ^ tag_in_dest))
 	continue;
 
       RegsetSetUnion(dest->bot,singleton);
@@ -445,6 +542,7 @@ t_bool ProcStateJoinSimple(t_procstate* dest, t_procstate* src, t_regset regs, t
 	continue;
 
       RegsetSetUnion(dest->tag_bot,singleton);
+      RegsetSetUnion(dest->bot,singleton);
 
       change = TRUE;
       /*	  printf("true4 %d\n",reg); */
@@ -489,6 +587,44 @@ void ProcStateDup(t_procstate *dest, t_procstate* src, t_architecture_descriptio
     memcpy(dest->register_values,src->register_values,sizeof(t_register_content)*REG_SUBSET_SIZE*MAX_NR_REG_SUBSETS);
   if (!RegsetEquals(RegsetUnion(src->tag_top,src->tag_bot), desc->all_registers))
     memcpy(dest->register_tags,src->register_tags,sizeof(t_reloc*)*REG_SUBSET_SIZE*MAX_NR_REG_SUBSETS);
+}
+
+bool ProcStateEquals(t_procstate *a, t_procstate *b, t_architecture_description *desc)
+{
+  if (!RegsetEquals(a->top, b->top)) return false;
+  if (!RegsetEquals(a->bot, b->bot)) return false;
+  if (!RegsetEquals(a->tag_top, b->tag_top)) return false;
+  if (!RegsetEquals(a->tag_bot, b->tag_bot)) return false;
+
+  t_reg r;
+  REGSET_FOREACH_REG (desc->int_registers, r) {
+    if (!RegsetIn(a->tag_top, r) && !RegsetIn(a->tag_bot, r)) {
+      /* check if the tag refers to the same location */
+      if (!TwoRelocsInSameBlock(a->register_tags[r],b->register_tags[r]))
+        return false;
+    }
+
+    if (!RegsetIn(a->top, r) && !RegsetIn(a->bot, r))
+      if (!AddressIsEq(a->register_values[r].i, b->register_values[r].i)) return false;
+  }
+
+  REGSET_FOREACH_REG(desc->cond_registers, r) {
+    t_bool flag1;
+    t_lattice_level lvl1 = ProcStateGetCond(a, r, &flag1);
+
+    t_bool flag2;
+    t_lattice_level lvl2 = ProcStateGetCond(b, r, &flag2);
+
+    if (lvl1 != lvl2)
+      return false;
+
+    /* lvl1 == lvl2 */
+    if (lvl1 == CP_VALUE
+        && flag1 != flag2)
+      return false;
+  }
+
+  return true;
 }
 
 void ProcStateDupRegsIntoTop(t_procstate *dest, t_procstate* src, t_regset regs)
@@ -683,26 +819,27 @@ t_string IoModifierProcState (t_const_string modifiers, va_list *ap)
     t_reloc *rel;
     t_lattice_level lvl;
 
-    iter += sprintf (iter, "%4s:", desc->register_names[r]);
+    //iter += sprintf (iter, "%4s:", desc->register_names[r]);
+    iter += sprintf (iter, "r%d:", r);
     
     lvl = ProcStateGetReg (state, r, &c);
     if (desc->address_size == ADDRSIZE32)
     {
       if (lvl == CP_BOT)
-	iter += sprintf (iter, "%8s ", "BOT");
+	iter += sprintf (iter, "%s ", "BOT");
       else if (lvl == CP_TOP)
-	iter += sprintf (iter, "%8s ", "TOP");
+	iter += sprintf (iter, "%s ", "TOP");
       else
-	iter += sprintf (iter, "%8x ", AddressExtractUint32 (c.i));
+	iter += sprintf (iter, "%x ", AddressExtractUint32 (c.i));
     }
     else
     {
       if (lvl == CP_BOT)
-	iter += sprintf (iter, "%16s ", "BOT");
+	iter += sprintf (iter, "%s ", "BOT");
       else if (lvl == CP_TOP)
-	iter += sprintf (iter, "%16s ", "TOP");
+	iter += sprintf (iter, "%s ", "TOP");
       else
-	iter += sprintf (iter, "%16x ", AddressExtractUint32 (c.i));
+	iter += sprintf (iter, "%x ", AddressExtractUint32 (c.i));
     }
 
     if (showtags)
@@ -716,12 +853,12 @@ t_string IoModifierProcState (t_const_string modifiers, va_list *ap)
 	iter += sprintf (iter, "(tag) ");
     }
 
-    if (((r+1) % regs_per_line) == 0)
+    /*if (((r+1) % regs_per_line) == 0)
     {
       *(iter-1) = *new_line;
       for (nl_iter=new_line; *nl_iter; nl_iter++)
         *(++iter)=*nl_iter;
-    }
+    }*/
 
     tmp = ret;
     ret = StringConcat2 (tmp, regbuf);
@@ -753,9 +890,9 @@ t_string IoModifierProcState (t_const_string modifiers, va_list *ap)
 
   tmp = ret;
   if (single_line)
-    ret = StringConcat3 (tmp, condbuf, "------------------------------------------\n");
+    ret = StringConcat3 (tmp, condbuf, "\n------------------------------------------\n");
   else if (double_line)
-    ret = StringConcat3 (tmp, condbuf, "==========================================\n");
+    ret = StringConcat3 (tmp, condbuf, "\n==========================================\n");
   else
     ret = StringConcat2 (tmp, condbuf);
   Free (tmp);

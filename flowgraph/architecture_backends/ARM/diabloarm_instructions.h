@@ -203,6 +203,7 @@ typedef t_uint16 t_arm_neon_flags;
 #ifndef ARM_INSTRUCTION_FUNCTIONS
 #define ARM_INSTRUCTION_FUNCTIONS
 void ArmInsInit(t_arm_ins *ins);
+void ArmInsMakeMrc(t_arm_ins *ins, t_uint32 coproc, t_uint32 opc1, t_reg reg, t_uint32 crn, t_uint32 crm, t_uint32 opc2);
 void ArmInsMakeNoop(t_arm_ins * ins);
 void ArmInsMakeData(t_arm_ins * ins, t_uint32 data);
 void ArmInsMakeUncondThumbBranch(t_arm_ins * ins);
@@ -219,6 +220,7 @@ void ArmInsMakeCmp(t_arm_ins * ins, t_reg regB, t_reg regC, t_uint32 immed, t_ui
 void ArmInsMakeTst(t_arm_ins * ins, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeSub(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeAnd(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
+void ArmInsMakeEor(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeMov(t_arm_ins * ins, t_reg regA, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeMovwImmed(t_arm_ins * ins, t_reg regA, t_uint32 immed, t_uint32 cond);
 void ArmInsMakePop(t_arm_ins * ins, t_uint32 regs, t_uint32 cond, t_bool thumb);
@@ -235,6 +237,7 @@ void ArmInsMakeVstr(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint3
 void ArmInsMakeMsr(t_arm_ins * ins, t_reg regC, t_uint32 cond, t_bool set);
 void ArmInsMakeVmsr(t_arm_ins * ins, t_reg regB, t_uint32 cond);
 void ArmInsMakeMvn(t_arm_ins * ins, t_reg regA, t_reg regC, t_uint32 immed, t_uint32 cond);
+void ArmInsMakeConstantProducer(t_arm_ins * ins, t_reg reg, t_uint32 immed);
 void ArmMakeConstantProducer(t_arm_ins * ins, t_uint32 immed);
 void ArmMakeFloatProducer(t_arm_ins * ins, char * data);
 void ArmInsMakePseudoCall(t_arm_ins * ins, t_function * fun);
@@ -242,11 +245,11 @@ void ArmInsMakeSwi(t_arm_ins * ins, t_uint32 immediate, t_uint32 cond);
 void ArmInsMakeBkpt(t_arm_ins * ins);
 void ArmInsMakeSwp(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 cond);
 void ArmInsMakeIT(t_arm_ins * ins, t_uint32 spec);
+void ArmInsMakeSwap(t_arm_ins * ins, t_reg regA, t_reg regB);
 t_bool ArmCompareInstructions(t_arm_ins *,t_arm_ins *);
 t_bool ArmCompareInstructionsOppositeCond(t_arm_ins * i1, t_arm_ins * i2);
 t_bool ArmInsHasSideEffect(t_arm_ins * ins);
 t_tristate ArmIsSyscallExit(t_arm_ins * ins);
-t_bool ArmIsControlflow(t_arm_ins * ins);
 t_bool ArmInsUnconditionalize(t_arm_ins * ins);
 t_arm_addr_info * ArmAddrInfoNew();
 t_bool ArmIsIndirectCall(t_arm_ins * ins);
@@ -276,6 +279,26 @@ void ArmInsertThumbITInstructions(t_cfg * cfg);
 
 t_bool ArmStatusFlagsLiveBefore(t_arm_ins * ins);
 void ArmInsLoadStoreMultipleToSingle(t_arm_ins * ins);
+
+void ArmInsReplaceImmediateWithRegister(t_arm_ins *ins, t_reg reg);
+
+bool ArmInsIsPush(t_arm_ins *ins);
+bool ArmInsIsPop(t_arm_ins *ins);
+#endif
+#endif
+
+#ifdef DIABLOARM_INLINES
+#ifndef ARM_INLINES
+#define ARM_INLINES
+static
+inline
+t_bool ArmIsControlflow(t_arm_ins * ins)
+{
+  if(ARM_INS_TYPE(ins) == IT_BRANCH) return TRUE;
+  if(ARM_INS_TYPE(ins) == IT_SWI) return TRUE;
+  if(RegsetIn(ARM_INS_REGS_DEF(ins),ARM_REG_R15)) return TRUE;
+  return FALSE;
+}
 #endif
 #endif
 /* vim: set shiftwidth=2 foldmethod=marker: */

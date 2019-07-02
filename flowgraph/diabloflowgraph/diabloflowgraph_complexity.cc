@@ -4,6 +4,51 @@
 
 using namespace std;
 
+struct TempComplexityInfo {
+  int nr_ins;
+  int nr_src_oper;
+  int nr_dst_oper;
+
+  TempComplexityInfo() {
+    nr_ins = 0;
+    nr_src_oper = 0;
+    nr_dst_oper = 0;
+  }
+};
+
+static bool temp_info_init = FALSE;
+INS_DYNAMIC_MEMBER_GLOBAL_BODY(temp_complexity_info, TEMP_COMPLEXITY_INFO, TempComplexityInfo, TempComplexityInfo *, {*valp = NULL;}, {}, {*valp = NULL;});
+INS_DYNAMIC_MEMBER_GLOBAL_ARRAY(temp_complexity_info);
+
+void ComplexityInitTempInfo(t_cfg *cfg) {
+  InsInitTempComplexityInfo(cfg);
+  temp_info_init = TRUE;
+}
+
+void ComplexityFiniTempInfo(t_cfg *cfg) {
+  InsFiniTempComplexityInfo(cfg);
+  temp_info_init = FALSE;
+}
+
+void ComplexityRecordTransformedInstruction(t_ins *to, t_ins *from) {
+  if (!temp_info_init)
+    return;
+
+  if (INS_TEMP_COMPLEXITY_INFO(to) == NULL)
+    INS_SET_TEMP_COMPLEXITY_INFO(to, new TempComplexityInfo());
+
+  INS_TEMP_COMPLEXITY_INFO(to)->nr_ins++;
+  INS_TEMP_COMPLEXITY_INFO(to)->nr_src_oper += RegsetCountRegs(INS_REGS_USE(from));
+  INS_TEMP_COMPLEXITY_INFO(to)->nr_dst_oper += RegsetCountRegs(INS_REGS_DEF(from));
+}
+
+TempComplexityInfo *InsGetTempComplexityInfo(t_ins *ins) {
+  if (!temp_info_init)
+    return NULL;
+
+  return INS_TEMP_COMPLEXITY_INFO(ins);
+}
+
 /* Checks whether or not an edge corresponds to a direct computation, or an indirect one. */
 t_bool IsCfgEdgeDirect(t_cfg_edge* edge, t_bool are_switches_direct_edges)
 {
@@ -37,6 +82,15 @@ t_bool IsCfgEdgeDirect(t_cfg_edge* edge, t_bool are_switches_direct_edges)
 
     case ET_SWITCH:
     case ET_IPSWITCH:
+      {
+        t_bool handled = FALSE;
+        t_bool result = FALSE;
+        DiabloBrokerCall("HandleAdvancedFactoringIsDirectControlTransfer", edge, &handled, &result);
+
+        if (handled)
+          return result;
+      }
+
       return are_switches_direct_edges;
 
     case ET_SWI:
@@ -69,6 +123,62 @@ void CfgStaticComplexityFini() {
     fclose(stat_compl_file);
 
   stat_compl_file = NULL;
+}
+
+static FILE *stat_compl_origin_archives_file = NULL;
+static FILE *stat_compl_origin_objects_file = NULL;
+static FILE *stat_compl_origin_functions_file = NULL;
+void CfgStaticComplexityOriginInit(t_const_string fname) {
+  if (!stat_compl_origin_archives_file) {
+    string aname = string(fname) + "-archives";
+    stat_compl_origin_archives_file = fopen(aname.c_str(), "w+");
+
+    string oname = string(fname) + "-objects";
+    stat_compl_origin_objects_file = fopen(oname.c_str(), "w+");
+
+    string Fname = string(fname) + "-functions";
+    stat_compl_origin_functions_file = fopen(Fname.c_str(), "w+");
+  }
+}
+
+void CfgStaticComplexityOriginFini() {
+  if (stat_compl_origin_archives_file) {
+    fclose(stat_compl_origin_archives_file);
+    fclose(stat_compl_origin_objects_file);
+    fclose(stat_compl_origin_functions_file);
+  }
+
+  stat_compl_origin_archives_file = NULL;
+  stat_compl_origin_objects_file = NULL;
+  stat_compl_origin_functions_file = NULL;
+}
+
+static FILE *dynamic_compl_origin_archives_file = NULL;
+static FILE *dynamic_compl_origin_objects_file = NULL;
+static FILE *dynamic_compl_origin_functions_file = NULL;
+void CfgDynamicComplexityOriginInit(t_const_string fname) {
+  if (!dynamic_compl_origin_archives_file) {
+    string aname = string(fname) + "-archives";
+    dynamic_compl_origin_archives_file = fopen(aname.c_str(), "w+");
+
+    string oname = string(fname) + "-objects";
+    dynamic_compl_origin_objects_file = fopen(oname.c_str(), "w+");
+
+    string Fname = string(fname) + "-functions";
+    dynamic_compl_origin_functions_file = fopen(Fname.c_str(), "w+");
+  }
+}
+
+void CfgDynamicComplexityOriginFini() {
+  if (dynamic_compl_origin_archives_file) {
+    fclose(dynamic_compl_origin_archives_file);
+    fclose(dynamic_compl_origin_objects_file);
+    fclose(dynamic_compl_origin_functions_file);
+  }
+
+  dynamic_compl_origin_archives_file = NULL;
+  dynamic_compl_origin_objects_file = NULL;
+  dynamic_compl_origin_functions_file = NULL;
 }
 
 static FILE *dynamic_compl_file = NULL;
@@ -121,8 +231,9 @@ RestrictedCfg CreateRestrictCfg(const BblSet& bbls) {
        we will pick it up in any case, and that is the only case that will allow us to include
        it in the return set */
     BBL_FOREACH_SUCC_EDGE(bbl, edge) {
-      if (   (bbls.find(CFG_EDGE_TAIL(edge)) != bbls.end())
-          && (bbls.find(CFG_EDGE_HEAD(edge)) != bbls.end()) ) {
+      if (((bbls.find(CFG_EDGE_TAIL(edge)) != bbls.end())
+            && (bbls.find(CFG_EDGE_HEAD(edge)) != bbls.end()))
+          || (bbls.find(CFG_EDGE_HEAD(edge)) != bbls.end() && BblIsExitBlock(CFG_EDGE_TAIL(edge)))) {
         restricted.edges.push_back(edge);
       }
     }
@@ -261,6 +372,112 @@ void DynamicComplexity::printComplexityMetricsLine(FILE* f, int region_index) {
   fprintf(f, "\n");
 }
 
+static
+StaticComplexityOrigin BblsComputeStaticComplexityOrigin(const BblSet& bbls, size_t nr_archives, size_t nr_objects, size_t nr_functions) {
+  StaticComplexityOrigin result;
+  result.archives.resize(nr_archives);
+  result.objects.resize(nr_objects);
+  result.functions.resize(nr_functions);
+
+  vector<BblSet> bbls_per_archive(nr_archives);
+  vector<BblSet> bbls_per_object(nr_objects);
+  vector<BblSet> bbls_per_function(nr_functions);
+
+  /* collect all BBL information */
+  t_ins *ins;
+  for (auto bbl : bbls) {
+    if (BBL_IS_HELL(bbl))
+      continue;
+
+    if (!BBL_FUNCTION(bbl))
+      continue;
+
+    size_t nr_ins = 0;
+    size_t nr_src_oper = 0;
+    size_t nr_dst_oper = 0;
+    BBL_FOREACH_INS(bbl, ins) {
+      TempComplexityInfo *x = InsGetTempComplexityInfo(ins);
+
+      if (!x) {
+        nr_ins++;
+        nr_src_oper += RegsetCountRegs(INS_REGS_USE(ins));
+        nr_dst_oper += RegsetCountRegs(INS_REGS_DEF(ins));
+      }
+      else {
+        ASSERT(INS_TYPE(ins) == IT_CONSTS, ("unhandled @I", ins));
+
+        nr_ins += x->nr_ins;
+        nr_src_oper += x->nr_src_oper;
+        nr_dst_oper += x->nr_dst_oper;
+      }
+    }
+
+    TrackingInformation info = CalculateAssociatedWith(bbl);
+
+    auto update_info = [nr_ins, nr_src_oper, nr_dst_oper] (StaticComplexity& x) {
+      x.counts.nr_ins += nr_ins;
+      x.counts.nr_src_oper += nr_src_oper;
+      x.counts.nr_dst_oper += nr_dst_oper;
+    };
+
+    for (auto i : info.archives) {
+      update_info(result.archives[i]);
+      bbls_per_archive[i].insert(bbl);
+    }
+
+    for (auto i : info.files) {
+      update_info(result.objects[i]);
+      bbls_per_object[i].insert(bbl);
+    }
+
+    for (auto i : info.functions) {
+      update_info(result.functions[i]);
+      bbls_per_function[i].insert(bbl);
+    }
+  }
+
+  auto collect_additional_info = [] (StaticComplexity& x, BblSet bbls) {
+    RestrictedCfg restricted = CreateRestrictCfg(bbls);
+
+    x.counts.nr_edges = restricted.edges.size();
+
+    for (auto edge: restricted.edges) {
+      if (!IsCfgEdgeDirect(edge, TRUE /* are_switches_direct_edges */)) {
+        x.counts.nr_indirect_edges++;
+
+        VERBOSE(1, ("Indirect edge: @E at the end of @eiB", edge, CFG_EDGE_HEAD(edge)));
+      }
+    }
+
+    x.metrics.cyclomatic_complexity = (t_int64) restricted.edges.size() - (t_int64) restricted.bbls.size() + 2 * (t_int64) NrConnectedComponents(restricted);
+  };
+
+  size_t i;
+
+  /* calculate complexity per archive */
+  i = 0;
+  for (auto bbls : bbls_per_archive) {
+    collect_additional_info(result.archives[i], bbls);
+    i++;
+  }
+
+  /* calculate complexity per object file */
+  i = 0;
+  for (auto bbls : bbls_per_object) {
+    collect_additional_info(result.objects[i], bbls);
+    i++;
+  }
+
+  /* calculate complexity per function */
+  i = 0;
+  for (auto bbls : bbls_per_function) {
+    collect_additional_info(result.functions[i], bbls);
+    i++;
+  }
+
+  return result;
+}
+
 StaticComplexity BblsComputeStaticComplexity(const BblSet& bbls) {
   StaticComplexity complexity;
   t_ins* ins;
@@ -292,6 +509,151 @@ StaticComplexity BblsComputeStaticComplexity(const BblSet& bbls) {
   complexity.metrics.cyclomatic_complexity = (t_int64) restricted.edges.size() - (t_int64) restricted.bbls.size() + 2 * (t_int64) NrConnectedComponents(restricted);
 
   return complexity;
+}
+
+static
+DynamicComplexityOrigin BblsComputeDynamicComplexityOrigin(const BblSet& bbls, size_t nr_archives, size_t nr_objects, size_t nr_functions, map<FunctionUID, t_bbl *> function_to_bbl) {
+  DynamicComplexityOrigin result;
+  result.archives.resize(nr_archives);
+  result.objects.resize(nr_objects);
+  result.functions.resize(nr_functions);
+
+  vector<BblSet> bbls_per_archive(nr_archives);
+  vector<BblSet> bbls_per_object(nr_objects);
+  vector<BblSet> bbls_per_function(nr_functions);
+
+  auto InsIsInvariant = CFG_DESCRIPTION(BBL_CFG(*(bbls.begin())))->InsIsInvariant;
+
+  /* collect all BBL information */
+  t_ins *ins;
+  for (auto bbl : bbls) {
+    if (BBL_IS_HELL(bbl))
+      continue;
+
+    if (!BBL_FUNCTION(bbl))
+      continue;
+
+    /* for dynamic metrics, only look at executed blocks */
+    if (BBL_EXEC_COUNT(bbl) == 0)
+      continue;
+
+    size_t nr_ins = 0;
+    size_t nr_src_oper = 0;
+    size_t nr_dst_oper = 0;
+    BBL_FOREACH_INS(bbl, ins) {
+      TempComplexityInfo *x = InsGetTempComplexityInfo(ins);
+
+      if (!x) {
+        nr_ins++;
+        nr_src_oper += RegsetCountRegs(INS_REGS_USE(ins));
+        nr_dst_oper += RegsetCountRegs(INS_REGS_DEF(ins));
+      }
+      else {
+        ASSERT(INS_TYPE(ins) == IT_CONSTS, ("unhandled @I", ins));
+
+        nr_ins += x->nr_ins;
+        nr_src_oper += x->nr_src_oper;
+        nr_dst_oper += x->nr_dst_oper;
+      }
+    }
+
+    TrackingInformation info = CalculateAssociatedWith(bbl);
+
+    auto update_info = [nr_ins, nr_src_oper, nr_dst_oper, bbl] (DynamicComplexity& x, t_uint64 exec_count) {
+      x.dynamic_size.nr_ins += nr_ins * exec_count;
+      x.dynamic_size.nr_src_oper += nr_src_oper * exec_count;
+      x.dynamic_size.nr_dst_oper += nr_dst_oper * exec_count;
+
+      x.dynamic_coverage.nr_ins += nr_ins;
+      x.dynamic_coverage.nr_src_oper += nr_src_oper;
+      x.dynamic_coverage.nr_dst_oper += nr_dst_oper;
+    };
+
+    map<SourceArchiveUID, t_uint64> exec_per_archive;
+    map<SourceFileUID, t_uint64> exec_per_object;
+
+    for (auto i : info.functions) {
+      /* archive and object file execution count */
+      t_uint64 exec_count = info.exec_per_function[i];
+
+      ASSERT(function_to_bbl.find(i) != function_to_bbl.end(), ("could not find function UID %d in map, bbl @eiB", i, bbl));
+      TrackingInformation new_info = CalculateAssociatedWith(function_to_bbl[i]);
+      ASSERT(new_info.functions.size() == 1, ("multiple functions? @eiB", bbl));
+      exec_per_archive[*(new_info.archives.begin())] += exec_count;
+      exec_per_object[*(new_info.files.begin())] += exec_count;
+
+      update_info(result.functions[i], exec_count);
+      bbls_per_function[i].insert(bbl);
+    }
+
+    for (auto i : info.archives) {
+      update_info(result.archives[i], exec_per_archive[i]);
+      bbls_per_archive[i].insert(bbl);
+    }
+
+    for (auto i : info.files) {
+      update_info(result.objects[i], exec_per_object[i]);
+      bbls_per_object[i].insert(bbl);
+    }
+
+    /* invariant instructions */
+    if (BBL_INS_LAST(bbl) && InsIsInvariant(BBL_INS_LAST(bbl)))
+      VERBOSE(1, ("invariant @I", BBL_INS_LAST(bbl)));
+  }
+
+  auto collect_additional_info = [] (DynamicComplexity& x, BblSet bbls, bool debug = false) {
+    RestrictedCfg restricted = CreateRestrictCfg(bbls);
+
+    /* We can filter away the unexecuted edges, as we filter away from the already restricted set, and edges do not influence which Bbls should
+      be in the restricted BblSet. */
+    for (auto it = restricted.edges.begin(); it != restricted.edges.end() ; /* explicit in the loop! */) {
+      if ( CFG_EDGE_EXEC_COUNT(*it) == 0 ) {
+        it = restricted.edges.erase(it);
+      }
+      else {
+        ++it;
+      }
+    }
+
+    for (auto edge: restricted.edges) {
+      x.dynamic_size.nr_edges += CFG_EDGE_EXEC_COUNT(edge);
+      x.dynamic_coverage.nr_edges += 1;
+
+      if (!IsCfgEdgeDirect(edge, TRUE /* are_switches_direct_edges */)) {
+        x.dynamic_size.nr_indirect_edges += CFG_EDGE_EXEC_COUNT(edge);
+        x.dynamic_coverage.nr_indirect_edges += 1;
+
+        VERBOSE(1, ("Indirect edge: @E at the end of @eiB", edge, CFG_EDGE_HEAD(edge)));
+      }
+    }
+
+    x.metrics.cyclomatic_complexity = (t_int64) restricted.edges.size() - (t_int64) restricted.bbls.size() + 2 * (t_int64) NrConnectedComponents(restricted);
+  };
+
+  size_t i;
+
+  /* calculate complexity per archive */
+  i = 0;
+  for (auto bbls : bbls_per_archive) {
+    collect_additional_info(result.archives[i], bbls);
+    i++;
+  }
+
+  /* calculate complexity per object file */
+  i = 0;
+  for (auto bbls : bbls_per_object) {
+    collect_additional_info(result.objects[i], bbls);
+    i++;
+  }
+
+  /* calculate complexity per function */
+  i = 0;
+  for (auto bbls : bbls_per_function) {
+    collect_additional_info(result.functions[i], bbls, i == 173);
+    i++;
+  }
+
+  return result;
 }
 
 /* TODO: maybe this could at the same time also compute static metrics, try to merge/factor these as much as possible! */
@@ -385,6 +747,48 @@ void CfgComputeStaticComplexity(t_cfg * cfg)
   }
 }
 
+void CfgComputeStaticComplexityOrigin(t_cfg *cfg, size_t nr_archives, size_t nr_objects, size_t nr_functions) {
+  t_bbl * bbl;
+  t_ins * ins;
+  t_cfg_edge* edge;
+
+  BblSet bbls;
+  CFG_FOREACH_BBL(cfg,bbl) {
+    bbls.insert(bbl);
+  }
+
+  StaticComplexityOrigin complexity = BblsComputeStaticComplexityOrigin(bbls, nr_archives, nr_objects, nr_functions);
+
+  if (stat_compl_origin_archives_file)
+  {
+    size_t i;
+
+    i = 0;
+    for (auto x : complexity.archives) {
+      if (i == 0)
+        x.printHeader(stat_compl_origin_archives_file);
+      x.printComplexityMetricsLine(stat_compl_origin_archives_file, i);
+      i++;
+    }
+
+    i = 0;
+    for (auto x : complexity.objects) {
+      if (i == 0)
+        x.printHeader(stat_compl_origin_objects_file);
+      x.printComplexityMetricsLine(stat_compl_origin_objects_file, i);
+      i++;
+    }
+
+    i = 0;
+    for (auto x : complexity.functions) {
+      if (i == 0)
+        x.printHeader(stat_compl_origin_functions_file);
+      x.printComplexityMetricsLine(stat_compl_origin_functions_file, i);
+      i++;
+    }
+  }
+}
+
 void CfgComputeDynamicComplexity(t_cfg * cfg)
 {
   BblSet bbls;
@@ -413,5 +817,47 @@ void CfgComputeDynamicComplexity(t_cfg * cfg)
   if (dynamic_compl_file) {
     complexity.printHeader(dynamic_compl_file);
     complexity.printComplexityMetricsLine(dynamic_compl_file, -1 /* entire file as region */);
+  }
+}
+
+void CfgComputeDynamicComplexityOrigin(t_cfg *cfg, size_t nr_archives, size_t nr_objects, size_t nr_functions, map<FunctionUID, t_bbl *> function_to_bbl) {
+  t_bbl * bbl;
+  t_ins * ins;
+  t_cfg_edge* edge;
+
+  BblSet bbls;
+  CFG_FOREACH_BBL(cfg,bbl) {
+    bbls.insert(bbl);
+  }
+
+  DynamicComplexityOrigin complexity = BblsComputeDynamicComplexityOrigin(bbls, nr_archives, nr_objects, nr_functions, function_to_bbl);
+
+  if (dynamic_compl_origin_archives_file)
+  {
+    size_t i;
+
+    i = 0;
+    for (auto x : complexity.archives) {
+      if (i == 0)
+        x.printHeader(dynamic_compl_origin_archives_file);
+      x.printComplexityMetricsLine(dynamic_compl_origin_archives_file, i);
+      i++;
+    }
+
+    i = 0;
+    for (auto x : complexity.objects) {
+      if (i == 0)
+        x.printHeader(dynamic_compl_origin_objects_file);
+      x.printComplexityMetricsLine(dynamic_compl_origin_objects_file, i);
+      i++;
+    }
+
+    i = 0;
+    for (auto x : complexity.functions) {
+      if (i == 0)
+        x.printHeader(dynamic_compl_origin_functions_file);
+      x.printComplexityMetricsLine(dynamic_compl_origin_functions_file, i);
+      i++;
+    }
   }
 }

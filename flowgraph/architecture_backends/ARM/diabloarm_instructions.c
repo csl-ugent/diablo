@@ -271,6 +271,19 @@ void ArmInsMakeIT(t_arm_ins * ins, t_uint32 spec)
   ARM_INS_SET_OLD_SIZE(ins, AddressNew32(2));
 }
 
+void ArmInsMakeMrc(t_arm_ins *ins, t_uint32 coproc, t_uint32 opc1, t_reg reg, t_uint32 crn, t_uint32 crm, t_uint32 opc2)
+{
+  ARM_INS_SET_TYPE(ins, IT_UNKNOWN);
+  ARM_INS_SET_OPCODE(ins, ARM_MRC);
+  ARM_INS_SET_IMMEDIATE(ins,  (crn << 14) | (crm << 10) | (opc2 << 7) | (opc1 << 4) | coproc);
+  ARM_INS_SET_REGA(ins, reg);
+  ARM_INS_SET_REGB(ins, ARM_REG_NONE);
+  ARM_INS_SET_REGC(ins, ARM_REG_NONE);
+  ARM_INS_SET_CSIZE(ins, AddressNew32(4));
+
+  ArmInsDefault(ins, ARM_CONDITION_AL);
+}
+
 void ArmInsMakeCondBranchExchange(t_arm_ins * ins, t_uint32 cond, t_reg reg_b)
 {
   ARM_INS_SET_TYPE(ins,  IT_BRANCH);
@@ -673,8 +686,16 @@ void ArmInsMakeVmrs(t_arm_ins * ins, t_reg regA, t_uint32 cond)
 /*ArmInsMakePush {{{ */
 void ArmInsMakePush(t_arm_ins * ins, t_uint32 regs, t_uint32 cond, t_bool thumb)
 {
+  t_reg reg;
+
+  /* count the number of registers */
+  t_uint32 nr_regs = 0;
+  REGSET_FOREACH_REG(arm_description.int_registers, reg)
+    if (regs & (1<<reg))
+      nr_regs++;
+
   /* for thumb, push needs minimally one register; for ARM, two */
-  if ( !thumb || ((regs & (regs - 1)) != 0) )
+  if ( (!thumb && nr_regs > 1) || ((regs & (regs - 1)) != 0) )
   {
     if (thumb)
       ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins)|FL_THUMB);
@@ -683,7 +704,6 @@ void ArmInsMakePush(t_arm_ins * ins, t_uint32 regs, t_uint32 cond, t_bool thumb)
   else
   {
     /* extract register from regs */
-    t_reg reg;
     REGSET_FOREACH_REG(arm_description.int_registers, reg)
       if (regs & (1 << reg))
         break;
@@ -717,8 +737,16 @@ void ArmInsMakeStm(t_arm_ins * ins, t_reg regB, t_uint32 regs, t_uint32 cond, t_
 /*ArmInsMakePop {{{ */
 void ArmInsMakePop(t_arm_ins * ins, t_uint32 regs, t_uint32 cond, t_bool thumb)
 {
+  t_reg reg;
+
+  /* count the number of registers */
+  t_uint32 nr_regs = 0;
+  REGSET_FOREACH_REG(arm_description.int_registers, reg)
+    if (regs & (1<<reg))
+      nr_regs++;
+
   /* for thumb, pop needs minimally one register; for ARM, two */
-  if ( !thumb || ((regs & (regs - 1)) != 0) )
+  if ( (!thumb && nr_regs > 1) || ((regs & (regs - 1)) != 0) )
     {
       if (thumb)
         ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins)|FL_THUMB);
@@ -727,7 +755,6 @@ void ArmInsMakePop(t_arm_ins * ins, t_uint32 regs, t_uint32 cond, t_bool thumb)
   else
   {
     /* extract register from regs */
-    t_reg reg;
     REGSET_FOREACH_REG(arm_description.int_registers, reg)
       if (regs & (1 << reg))
         break;
@@ -839,6 +866,15 @@ void ArmInsMakePseudoCall(t_arm_ins * ins, t_function * fun)
   ARM_INS_SET_DATA(T_ARM_INS(ins), (void*)fun);
   ARM_INS_SET_CSIZE(ins,  AddressNew32(4));
 }
+
+void ArmInsMakeConstantProducer(t_arm_ins * ins, t_reg reg, t_uint32 immed)
+{
+  ArmMakeConstantProducer(ins, immed);
+  ARM_INS_SET_REGA(ins, reg);
+
+  ArmInsDefault(ins, ARM_CONDITION_AL);
+}
+
 /* }}} */
 /*!
  * \todo Document
@@ -853,6 +889,7 @@ void  ArmMakeConstantProducer(t_arm_ins * ins, t_uint32 immed)
 {
   ARM_INS_SET_OPCODE(ins, ARM_CONSTANT_PRODUCER);
   /* The produced register stays the same, as do the conditionflags */
+  ARM_INS_SET_REGABIS(ins, ARM_REG_NONE);
   ARM_INS_SET_REGB(ins, ARM_REG_NONE); /* The previous operands are useless now */
   ARM_INS_SET_REGC(ins, ARM_REG_NONE); /* The previous operands are useless now */
   ARM_INS_SET_TYPE(ins,  IT_CONSTS);
@@ -953,6 +990,29 @@ void ArmInsMakeMov(t_arm_ins * ins, t_reg regA, t_reg regC, t_uint32 immed, t_ui
 }
 /* }}} */
 
+void ArmInsMakeSwap(t_arm_ins * ins, t_reg regA, t_reg regB)
+{
+  ARM_INS_SET_OPCODE(ins, ARM_PSEUDO_SWAP);
+  ARM_INS_SET_TYPE(ins, IT_DATAPROC);
+
+  ARM_INS_SET_CONDITION(ins, ARM_CONDITION_AL);
+  ARM_INS_SET_ATTRIB(ins,   ARM_INS_ATTRIB(ins) & (~IF_CONDITIONAL));
+  
+  ARM_INS_SET_REGA(ins, regA);
+  ARM_INS_SET_REGB(ins, regB);
+  ARM_INS_SET_REGC(ins, ARM_REG_NONE);
+  ARM_INS_SET_REGS(ins, ARM_REG_NONE);
+  ARM_INS_SET_IMMEDIATE(ins, 0);
+  
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & ~FL_IMMED);
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & ~(FL_DIRUP | FL_WRITEBACK | FL_PREINDEX));
+  
+  ARM_INS_SET_REGS_DEF(ins, ArmDefinedRegisters(ins));
+  ARM_INS_SET_REGS_USE(ins, ArmUsedRegisters(ins));
+  
+  ARM_INS_SET_CSIZE(ins, AddressNew32(4));
+}
+
 /* ArmInsMakeMov {{{ */
 void ArmInsMakeMovwImmed(t_arm_ins * ins, t_reg regA, t_uint32 immed, t_uint32 cond)
 {
@@ -1033,6 +1093,24 @@ void ArmInsMakeAnd(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32
 
   ARM_INS_SET_CSIZE(ins, AddressNew32(4));
   ArmInsDefault(ins, cond);
+}
+/* }}} */
+
+/* ArmInsMakeAnd {{{ */
+void ArmInsMakeEor(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond)
+{
+ ARM_INS_SET_TYPE(ins,  IT_DATAPROC);
+ ARM_INS_SET_OPCODE(ins,  ARM_EOR);
+ ARM_INS_SET_REGA(ins,  regA);
+ ARM_INS_SET_REGB(ins,  regB);
+ ARM_INS_SET_REGC(ins,  regC);
+ ARM_INS_SET_IMMEDIATE(ins,  immed);
+ ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins)& ~FL_DIRUP & ~FL_WRITEBACK & ~FL_PREINDEX);
+ if (regC == ARM_REG_NONE)
+   ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins)| FL_IMMED);
+
+ ARM_INS_SET_CSIZE(ins, AddressNew32(4));
+ ArmInsDefault(ins, cond);
 }
 /* }}} */
 
@@ -1234,14 +1312,6 @@ t_bool ArmInsUnconditionalize(t_arm_ins * ins)
     }
 
   ARM_INS_SET_ATTRIB(ins,   ARM_INS_ATTRIB(ins) & (~IF_CONDITIONAL));
-  return FALSE;
-}
-
-t_bool ArmIsControlflow(t_arm_ins * ins)
-{
-  if(ARM_INS_TYPE(ins) == IT_BRANCH) return TRUE;
-  if(ARM_INS_TYPE(ins) == IT_SWI) return TRUE;
-  if(RegsetIn(ARM_INS_REGS_DEF(ins),ARM_REG_R15)) return TRUE;
   return FALSE;
 }
 
@@ -2127,4 +2197,60 @@ void ArmInsLoadStoreMultipleToSingle(t_arm_ins * i_ins)
 
   ASSERT(ArmInsIsEncodable(i_ins), ("Instruction can't be encoded @I", i_ins));
 }
+
+void ArmInsReplaceImmediateWithRegister(t_arm_ins *ins, t_reg reg)
+{
+  switch (ARM_INS_OPCODE(ins))
+  {
+  case ARM_MOVW:
+  case ARM_MOVT:
+    FATAL(("attempting to registerize unregisterizable instruction! @I", ins));
+    break;
+
+  default:
+    break;
+  }
+
+  ASSERT(ARM_INS_REGC(ins) == ARM_REG_NONE, ("reg-C is set! @I", ins));
+
+  ARM_INS_SET_REGC(ins, reg);
+
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & ~FL_IMMED);
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & ~FL_IMMEDW);
+  
+  ARM_INS_SET_REGS_USE(ins, ArmUsedRegisters(ins));
+}
+
+bool ArmInsIsPush(t_arm_ins *instruction)
+{
+  if ((ARM_INS_TYPE(instruction) == IT_STORE) &&
+      (ARM_INS_REGB(instruction) == ARM_REG_R13) &&
+      (ARM_INS_FLAGS(instruction) & FL_PREINDEX) && (ARM_INS_FLAGS(instruction) & FL_WRITEBACK) &&
+      (ARM_INS_IMMEDIATE(instruction) == 4))
+    return TRUE;
+
+  if ((ARM_INS_OPCODE(instruction) == ARM_STM) &&
+      (ARM_INS_REGB(instruction) == ARM_REG_R13) &&
+      !(ARM_INS_FLAGS(instruction) & FL_DIRUP) && (ARM_INS_FLAGS(instruction) & FL_PREINDEX) && (ARM_INS_FLAGS(instruction) & FL_WRITEBACK))
+    return TRUE;
+
+  return FALSE;
+}
+
+bool ArmInsIsPop(t_arm_ins *instruction)
+{
+  if ((ARM_INS_TYPE(instruction) == IT_LOAD) &&
+      (ARM_INS_REGB(instruction) == ARM_REG_R13) &&
+      !(ARM_INS_FLAGS(instruction) & FL_PREINDEX) &&
+      (ARM_INS_IMMEDIATE(instruction) == 4))
+    return TRUE;
+
+  if ((ARM_INS_OPCODE(instruction) == ARM_LDM) &&
+      (ARM_INS_REGB(instruction) == ARM_REG_R13) &&
+      (ARM_INS_FLAGS(instruction) & FL_DIRUP) && !(ARM_INS_FLAGS(instruction) & FL_PREINDEX) && (ARM_INS_FLAGS(instruction) & FL_WRITEBACK))
+    return TRUE;
+
+  return FALSE;
+}
+
 /* vim: set shiftwidth=2 foldmethod=marker : */

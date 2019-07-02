@@ -1,11 +1,7 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
-
-#include <map>
-#include <string>
-
-#include "diabloflowgraph_transformation.hpp"
+#include "diabloflowgraph.hpp"
 
 using namespace std;
 
@@ -22,6 +18,31 @@ void RegisterTransformationType(Transformation* transfo, t_const_string type) {
   auto to_insert = vector<Transformation*>();
   to_insert.push_back(transfo);
   reverse_transfo_map.insert(make_pair(type, to_insert));
+}
+
+void UnregisterTransformationType(Transformation* transfo, t_const_string type) {
+  auto found = reverse_transfo_map.find(type);
+
+  /* does the type exist? */
+  if (found == reverse_transfo_map.end())
+    return;
+
+  auto existing = (*found).second;
+  for (auto it = existing.begin(); it != existing.end(); it++) {
+    if (*it == transfo) {
+      existing.erase(it);
+      break;
+    }
+  }
+
+  if (existing.size() > 0) {
+    /* still elements left */
+    reverse_transfo_map[type] = existing;
+  }
+  else {
+    /* no more elements */
+    reverse_transfo_map.erase(found);
+  }
 }
 
 vector<Transformation*> GetTransformationsForType(t_const_string type, bool is_for_randomized_list) {

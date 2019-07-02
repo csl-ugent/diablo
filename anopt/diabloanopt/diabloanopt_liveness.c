@@ -586,7 +586,7 @@ void InitSensitiveLivenessFixpoint(t_cfg * cfg)
  * found in Robert Muth's thesis. A more detailed description can be found in
  * Bjorn De Sutter's thesis.  */
 
-static t_regset 
+t_regset 
 BblComputeLiveInFromLiveOut(t_bbl * bbl, t_bool update, t_bool with_kill_useless)
 {
   t_regset in = RegsetDup(BBL_REGS_LIVE_OUT(bbl));

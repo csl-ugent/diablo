@@ -15,6 +15,7 @@
 #include <diabloanopt.h>
 
 BBL_DYNAMIC_MEMBER_GLOBAL_ARRAY(procstate_in);
+BBL_DYNAMIC_MEMBER_GLOBAL_ARRAY(procstate_out);
 
 CFG_DYNAMIC_MEMBER_GLOBAL_ARRAY(edge_propagator);
 CFG_DYNAMIC_MEMBER_GLOBAL_ARRAY(instruction_constant_optimizer);
@@ -32,6 +33,28 @@ INS_DYNAMIC_MEMBER_GLOBAL_ARRAY(usearg);
 INS_DYNAMIC_MEMBER_GLOBAL_ARRAY(defarg);
 INS_DYNAMIC_MEMBER_GLOBAL_ARRAY(defedge);
 
+EDGE_DYNAMIC_MEMBER_GLOBAL_ARRAY(conditional_procstate);
+
+t_procstate * conditional_state;
+
+t_bool constprop_enable_helpers = FALSE;
+void ConstantPropagationHelpers(t_bool state)
+{
+        constprop_enable_helpers = state;
+}
+
+t_bool disable_transformations = FALSE;
+void ConstantPropagationDisableTransformations(t_bool state)
+{
+  disable_transformations = state;
+}
+
+t_bool is_advanced_factoring_phase = FALSE;
+void ConstantPropagationAdvancedFactoringPhase(t_bool state)
+{
+  is_advanced_factoring_phase = state;
+}
+
 /*TODO
  * this is an ugly hack, but if we don't do this we have to change the function
  * signature of just about _all_ constant propagation related functions to
@@ -47,20 +70,22 @@ t_procstate * temp_procstate3;
 
 /* Defines for static functions {{{ */
 static void FunctionPropagateBotThrough(t_function * fun, t_analysis_complexity complexity);
-static void FunctionPropagateConstantsDuringIterativeSolution(t_function * function, t_cfg_edge * edge_in, t_analysis_complexity complexity);
+void FunctionPropagateConstantsDuringIterativeSolution(t_function * function, t_cfg_edge * edge_in, t_analysis_complexity complexity);
 t_bool FunctionUnmarkBbl(t_function * fun, t_bbl** bbl);
 /*}}}*/
 
-t_bool 
+t_bool
 ConstantPropagationInit(t_cfg * cfg)
 {
   CfgEdgeInitProcstate(cfg);
   BblInitProcstateIn(cfg);
+  BblInitProcstateOut(cfg);
   CfgEdgeInitTestCondition(cfg);
   CfgInitInstructionEmulator(CFG_OBJECT(cfg));
   CfgInitInstructionConstantOptimizer(CFG_OBJECT(cfg));
   CfgInitEdgePropagator(CFG_OBJECT(cfg));
   CfgInitGetFirstInsOfConditionalBranchWithSideEffect(CFG_OBJECT(cfg));
+  CfgEdgeInitConditionalProcstate(cfg);
 
   /* argstate forwarding init */
   InsInitUseArg(cfg);
@@ -96,18 +121,20 @@ ConstantPropagationInit(t_cfg * cfg)
   return TRUE;
 }
 
-void 
+void
 ConstantPropagationFini(t_cfg * cfg)
 {
   t_cfg_edge *edge;
 
   CfgEdgeFiniProcstate(cfg);
   BblFiniProcstateIn(cfg);
+  BblFiniProcstateOut(cfg);
   CfgFiniInstructionEmulator(CFG_OBJECT(cfg));
   CfgFiniInstructionConstantOptimizer(CFG_OBJECT(cfg));
   CfgFiniEdgePropagator(CFG_OBJECT(cfg));
   CfgFiniGetFirstInsOfConditionalBranchWithSideEffect(CFG_OBJECT(cfg));
   CfgEdgeFiniTestCondition(cfg);
+  CfgEdgeFiniConditionalProcstate(cfg);
 
   /* argstate forwarding cleanup */
   CFG_FOREACH_EDGE(cfg, edge)
@@ -123,7 +150,7 @@ ConstantPropagationFini(t_cfg * cfg)
   DiabloBrokerCall("ConstantPropagationFini",cfg);
 }
 
-static void GenericSetjmpReturnEdgePropagator(t_cfg_edge * edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void GenericSetjmpReturnEdgePropagator(t_cfg_edge * edge, t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **conditional_state)
 {
   t_architecture_description *desc = CFG_DESCRIPTION(CFG_EDGE_CFG(edge));
   ProcStateSetRegsetBot(state, desc->return_regs);
@@ -139,9 +166,9 @@ static void GenericSetjmpReturnEdgePropagator(t_cfg_edge * edge, t_procstate* st
  *
  * \param complexity
  *
- * Now we come to the actual constant propagation implementation.   
+ * Now we come to the actual constant propagation implementation.
  */
-void 
+void
 ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
 {
   /* iterators */
@@ -169,7 +196,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
   if (complexity == CONTEXT_INSENSITIVE)
   {
     CFG_FOREACH_FUN(cfg,i_fun)
-    {	
+    {
       t_bbl * first_bbl = FUNCTION_BBL_FIRST(i_fun);
       if (BBL_IS_HELL(first_bbl)) continue;
       if (BBL_PRED_FIRST(first_bbl))
@@ -232,7 +259,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
 
     CFG_FOREACH_FUN(cfg,i_fun)
       {
-        int bbl_counter = 0;                
+        int bbl_counter = 0;
         t_bool form_simple_leaf = TRUE;
         FUNCTION_FOREACH_BBL(i_fun,i_bbl)
           {
@@ -245,20 +272,20 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
           }
         if (bbl_counter!=2)
           form_simple_leaf = FALSE;
-        else 
-          { 
+        else
+          {
             t_bbl * first_bbl = FUNCTION_BBL_FIRST(i_fun);
             t_cfg_edge * edge;
             if (BBL_IS_HELL(first_bbl)) continue;
             BBL_FOREACH_PRED_EDGE(first_bbl, edge)
               if (CFG_EDGE_CAT(edge)!=ET_CALL)
-                { 
+                {
                   form_simple_leaf = FALSE;
                   break;
                 }
             BBL_FOREACH_SUCC_EDGE(first_bbl, edge)
               if (CFG_EDGE_CAT(edge)!=ET_JUMP)
-                { 
+                {
                   form_simple_leaf = FALSE;
                   break;
                 }
@@ -269,7 +296,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
             FUNCTION_SET_FLAGS(i_fun,FUNCTION_FLAGS(i_fun) | FF_IS_SIMPLE_LEAF);
             simple_leaf_counter++;
           }
-        else 
+        else
           {
             FUNCTION_SET_FLAGS(i_fun,FUNCTION_FLAGS(i_fun) &~ FF_IS_SIMPLE_LEAF);
             other_fun_counter++;
@@ -293,7 +320,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
   /* No edge are initially assumed reachable, ProcStates are allocated, the
    * architecture dependent evaluation of whether information needs to be
    * propagated over an edge is initialized, and the registers to be
-   * propagated over edges is initialized.  
+   * propagated over edges is initialized.
    *
    * The latter for the moment is the same for all edges, as we do not have a
    * saved-changed register analysis for procedures yet. */
@@ -305,7 +332,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
     if (CfgEdgeIsInterproc(i_edge))
     {
       if (
-	  (complexity==CONTEXT_SENSITIVE) 
+	  (complexity==CONTEXT_SENSITIVE)
 	  || (CfgEdgeIsForwardInterproc(i_edge) && i_edge == BBL_PRED_FIRST(CFG_EDGE_TAIL(i_edge)))
 	  || (CfgEdgeIsBackwardInterproc(i_edge) && i_edge == BBL_SUCC_FIRST(CFG_EDGE_HEAD(i_edge)))
 	 )
@@ -320,7 +347,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
     {
       if (CFG_EDGE_CORR(i_edge) && CFG_EDGE_CAT(CFG_EDGE_CORR(i_edge))==ET_SWI)
 	CFG_EDGE_SET_PROP_REGS(i_edge, NullRegs);
-      else	    
+      else
 	CFG_EDGE_SET_PROP_REGS(i_edge, RegsetIntersect(CFG_EDGE_PROP_REGS(i_edge),FUNCTION_REGS_CHANGED(BBL_FUNCTION(CFG_EDGE_HEAD(i_edge)))));
     }
   }
@@ -371,6 +398,20 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
   }
 
 #ifdef NO_CONSTPROP_OVER_HELL
+  t_function *hell_fun = CFG_HELL_FUNCTIONS(cfg);
+  while (hell_fun) {
+    if (FUNCTION_NAME(hell_fun)
+        && StringPatternMatch("*GLOBALTARGETHELL*", FUNCTION_NAME(hell_fun)))
+    {
+      BBL_FOREACH_PRED_EDGE(FUNCTION_BBL_FIRST(hell_fun), i_edge) {
+        if (CFG_EDGE_PROCSTATE(i_edge)) {
+          ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));
+        }
+      }
+    }
+    hell_fun = FUNCTION_NEXT_HELL(hell_fun);
+  }
+
   /* We want to avoid propagation over hell every time something changes on the
    * incoming edges of the hell nodes. Therefore, we just set all procstates on
    * these incoming edges to BOT */
@@ -378,7 +419,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
   {
     if (CFG_EDGE_PROCSTATE(i_edge))
     {
-      ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));	
+      ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));
     }
   }
 
@@ -386,7 +427,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
   {
     if (CFG_EDGE_PROCSTATE(i_edge))
     {
-      ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));	
+      ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));
     }
   }
   FunctionPropagateBotThrough(BBL_FUNCTION(CFG_HELL_NODE(cfg)), complexity);
@@ -402,7 +443,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
     {
       if (CFG_EDGE_PROCSTATE(i_edge))
       {
-	ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));	
+	ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));
       }
     }
 
@@ -410,7 +451,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
     {
       if (CFG_EDGE_PROCSTATE(i_edge))
       {
-	ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));	
+	ProcStateSetAllBot(CFG_EDGE_PROCSTATE(i_edge),RegsetNewInvers(CFG_DESCRIPTION(cfg)->registers_prop_over_hell,CFG_DESCRIPTION(cfg)->all_registers));
       }
     }
 
@@ -440,7 +481,7 @@ ConstantPropagation(t_cfg * cfg, t_analysis_complexity complexity)
 /* }}} */
 
 /* FreeConstantInformation {{{ */
-void 
+void
 FreeConstantInformation(t_cfg * cfg)
 {
   t_cfg_edge * i_edge;
@@ -471,18 +512,18 @@ FreeConstantInformation(t_cfg * cfg)
 
 /* FunctionPropagateConstants {{{ */
 
-/*! Propagate information through a procedure 
+/*! Propagate information through a procedure
  *
- * \par fun 
- * 
+ * \par fun
+ *
  * \par edge_in if NULL this propagation is not for an incoming edge, but for
- * the program entry point 
+ * the program entry point
  *
  * \par during_fixpoint_calculations is false if no outgoing information has to
- * be propagated over interprocedural edges 
+ * be propagated over interprocedural edges
  */
 
-static void 
+static void
 FunctionPropagateConstantsIteratively(t_function * fun, t_cfg_edge * edge_out, t_bool during_fixpoint_calculations, t_analysis_complexity complexity)
 {
   t_bbl * i_bbl;
@@ -492,7 +533,7 @@ FunctionPropagateConstantsIteratively(t_function * fun, t_cfg_edge * edge_out, t
   }
 }
 
-static void 
+static void
 FunctionPropagateConstantsFreeProcstates(t_function * fun)
 {
   t_bbl * i_bbl;
@@ -503,7 +544,7 @@ FunctionPropagateConstantsFreeProcstates(t_function * fun)
   }
 }
 
-void 
+void
 FunctionPropagateConstantsAfterIterativeSolution(t_function * fun, t_analysis_complexity complexity)
 {
   /* iterators */
@@ -534,8 +575,8 @@ FunctionPropagateConstantsAfterIterativeSolution(t_function * fun, t_analysis_co
   {
     /* If we did context sensitive constant propagation, we need to join the
      * procstates on all the incoming edges to get the procstate that can be
-     * propagated into the first basic block */ 
-    BBL_FOREACH_PRED_EDGE(i_bbl, i_edge) 
+     * propagated into the first basic block */
+    BBL_FOREACH_PRED_EDGE(i_bbl, i_edge)
     {
       if (CfgEdgeIsForwardInterproc(i_edge))
 	if (CfgEdgeIsMarked(i_edge) && CFG_EDGE_PROCSTATE(i_edge))
@@ -580,7 +621,7 @@ FunctionPropagateConstantsAfterIterativeSolution(t_function * fun, t_analysis_co
 
   FunctionMarkBbl(fun,FUNCTION_BBL_FIRST(fun));
 
-  if (BBL_IS_HELL(FUNCTION_BBL_FIRST(fun))) 
+  if (BBL_IS_HELL(FUNCTION_BBL_FIRST(fun)))
   {
     ProcStateSetAllBot(BBL_PROCSTATE_IN(FUNCTION_BBL_FIRST(fun)),RegsetNewInvers(registers_prop_over_hell,all_registers));
     ProcStateSetAllBot(BBL_PROCSTATE_IN(FUNCTION_BBL_LAST(fun)),RegsetNewInvers(registers_prop_over_hell,all_registers));
@@ -599,9 +640,9 @@ FunctionPropagateConstantsAfterIterativeSolution(t_function * fun, t_analysis_co
   }
 }
 
-static void 
-FunctionPropagateConstantsDuringIterativeSolution(t_function * fun, 
-    t_cfg_edge * edge_in, 
+void
+FunctionPropagateConstantsDuringIterativeSolution(t_function * fun,
+    t_cfg_edge * edge_in,
     t_analysis_complexity complexity
     )
 {
@@ -631,11 +672,12 @@ FunctionPropagateConstantsDuringIterativeSolution(t_function * fun,
    * used or everything is set to bot (in case of hell nodes). This is not
    * correct once we will track addresses or relocs propagated to hell. */
 
+  ASSERT(CFG_EDGE_PROCSTATE(edge_in), ("no procstate for edge! @E", edge_in));
   ProcStateJoinSimple(BBL_PROCSTATE_IN(CFG_EDGE_TAIL(edge_in)),CFG_EDGE_PROCSTATE(edge_in),CFG_EDGE_PROP_REGS(edge_in), desc);
 
   FunctionMarkBbl(fun, CFG_EDGE_TAIL(edge_in));
 
-  /* set the correct argstate for this propagation 
+  /* set the correct argstate for this propagation
    * TODO ugly hack!!! */
   if (complexity == CONTEXT_SENSITIVE)
   {
@@ -698,7 +740,7 @@ FunctionPropagateConstantsDuringIterativeSolution(t_function * fun,
     }
 }
 
-static void 
+static void
 FunctionPropagateBotThrough(t_function * fun, t_analysis_complexity complexity)
 {
   /* iterators */
@@ -718,7 +760,7 @@ FunctionPropagateBotThrough(t_function * fun, t_analysis_complexity complexity)
   /* We are working on the entry fun or on hell initially. */
   FunctionMarkBbl(fun,FUNCTION_BBL_FIRST(fun));
 
-  if (BBL_IS_HELL(FUNCTION_BBL_FIRST(fun))) 
+  if (BBL_IS_HELL(FUNCTION_BBL_FIRST(fun)))
   {
     ProcStateSetAllBot(BBL_PROCSTATE_IN(FUNCTION_BBL_FIRST(fun)), RegsetNewInvers(registers_prop_over_hell,all_registers));
     ProcStateSetAllBot(BBL_PROCSTATE_IN(FUNCTION_BBL_LAST(fun)), RegsetNewInvers(registers_prop_over_hell,all_registers));
@@ -736,24 +778,36 @@ FunctionPropagateBotThrough(t_function * fun, t_analysis_complexity complexity)
 }
 /*}}}*/
 
+void UpdateConditionalProcstate(t_cfg_edge *edge, t_procstate *ps) {
+  /* free the old procstate if there is one */
+  if (CFG_EDGE_CONDITIONAL_PROCSTATE(edge)) {
+    ProcStateFree(CFG_EDGE_CONDITIONAL_PROCSTATE(edge));
+    CFG_EDGE_SET_CONDITIONAL_PROCSTATE(edge, NULL);
+  }
+
+  /* set the new procstate, but only if the edge is to be taken conditionally */
+  if (ps)
+    CFG_EDGE_SET_CONDITIONAL_PROCSTATE(edge, ProcStateNewDup(ps));
+}
+
 /* PropOverEdge {{{ */
 
-/*! propagate a state over an edge 
+/*! propagate a state over an edge
  *
  * PRECONDITION: the edge_propagators must have
- * been initialized 
+ * been initialized
  *
  * POSTCONDITION: the state returned is not the original one:
  * it is adapted with information about the state in case the edge was not
- * followed: the returning state is the state if an edge is not taken 
+ * followed: the returning state is the state if an edge is not taken
  *
  * \return whether or not there is a need to propagate further (can it be that
- * the edge is not taken?) 
+ * the edge is not taken?)
  *
  * \todo does not work for link edges if there need to
  * be propagated something over them */
 
-static t_bool 
+static t_bool
 PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool during_fixpoint_calculations, t_regset all_registers)
 {
   t_procstate * state_true;
@@ -767,7 +821,7 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
    * branch cannot be taken (according to the current input procstate) it will
    * return null as state_true and (a potentially modified copy of - see 2) the
    * state as state false. If it will certainly be taken it will return null as
-   * state false. Otherwise it will return both true and false.   
+   * state false. Otherwise it will return both true and false.
    *
    * 2. It uses information about conditional jumps to partition the current
    * procstate into two different procstates: one procstate (state_true) that
@@ -781,7 +835,8 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
    * AND state_false, however, then you will not take conditional jumps into
    * account and performance/analysis correctness will deteriorate.  */
 
-  CFG_EDGE_TESTCONDITION(edge)(edge, *state, &state_true, &state_false);
+  conditional_state = NULL;
+  CFG_EDGE_TESTCONDITION(edge)(edge, *state, &state_true, &state_false, &conditional_state);
 
   /* If the call to testcondition resulted in a state_true not being null, the
    * state pointed to by state_true can be propagated over the edge */
@@ -806,7 +861,7 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
 	 * we could make registers live that were dead before. If we make these
 	 * registers live, liveness analysis could produce faulty results in
 	 * the next run (as long as we rely on calling conventions, certain
-	 * registers will never be considered live over calls/returns). */   
+	 * registers will never be considered live over calls/returns). */
 
 	if (diabloanopt_options.rely_on_calling_conventions)
 	{
@@ -835,7 +890,7 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
 	      CfgMarkFun(CFG_EDGE_CFG(edge),BBL_FUNCTION(tail));
 	      FunctionMarkAllTrueIncomingEdges(BBL_FUNCTION(tail));
 	    }
-	    else 
+	    else
 	    {
 	      /* only this edge will need to be repropagated */
 	      CfgMarkFun(CFG_EDGE_CFG(edge),BBL_FUNCTION(tail));
@@ -848,14 +903,14 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
               if (CFG_EDGE_CAT(edge) == ET_CALL && (FUNCTION_FLAGS(BBL_FUNCTION(CFG_EDGE_TAIL(edge))) & FF_IS_SIMPLE_LEAF))
                 {
                   t_cfg_edge * corr_edge = CFG_EDGE_CORR(edge);
-                  
+
                   if (corr_edge)
                     {
                       /* step 1: propagate the state through the bbl */
                       t_ConstantPropagationInsEmul propagator = CFG_INSTRUCTION_EMULATOR(CFG_EDGE_CFG(edge));
                       t_ins * i_ins;
                       ProcStateDup(temp_procstate3, state_true, desc);
-                      BBL_FOREACH_INS(CFG_EDGE_TAIL(edge),i_ins) 
+                      BBL_FOREACH_INS(CFG_EDGE_TAIL(edge),i_ins)
                         {
                           if (INS_DEFARG(i_ins) == -1 && INS_USEARG(i_ins) == -1 && (INS_ATTRIB(i_ins) & IF_FAST_CP_EVAL) && !RegsetIsEmpty(RegsetIntersect(INS_REGS_USE(i_ins),temp_procstate->bot)))
                             {
@@ -918,10 +973,11 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
       }
       /* Normal, non-interprocedural edge: the procstate is joined with the
        * procstate already stored for the bbl that is the tail of this edge. */
-      else 
+      else
       {
 	t_bbl* tail = CFG_EDGE_TAIL(edge);
 
+  UpdateConditionalProcstate(edge, conditional_state);
 	if (ProcStateJoinSimple(BBL_PROCSTATE_IN(tail),state_true,CFG_EDGE_PROP_REGS(edge), desc))
 	{
 	  FunctionMarkBbl(BBL_FUNCTION(tail),tail);
@@ -929,7 +985,7 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
       }
     }
 
-    if (state_false) 
+    if (state_false)
     {
       /* if there is a state to be propagated over the other outgoing edges,
        * the state over the true edge was freshly allocated in the call to
@@ -942,6 +998,9 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
       state_true = NULL;
     }
   }
+
+  if (conditional_state)
+    ProcStateFree(conditional_state);
 
   if (state_false)
   {
@@ -960,18 +1019,19 @@ PropOverEdge(t_cfg_edge * edge, t_procstate ** state, t_bool do_it, t_bool durin
   }
 }
 
-static t_bool 
+static t_bool
 PropOverEdgeCI(t_cfg_edge * edge, t_procstate ** state, t_bool during_fixpoint_calculations, t_regset all_registers)
 {
   t_procstate * state_true;
   t_procstate * state_false;
   t_architecture_description * desc = CFG_DESCRIPTION(CFG_EDGE_CFG(edge));
 
-  CFG_EDGE_TESTCONDITION(edge)(edge,*state,&state_true,&state_false);
+  conditional_state = NULL;
+  CFG_EDGE_TESTCONDITION(edge)(edge,*state,&state_true,&state_false,&conditional_state);
 
   if (state_true)
   {
-    /* 
+    /*
        if the call to testcondition resulted in a state_true not
        being null, the state pointed to by state_true can be
        propagated over the edge */
@@ -982,7 +1042,7 @@ PropOverEdgeCI(t_cfg_edge * edge, t_procstate ** state, t_bool during_fixpoint_c
 
     if (CfgEdgeIsInterproc(edge))
     {
-      /* 
+      /*
 	 if it is a true outgoing edge, the corresponding incoming edge must have its information propagated into the procedure (if it is marked that is).
 	 */
 
@@ -1076,16 +1136,18 @@ PropOverEdgeCI(t_cfg_edge * edge, t_procstate ** state, t_bool during_fixpoint_c
 	}
       }
     }
-    else 
+    else
     {
       t_bbl* tail = CFG_EDGE_TAIL(edge);
+
+      UpdateConditionalProcstate(edge, conditional_state);
 
       if (ProcStateJoinSimple(BBL_PROCSTATE_IN(tail),state_true,CFG_EDGE_PROP_REGS(edge),desc))
       {
 	FunctionMarkBbl(BBL_FUNCTION(tail),tail);
       }
     }
-    if (state_false) 
+    if (state_false)
     {
       /* if there is a state to be propagated over the other
 	 outgoing edges, the state over the true edge was freshly
@@ -1099,6 +1161,9 @@ PropOverEdgeCI(t_cfg_edge * edge, t_procstate ** state, t_bool during_fixpoint_c
     }
   }
 
+  if (conditional_state)
+    ProcStateFree(conditional_state);
+
   if (state_false)
   {
     /*
@@ -1109,7 +1174,7 @@ PropOverEdgeCI(t_cfg_edge * edge, t_procstate ** state, t_bool during_fixpoint_c
   }
   else
   {
-    /* 
+    /*
        if state_false is null after the call to testcondition(), it
        was determined that no more states need to propagated over
        outgoing edges of the basic block */
@@ -1119,10 +1184,24 @@ PropOverEdgeCI(t_cfg_edge * edge, t_procstate ** state, t_bool during_fixpoint_c
 }
 /*}}}*/
 
+void InsPropagateConstants(t_procstate *procstate, t_ins *ins)
+{
+  t_cfg *cfg = INS_CFG(ins);
+  t_ConstantPropagationInsEmul propagator = CFG_INSTRUCTION_EMULATOR(cfg);
+
+  if ((INS_ATTRIB(ins) & IF_FAST_CP_EVAL) && !RegsetIsEmpty(RegsetIntersect(INS_REGS_USE(ins),procstate->bot)) &&
+        INS_DEFARG(ins) == -1 && INS_USEARG(ins) == -1)
+  {
+    ProcStateSetAllBot(procstate, INS_REGS_DEF(ins));
+  }
+  else
+    propagator(ins, procstate, FALSE);
+}
+
 /* Propagate BBL
  *
  * Propagate a state over a bbl and to the successor edges {{{ */
-void 
+void
 BblPropagateConstants(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint_calculations, t_analysis_complexity complexity)
 {
   /* iterators */
@@ -1143,7 +1222,7 @@ BblPropagateConstants(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint
   if (!RegsetIsMutualExclusive(((t_procstate*)BBL_PROCSTATE_IN(bbl))->top,allregs))
     return;
 
-  /* */ 
+  /* */
   CFG_GET_FIRST_INS_OF_CONDITIONAL_BRANCH_WITH_SIDE_EFFECT(cfg)(bbl,&last_ins);
   if (last_ins)
   {
@@ -1156,14 +1235,14 @@ BblPropagateConstants(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint
   }
 
   ProcStateDup(temp_procstate, BBL_PROCSTATE_IN(bbl), desc);
-  BBL_FOREACH_INS(bbl,i_ins) 
+  BBL_FOREACH_INS(bbl,i_ins)
   {
     if ((last_ins == i_ins) && (special_last_ins))
     {
       ProcStateDup(temp_procstate2, temp_procstate, desc);
     }
 
-    if ((INS_ATTRIB(i_ins) & IF_FAST_CP_EVAL) && !RegsetIsEmpty(RegsetIntersect(INS_REGS_USE(i_ins),temp_procstate->bot)) && 
+    if ((INS_ATTRIB(i_ins) & IF_FAST_CP_EVAL) && !RegsetIsEmpty(RegsetIntersect(INS_REGS_USE(i_ins),temp_procstate->bot)) &&
 	INS_DEFARG(i_ins) == -1 && INS_USEARG(i_ins) == -1)
     {
       ProcStateSetAllBot(temp_procstate, INS_REGS_DEF(i_ins));
@@ -1189,7 +1268,7 @@ BblPropagateConstants(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint
      * registers should be propagated over the fallthrough edge */
     BBL_FOREACH_SUCC_EDGE(bbl,i_edge)
     {
-      if (prop_further) 
+      if (prop_further)
       {
 	if ((CFG_EDGE_CAT(i_edge)==ET_FALLTHROUGH)&&(special_last_ins))
 	{
@@ -1214,7 +1293,7 @@ BblPropagateConstants(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint
     {
       BBL_FOREACH_SUCC_EDGE(bbl,i_edge)
       {
-	if (prop_further && temp_procstate) 
+	if (prop_further && temp_procstate)
 	{
 	  {
 	    prop_further = PropOverEdgeCI(i_edge, &temp_procstate, during_fixpoint_calculations,allregs);
@@ -1231,7 +1310,7 @@ BblPropagateConstants(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint
 
       BBL_FOREACH_SUCC_EDGE(bbl,i_edge)
       {
-	if (prop_further && temp_procstate) 
+	if (prop_further && temp_procstate)
 	{
 	  if (CFG_EDGE_CAT(i_edge)==ET_FALLTHROUGH)
 	  {
@@ -1260,7 +1339,7 @@ BblPropagateConstants(t_bbl * bbl, t_cfg_edge * edge_out, t_bool during_fixpoint
 
 /* Optimizations using CP information {{{*/
 /* Remove unreachable edges {{{ */
-static void 
+static void
 CfgRemoveUnreachableEdges(t_cfg * cfg, t_analysis_complexity complexity)
 {
   t_cfg_edge * i_edge, * i_safe;
@@ -1295,7 +1374,7 @@ CfgRemoveUnreachableEdges(t_cfg * cfg, t_analysis_complexity complexity)
 	  }
 
 	  /* kill the corresponding edge */
-	  if (corr_edge == i_safe) 
+	  if (corr_edge == i_safe)
 	    i_safe = CFG_EDGE_NEXT(i_safe);
     if (CFG_EDGE_ARGS(corr_edge))
       ArgStateFree(CFG_EDGE_ARGS(corr_edge));
@@ -1446,26 +1525,89 @@ static void CfgRemoveNotExecutedIns(t_cfg *cfg, t_reloc_table * table)
   }
   VERBOSE(0,("%d unexecuted instructions killed",dead_ins));
 }
+
+void BblPropagateConstantInformation(t_bbl *i_bbl, t_analysis_complexity complexity, t_procstate *prev_state, t_procstate *next_state)
+{
+        t_cfg *cfg = BBL_CFG(i_bbl);
+        t_architecture_description *desc = CFG_DESCRIPTION(cfg);
+        t_regset allregs = desc->all_registers;
+
+        if (!RegsetIsMutualExclusive(((t_procstate*)BBL_PROCSTATE_IN(i_bbl))->top,allregs))
+                return;
+
+        t_bool have_to_free = FALSE;
+        if (!prev_state)
+        {
+                have_to_free = TRUE;
+                prev_state = ProcStateNew(desc);
+                next_state = ProcStateNew(desc);
+        }
+
+        ProcStateDup(next_state,BBL_PROCSTATE_IN(i_bbl),desc);
+        ProcStateDup(prev_state,BBL_PROCSTATE_IN(i_bbl),desc);
+
+        /* We need to use a safe iterator, because useless instruction can be
+        * killed in Optimizer */
+
+        t_ins *i_tmp;
+        t_ins *i_ins;
+        BBL_FOREACH_INS_SAFE(i_bbl,i_ins,i_tmp)
+        {
+                /* Instructions that are marked IF_FAST_CP_EVAL have the property
+                 * that if one of their used registers is bot then the defined
+                 * registers will also be bot.
+                 *
+                 * It is always safe to set the IF_FAST_CP_EVAL on instructions, but
+                 * results might deteriorate, depending on the architecture (and the
+                 * implementation of the cp transfer functions).
+                 *
+                 * As an example of an instruction where results deteriorate if
+                 * IF_FAST_CP_EVAL is used, consider conditional execution on the ARM
+                 * architecture: if the condition is known, but the rest of the used
+                 * registers are bot, we might still be able to know the result if
+                 * the result register is known before evaluation and if the
+                 * condition is false (i.e. the instruction does not execute).  */
+                if ((INS_ATTRIB(i_ins) & IF_FAST_CP_EVAL) && !RegsetIsEmpty(RegsetIntersect(INS_REGS_USE(i_ins), prev_state->bot)))
+                  ProcStateSetAllBot(next_state,INS_REGS_DEF(i_ins));
+                else
+                  CFG_INSTRUCTION_EMULATOR(cfg)(i_ins,next_state,TRUE);
+
+                if (!disable_transformations)
+                  CFG_INSTRUCTION_CONSTANT_OPTIMIZER(cfg)(i_ins,prev_state,next_state, complexity);
+
+                ProcStateDup(prev_state,next_state,desc);
+        }
+
+        /* should be set after the loop in case the BBL does not contain any instructions */
+        if (BBL_PROCSTATE_OUT(i_bbl) == NULL)
+          BBL_SET_PROCSTATE_OUT(i_bbl, ProcStateNewDup(next_state));
+        else
+          ProcStateDup(BBL_PROCSTATE_OUT(i_bbl), next_state, desc);
+
+        if (have_to_free)
+        {
+                ProcStateFree(prev_state);
+                ProcStateFree(next_state);
+        }
+}
+
 /*}}} */
 /* CfgApplyConstantInformation. This function computes constant information for
  * each instruction in the cfg using the results of the iterative constant
  * propagation solution, and calls the architecture specific constant
- * instruction optimizer with this information. 
+ * instruction optimizer with this information.
  *
  * {{{ */
-static void 
+void
 CfgApplyConstantInformation(t_cfg * cfg, t_analysis_complexity complexity)
 {
   /* iterators */
   t_function * i_fun;
   t_bbl * i_bbl;
-  t_ins * i_ins, * i_tmp;
 
-  /* local variables */
-  t_architecture_description * desc = CFG_DESCRIPTION(cfg);
-  t_procstate * prev_state = ProcStateNew(desc);
-  t_procstate * next_state = ProcStateNew(desc);
-  t_regset allregs = desc->all_registers;
+  /* for speedups */
+  t_procstate * prev_state = ProcStateNew(CFG_DESCRIPTION(cfg));
+  t_procstate * next_state = ProcStateNew(CFG_DESCRIPTION(cfg));
 
   /* first of all, if the instructions in the graph already contain regstates,
    * remove them */
@@ -1496,48 +1638,16 @@ CfgApplyConstantInformation(t_cfg * cfg, t_analysis_complexity complexity)
         if (IS_DATABBL(i_bbl))
           continue;
 
-	if (!RegsetIsMutualExclusive(((t_procstate*)BBL_PROCSTATE_IN(i_bbl))->top,allregs))
-	  continue;
-
-	ProcStateDup(next_state,BBL_PROCSTATE_IN(i_bbl),desc);
-	ProcStateDup(prev_state,BBL_PROCSTATE_IN(i_bbl),desc);
-
-	/* We need to use a safe iterator, because useless instruction can be
-	 * killed in Optimizer */
-
-	BBL_FOREACH_INS_SAFE(i_bbl,i_ins,i_tmp)
-	{
-
-	  /* Instructions that are marked IF_FAST_CP_EVAL have the property
-	   * that if one of their used registers is bot then the defined
-	   * registers will also be bot. 
-	   *
-	   * It is always safe to set the IF_FAST_CP_EVAL on instructions, but
-	   * results might deteriorate, depending on the architecture (and the
-	   * implementation of the cp transfer functions).
-	   *
-	   * As an example of an instruction where results deteriorate if
-	   * IF_FAST_CP_EVAL is used, consider conditional execution on the ARM
-	   * architecture: if the condition is known, but the rest of the used
-	   * registers are bot, we might still be able to know the result if
-	   * the result register is known before evaluation and if the
-	   * condition is false (i.e. the instruction does not execute).  */
-
-	  if ((INS_ATTRIB(i_ins) & IF_FAST_CP_EVAL) && !RegsetIsEmpty(RegsetIntersect(INS_REGS_USE(i_ins), prev_state->bot)))
-	    ProcStateSetAllBot(next_state,INS_REGS_DEF(i_ins));
-	  else
-	    CFG_INSTRUCTION_EMULATOR(cfg)(i_ins,next_state,TRUE);
-
-	  CFG_INSTRUCTION_CONSTANT_OPTIMIZER(cfg)(i_ins,prev_state,next_state, complexity);
-
-	  ProcStateDup(prev_state,next_state,desc);
-	}
+        BblPropagateConstantInformation(i_bbl, complexity, prev_state, next_state);
       }
 
-      FUNCTION_FOREACH_BBL(i_fun,i_bbl)
+      if (!is_advanced_factoring_phase)
       {
-	ProcStateFree(BBL_PROCSTATE_IN(i_bbl));
-	BBL_SET_PROCSTATE_IN(i_bbl,  NULL);
+        FUNCTION_FOREACH_BBL(i_fun,i_bbl)
+        {
+        	ProcStateFree(BBL_PROCSTATE_IN(i_bbl));
+        	BBL_SET_PROCSTATE_IN(i_bbl,  NULL);
+        }
       }
     }
   }
@@ -1547,7 +1657,7 @@ CfgApplyConstantInformation(t_cfg * cfg, t_analysis_complexity complexity)
 }
 /*}}} */
 /* UseConstantInformation {{{ */
-void 
+void
 OptUseConstantInformation(t_cfg * cfg, t_analysis_complexity complexity)
 {
   t_object * obj=CFG_OBJECT(cfg);
@@ -1617,7 +1727,7 @@ t_bool IsKnownToBeConstant(t_address address, t_reloc *rel)
   int i;
 
   if (!known_constant_syms) return FALSE;
-  if (RELOC_N_TO_RELOCATABLES(rel)!=1) return FALSE; 
+  if (RELOC_N_TO_RELOCATABLES(rel)!=1) return FALSE;
   offset = AddressSub(address,RELOCATABLE_CADDRESS(RELOC_TO_RELOCATABLE(rel)[0]));
 
   if (AddressIsGe(offset,RELOCATABLE_CSIZE(RELOC_TO_RELOCATABLE(rel)[0])))

@@ -37,15 +37,16 @@ extern "C" {
   #include "diablosoftvm_softvm_interface.h"
 #endif
 
-using namespace std;
+#include "softvmproxy/api.h"
 
-#define ENABLE_PROFILE_BASED 1
+using namespace std;
 
 #define NO_INS_SELECTOR 0
 #define SUPPORT_CONST_PROD 1
 #define SUPPORT_ADDR_PROD 1
 #define SUPPORT_DATA 0
 #define DISABLE_MULTI_EXIT 0
+#define EXCLUDE_MEANINGLESS_CHUNKS 1
 
 #define JANSSON_JSON_FLAGS (JSON_INDENT(2) | JSON_PRESERVE_ORDER)
 
@@ -53,15 +54,21 @@ using namespace std;
 #define ONE_CHUNK 0
 #define CHUNK_INDEX 0
 #define SOFTVM_DEBUGCOUNTER 0
-#define SOFTVM_DEBUGCOUNTER_VALUE diablosupport_options.debugcounter
-//#define SOFTVM_DEBUGCOUNTER_VALUE 0
+//#define SOFTVM_DEBUGCOUNTER_VALUE diablosupport_options.debugcounter
+#define SOFTVM_DEBUGCOUNTER_VALUE 0
 #define DEBUG_EXTRACTOR 0
+#define MAX_CHUNK_SIZE 0
+#define LAST_CHUNK_INDEX 0
+#define MAX_LAST_CHUNK_SIZE 0
+//#define INS_DEBUGCOUNTER_VALUE diablosupport_options.debugcounter
+#define INS_DEBUGCOUNTER_VALUE 0
 
-extern int frontend_id;
-
-static void *isl_handle = NULL;
-static Bin2Vm* isl_session = NULL;
-static Bin2Vm* phase2_session = NULL;
+static int frontend_id = -1;
+#define IS_BBL_IN_FRONTEND(frontend, bbl, addr) \
+  (frontend_id == frontend && AddressIsEq(BBL_OLD_ADDRESS(bbl), addr))
+int AspireSoftVMGetFrontendId() {
+  return frontend_id;
+}
 
 static t_ptr_array implemented_chunks;
 static t_bool implemented_chunks_init = FALSE;
@@ -77,62 +84,95 @@ INS_DYNAMIC_MEMBER(mark, MARK, Mark, t_bool, FALSE);
 BBL_DYNAMIC_MEMBER(in_chunk, IN_CHUNK, InChunk, t_bool, FALSE);
 BBL_DYNAMIC_MEMBER(softvm_mobile, SOFTVM_MOBILE, SoftVMMobile, t_bool, FALSE);
 
+LogFile* L_SOFTVM = NULL;
+
+#define RET(x) {return x;}
+
+#define DISABLE_INSN_OBF(funcname, offset) {\
+  t_function *f = BBL_FUNCTION(ARM_INS_BBL(ins));\
+  t_address offs = AddressSub(ARM_INS_OLD_ADDRESS(ins), BBL_OLD_ADDRESS(FUNCTION_BBL_FIRST(f)));\
+  if (!StringCmp(funcname, FUNCTION_NAME(f)) && AddressIsEq(offset, offs)) {\
+    DEBUG(("skipping @I", ins));\
+    RET(FALSE);\
+  }\
+}
+
+#define DISABLE_BBL_OBF(funcname, offset) {\
+  t_function *f = BBL_FUNCTION(ARM_INS_BBL(ins));\
+  t_address offs = AddressSub(BBL_OLD_ADDRESS(ARM_INS_BBL(ins)), BBL_OLD_ADDRESS(FUNCTION_BBL_FIRST(f)));\
+  if (!StringCmp(funcname, FUNCTION_NAME(f)) && AddressIsEq(offset, offs)) {\
+    DEBUG(("skipping bbl @iB", ARM_INS_BBL(ins)));\
+    RET(FALSE);\
+  }\
+}
+
 t_bool
 IsInsSupportedByVM(t_arm_ins * ins)
 {
+  static int supported_insns = 0;
+#if DEBUG_SOFTVM
+  if (supported_insns >= INS_DEBUGCOUNTER_VALUE)
+    return FALSE;
+#endif
+
+  /* DEBUG */
+  //DISABLE_INSN_OBF("sha1_compress", AddressNew32(0x268));
+  //DISABLE_BBL_OBF("sha1_compress", AddressNew32(0x25c));
+  //DISABLE_BBL_OBF("sha1_compress", AddressNew32(0x348));
+
   bin2vm_status_code_t b2vStatus = BIN2VM_STATUS_SUCCESS;
   t_bool isSupported = FALSE;
   char assembled_ins[4];
 
 #if !SUPPORT_DATA
   if (ARM_INS_OPCODE(T_ARM_INS(ins)) == ARM_DATA)
-    return FALSE;
+    RET(FALSE);
 #endif
 
   if (ARM_INS_OPCODE(T_ARM_INS(ins)) == ARM_ADDRESS_PRODUCER)
     {
-      if (!SUPPORT_ADDR_PROD) return FALSE;
-      if (ArmInsIsConditional(ins)) return FALSE;
-      if (!(ARM_INS_REFERS_TO(ins))) return FALSE;
+      if (!SUPPORT_ADDR_PROD) RET(FALSE);
+      if (ArmInsIsConditional(ins)) RET(FALSE);
+      if (!(ARM_INS_REFERS_TO(ins))) RET(FALSE);
       t_reloc * rel = RELOC_REF_RELOC(ARM_INS_REFERS_TO(ins));
       if (StringPatternMatch("*-*",RELOC_CODE(rel)))
 	{
 	  WARNING(("SKIPPING THE EXTRACTION OF @I BECAUSE OF RELATIVE ADDRESS FROM @R",ins,rel));
-	  return FALSE;
+	  RET(FALSE);
 	}
-      return TRUE;
+      RET(TRUE);
     }
 
   if (ARM_INS_OPCODE(T_ARM_INS(ins)) == ARM_CONSTANT_PRODUCER)
   {
-	if (!SUPPORT_CONST_PROD) return FALSE;
-    return TRUE;
+	if (!SUPPORT_CONST_PROD) RET(FALSE);
+    RET(TRUE);
   }
 
   if (ARM_INS_OPCODE(T_ARM_INS(ins)) == ARM_FLOAT_PRODUCER
       || ARM_INS_OPCODE(T_ARM_INS(ins)) == ARM_VFPFLOAT_PRODUCER
       || ARM_INS_OPCODE(T_ARM_INS(ins)) == ARM_PSEUDO_CALL)
-    return FALSE;
+    RET(FALSE);
 
 #if NO_INS_SELECTOR
   if (ARM_INS_OPCODE(ins) == ARM_BL
       || ARM_INS_OPCODE(ins) == ARM_BLX
       || ARM_INS_TYPE(ins) == IT_DATA
       || (ARM_INS_ATTRIB(ins) & IF_SWITCHJUMP))
-    return FALSE;
-  return TRUE;
+    RET(FALSE);
+  RET(TRUE);
 #else
   ArmAssembleOne(ins, assembled_ins);
-  b2vStatus = Bin2VmCheckArmInstruction( isl_session, reinterpret_cast<unsigned char *>(&assembled_ins), ARM_INS_CSIZE(ins), &isSupported );
-  ASSERT(b2vStatus == BIN2VM_STATUS_SUCCESS, ("could not check wether @I is supported or not: %d", ins, b2vStatus));
+  t_uint32 *intptr = reinterpret_cast<t_uint32 *>(assembled_ins);
+  isSupported = SoftVMProxyIsInstructionSupported(*intptr, ARM_INS_CSIZE(ins));
 
 #if DISABLE_MULTI_EXIT
   if (ARM_INS_TYPE(ins) == IT_BRANCH
       && ArmInsIsConditional(ins))
-    return FALSE;
+    RET(FALSE);
 #endif
 
-  return isSupported;
+  RET(isSupported);
 #endif
 }
 
@@ -241,6 +281,8 @@ AspireSoftVMInsertGlueJumps(t_cfg *cfg, t_ptr_array *chunks)
     /* jump edge */ /* TODO: IP */
     new_edge = CfgEdgeCreate(cfg, gluejump_bbl, gluecode_bbl1, (BBL_FUNCTION(gluejump_bbl) == BBL_FUNCTION(gluecode_bbl1)) ? ET_IPJUMP : ET_IPJUMP);
     CfgEdgeCreateCompensating(cfg, new_edge);
+    BblCopyExecInformation(gluecode_bbl1, gluejump_bbl);
+    BblCopyExecInformationToEdge(gluejump_bbl, new_edge);
 
     /* This has to be done here as the context-sensitive liveness analysis will FATAL later on.
      * The edges killed here are [(C)all, (R)eturn, (J)ump edges]:
@@ -312,6 +354,7 @@ AspireSoftVMInsertGlueJumps(t_cfg *cfg, t_ptr_array *chunks)
       }
       CfgEdgeCreateCompensating(cfg, new_exit_edge);
       CFG_EDGE_SET_SWITCHVALUE(new_exit_edge, -1);
+      BblCopyExecInformationToEdge(old_tail, new_exit_edge);
       BBL_SET_ATTRIB(old_tail, BBL_ATTRIB(old_tail) | BBL_FORCE_REACHABLE);
       m->insert(t_edge_to_edge_map_entry(bk, new_exit_edge));
     }
@@ -438,28 +481,20 @@ AspireSoftVMInsertGlueJumps(t_cfg *cfg, t_ptr_array *chunks)
 /*
  */
 void
-AspireSoftVMInit()
+AspireSoftVMInit(t_string binary_path)
 {
-  bin2vm_status_code_t b2vStatus;
+  DiabloBrokerCall("FrontendId", &frontend_id);
+  ASSERT(frontend_id != -1, ("could not get frontend ID"));
 
-  ASSERT(diablosoftvm_options.instructionselector_path, ("Please provide the file path and name of the instruction selector library."));
+  VERBOSE(0, (SVM "initialising proxy connection!"));
+  SoftVMProxyInit();
+  VERBOSE(0, (SVM "  connected!"));
 
-  isl_handle = dlopen(diablosoftvm_options.instructionselector_path, RTLD_LAZY);
-  ASSERT(isl_handle, ("could not load instruction selector library (%s)", dlerror()));
+  t_const_string logging_svm_filename = StringConcat2 (OutputFilename(), ".diablo.integration.log");
+  INIT_LOGGING(L_SOFTVM, logging_svm_filename);
+  Free(logging_svm_filename);
 
-  LoadIslSymbols(isl_handle);
-
-  /* open up the phase-2 session */
-  b2vStatus = Bin2VmCreate(&phase2_session);
-  ASSERT(b2vStatus == BIN2VM_STATUS_SUCCESS, ("could not create phase-2 session %d", b2vStatus));
-
-  /* open up the instruction selector session */
-  b2vStatus = Bin2VmCreateInstructionSelector(&isl_session);
-  ASSERT(b2vStatus == BIN2VM_STATUS_SUCCESS, ("could not create instruction selector session %d", b2vStatus));
-
-  /* select the VM type */
-  SetTargetVmType(phase2_session, USE_WANDIVM);
-  SetTargetVmType(isl_session, USE_WANDIVM);
+  LOG(L_SOFTVM, ("START OF INTEGRATION LOG\n"));
 }
 
 void
@@ -467,21 +502,15 @@ AspireSoftVMPreFini()
 {
   PtrArrayFini(&implemented_chunks, FALSE);
   implemented_chunks_init = FALSE;
+
+  LOG(L_SOFTVM,("END OF INTEGRATION LOG\n"));
+  FINI_LOGGING(L_SOFTVM);
 }
 
 void
 AspireSoftVMFini(t_ptr_array *chunks)
 {
-  /* Close all DL handlers */
-  enum bin2vm_status_codes b2vStatus;
-
-  b2vStatus = Bin2VmDestroy(&isl_session);
-  ASSERT(b2vStatus == BIN2VM_STATUS_SUCCESS, ("could not destroy instruction selector session %d", b2vStatus));
-
-  b2vStatus = Bin2VmDestroy(&phase2_session);
-  ASSERT(b2vStatus == BIN2VM_STATUS_SUCCESS, ("could not destroy phase-2 session %d", b2vStatus));
-
-  dlclose(isl_handle);
+  SoftVMProxyDestroy();
 
   /* Free the array of chunks */
   for (int i=0; i < PtrArrayCount(chunks); ++i)
@@ -535,6 +564,7 @@ IsMeaningfulChunkInBbl(t_ins *start_ins, t_ins *stop_ins)
 static t_bool
 IsMeaningfulChunk(t_ptr_array *bbls_in_chunk, t_ins *start_ins)
 {
+#if EXCLUDE_MEANINGLESS_CHUNKS
   t_bbl *bbl = static_cast<t_bbl *>(PtrArrayGet(bbls_in_chunk, 0));
   ASSERT(bbl == INS_BBL(start_ins), ("expected first BBL in chunk BBL list to contain the start instruction @I, but got @eiB", start_ins, bbl));
 
@@ -548,6 +578,7 @@ IsMeaningfulChunk(t_ptr_array *bbls_in_chunk, t_ins *start_ins)
   if (PtrArrayCount(bbls_in_chunk) == 1
       && ARM_INS_TYPE(T_ARM_INS(start_ins)) == IT_BRANCH)
     return FALSE;
+#endif
 
   return TRUE;
 }
@@ -626,11 +657,18 @@ BblEnsureSingleIncomingEdge(t_bbl *bbl)
       CfgEdgeChangeTail(edge, new_branch_bbl);
     }
 
+    /* if a relocation still refers to the BBL, redirect it to the new one instead */
+    t_reloc_ref *rr, *rr2;
+    for (rr = BBL_REFED_BY(bbl), rr2 = rr ? RELOC_REF_NEXT(rr) : NULL; rr; rr = rr2, rr2 = rr ? RELOC_REF_NEXT(rr) : NULL)
+      RelocSetToRelocatable(RELOC_REF_RELOC(rr), 0, T_RELOCATABLE(new_branch_bbl));
+
     /* then create a new edge jumping to the chunk entry point */
     ArmInsMakeUncondBranch(new_ins);
     ArmInsAppendToBbl(new_ins, new_branch_bbl);
     /* TODO: IP */
-    CfgEdgeCreate(cfg, new_branch_bbl, bbl, (BBL_FUNCTION(new_branch_bbl) == BBL_FUNCTION(bbl)) ? ET_JUMP : ET_JUMP);
+    t_cfg_edge *new_edge = CfgEdgeCreate(cfg, new_branch_bbl, bbl, (BBL_FUNCTION(new_branch_bbl) == BBL_FUNCTION(bbl)) ? ET_JUMP : ET_JUMP);
+    BblCopyExecInformation(bbl, new_branch_bbl);
+    BblCopyExecInformationToEdge(bbl, new_edge);
 
     /* sanity check */
     ASSERT(CFG_EDGE_PRED_NEXT(BBL_PRED_FIRST(bbl)) == NULL, ("Something went wrong: @eiB should have only one incoming edge now, coming from @eiB", bbl, new_branch_bbl));
@@ -774,6 +812,15 @@ CreateChunks(t_cfg *cfg, t_ptr_array *chunks, t_ptr_array *translatable_bbls)
 
         while (bbl_todo.size() > 0)
         {
+#if DEBUG_SOFTVM
+          if (PtrArrayCount(&bbls_in_chunk) >= MAX_CHUNK_SIZE)
+            break;
+
+          if (chunk_count == LAST_CHUNK_INDEX
+              && PtrArrayCount(&bbls_in_chunk) >= MAX_LAST_CHUNK_SIZE)
+            break;
+#endif
+
           t_bbl *bbl_it = bbl_todo.back();
           bbl_todo.pop_back();
 
@@ -861,7 +908,7 @@ CreateChunks(t_cfg *cfg, t_ptr_array *chunks, t_ptr_array *translatable_bbls)
              *  */
             if (BblIsMarked2(CFG_EDGE_TAIL(e)) && CFG_EDGE_TAIL(e) != entry_bbl)
             {
-              VERBOSE(SOFTVM_VERBOSITY_LEVEL, (SVM "   removing2 @eB via edge @E", CFG_EDGE_TAIL(e), e));
+              VERBOSE(SOFTVM_VERBOSITY_LEVEL+1, (SVM "   removing2 @eB via edge @E", CFG_EDGE_TAIL(e), e));
               BblUnmark2(CFG_EDGE_TAIL(e));
             }
           }
@@ -892,7 +939,7 @@ CreateChunks(t_cfg *cfg, t_ptr_array *chunks, t_ptr_array *translatable_bbls)
                * if it has a predecessor that can't be put in the chunk */
               if (!BblIsMarked2(CFG_EDGE_HEAD(e)))
               {
-                VERBOSE(SOFTVM_VERBOSITY_LEVEL, (SVM "   removing @eB", bbl_it));
+                VERBOSE(SOFTVM_VERBOSITY_LEVEL+1, (SVM "   removing @eB", bbl_it));
                 BblUnmark2(bbl_it);
                 remove_more = TRUE;
                 break;
@@ -1006,6 +1053,8 @@ CreateChunks(t_cfg *cfg, t_ptr_array *chunks, t_ptr_array *translatable_bbls)
               /* create a new BBL containing one branch instruction */
               /* TODO: IP */
               t_cfg_edge *new_edge = CfgEdgeCreate(cfg, new_branch_bbl, CFG_EDGE_TAIL(edge), (BBL_FUNCTION(new_branch_bbl) == BBL_FUNCTION(CFG_EDGE_TAIL(edge))) ? ET_JUMP : ET_IPJUMP);
+              BblCopyExecInformation(CFG_EDGE_TAIL(edge), new_branch_bbl);
+              BblCopyExecInformationToEdge(new_branch_bbl, new_edge);
               new_ins = ArmInsNewForBbl(new_branch_bbl);
               ArmInsMakeUncondBranch(new_ins);
               ArmInsAppendToBbl(new_ins, new_branch_bbl);
@@ -1172,7 +1221,7 @@ AspireSoftVMMarkAndSplit(t_cfg *cfg, t_ptr_array *chunks, t_randomnumbergenerato
   CFG_FOREACH_SOFTVM_REGION(cfg, region, info)
   {
     vector<t_bbl *> selected_bbls;
-    SelectBblsFromRegion(selected_bbls, SoftVMSelectBblFromRegionChecker, region, 100, rng, ENABLE_PROFILE_BASED);
+    SelectBblsFromRegion(selected_bbls, SoftVMSelectBblFromRegionChecker, region, 100, rng, diablosoftvm_options.use_profile_information);
 
     t_bool is_mobile = RegionIsMobileSoftVM(region);
 
@@ -1342,19 +1391,18 @@ AspireSoftVMFixups(t_cfg *cfg, t_ptr_array *chunks)
   {
     ASSERT(code_mobility_options.output_dir, ("mobile SoftVM chunks found but the code mobility output directory is not set (--code_mobility_output_dir <string>)!"));
     DirMake(code_mobility_options.output_dir, FALSE);
-    Bin2VmSetMobileCodeOutputDir(phase2_session, code_mobility_options.output_dir);
+    SoftVMProxySetMobileCodeOutputDir(code_mobility_options.output_dir);
   }
 
   /* invoke the second phase pass of the X-translator (i.e., the post-linker fixups) */
-  b2vStatus = Bin2VmDiabloPhase2(phase2_session, json_string, strlen(json_string),
+  vmImages = SoftVMProxyDiabloPhase2(json_string,
 #if DEBUG_SOFTVM
                                  "vmStart_phase2.s",
 #else
-                                 NULL,
+                                 NULL
 #endif
-                                 NULL, &vmImages);
-  ASSERT(b2vStatus == BIN2VM_STATUS_SUCCESS, ("Something went wrong in the X-translator during the phase-2 pass (%d)", b2vStatus));
-  
+              );
+
   json_decref(json_root);
 
   /* patch the bytecode already present in the binary with the newly generated, post-linker fixed, bytecode */
@@ -1427,8 +1475,7 @@ AspireSoftVMFixups(t_cfg *cfg, t_ptr_array *chunks)
   }
 
   /* free up used memory */
-  b2vStatus = Bin2VmFreeVmImagesArm(&vmImages);
-  ASSERT(b2vStatus == BIN2VM_STATUS_SUCCESS, ("Something went wrong in the X-translator when freeing the list of VM images"));
+  SoftVMProxyFreeVMImages(vmImages);
 
   free(json_string);
 }
@@ -1547,7 +1594,7 @@ AspireSoftVMReadExtractorOutput(t_cfg * cfg, t_ptr_array *diablo_chunks, t_ptr_a
   /* the amount of chunks selected by Diablo (diablo_chunks), and the amount of chunks in the sorted extractor output
    * does not have to be equal. This is the case, for example, when additional object files are linked into the input
    * binary for the obfuscator pass. */
-   
+
   /* free up memory */
   json_decref(root);
 }

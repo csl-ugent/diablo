@@ -92,6 +92,7 @@ judy_prevnext(JudyL)
 
 
 add_library(DiabloJudy1 SHARED ${judy_sources} ${Judy1_sources_extra} Judy1Tables.c)
+target_link_libraries(DiabloJudy1 PUBLIC DiabloJudyL)
 target_compile_definitions(DiabloJudy1
   PRIVATE JUDY1
 )

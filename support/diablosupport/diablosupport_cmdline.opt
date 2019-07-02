@@ -8,6 +8,14 @@ hidden int_option debugcounter
    description="debug counter. only useful for debugging diablo's own analyses";
 }
 
+hidden int_option debugcounter2
+{
+   short="c2";
+   long= "debugcount2";
+   default=0;
+   description="debug counter. only useful for debugging diablo's own analyses";
+}
+
 count_option verbose
 {
   short="v";
@@ -71,4 +79,12 @@ bool_option revision
   long="revision";
   default=off;
   description="Print the Diablo revision information";
+}
+
+string_option rng_dump_generators
+{
+  short="rnggenerators";
+  long="rng-dump-generators";
+  description="If set, dump the created RNGs to this file";
+  default=NULL;
 }

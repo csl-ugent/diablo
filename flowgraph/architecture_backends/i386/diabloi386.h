@@ -67,12 +67,5 @@ void DiabloI386CppInit(int, char **);
 void DiabloI386CppFini();
 #endif
 
-#ifdef __cplusplus
-extern "C++"
-{
-#include "diabloi386.hpp"
-}
-#endif
-
 #endif
 /* vim: set shiftwidth=4 cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-2,+0.5s foldmethod=marker tw=78 cindent: */

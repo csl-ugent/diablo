@@ -3,8 +3,7 @@
 #ifndef I386_SCHEDULE_INSTRUCTIONS_H
 #define I386_SCHEDULE_INSTRUCTIONS_H
 
-#include <obfuscation/obfuscation_transformation.h>
-#include <schedule_instructions.h>
+#include <obfuscation/generic/schedule_instructions.h>
 
 class I386ScheduleInstructionsTransformation : public ScheduleInstructionsTransformation {
 protected:

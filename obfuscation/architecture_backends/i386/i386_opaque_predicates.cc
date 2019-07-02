@@ -1,21 +1,9 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
-
-#include <iostream>
-#include <map>
-#include <set>
-#include <vector>
-
-#include <obfuscation/obfuscation_architecture_backend.h>
+#include "i386_obfuscations.h"
 #include "i386_architecture_backend.h"
 #include "i386_opaque_predicates.h"
-
-extern "C" {
 #include "i386_opaque_predicates_opt.h"
-
-#include <diabloi386.h>
-#include <diabloanopti386.h>
-}
-
+using namespace std;
 
 /***********************************************************
  * LOCO files
@@ -24,12 +12,6 @@ extern "C" {
  *
  * mmadou@elis.ugent.be
  **********************************************************/
-
-#include <iostream>
-#include <fstream>
-#include <sstream>
-
-using namespace std;
  
 static void InsertBblIntOf6(t_bbl * bbl, t_int32 nr, t_randomnumbergenerator* rng);
 

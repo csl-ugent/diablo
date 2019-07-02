@@ -78,3 +78,11 @@ group "ARM" bool_option nomovwmovtprod
   default=off;
   description="Disables the conversion of MOVW/NOVT instruction pairs into address/constant producers (use with caution)."
 }
+
+group "ARM" bool_option noaddraddsub
+{
+  short="noaddraddsub";
+  long="no-address-producers-to-add-sub";
+  default=off;
+  description="Disables the conversion of address producers to ADD/SUB instructions.";
+}

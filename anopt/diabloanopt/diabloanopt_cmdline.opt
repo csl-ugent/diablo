@@ -60,4 +60,44 @@ usage_option help
   description="Print this help message";
 }
 
+int_option factor_min_covered_archives
+{
+  short="factor-min-covered-archives";
+  long="factor-min-covered-archives";
+  default=0;
+}
 
+int_option factor_min_covered_objects
+{
+  short="factor-min-covered-objects";
+  long="factor-min-covered-objects";
+  default=0;
+}
+
+int_option factor_min_covered_functions
+{
+  short="factor-min-covered-functions";
+  long="factor-min-covered-functions";
+  default=0;
+}
+
+int_option factor_min_covered_exec_archives
+{
+  short="factor-min-covered-exec-archives";
+  long="factor-min-covered-exec-archives";
+  default=0;
+}
+
+int_option factor_min_covered_exec_objects
+{
+  short="factor-min-covered-exec-objects";
+  long="factor-min-covered-exec-objects";
+  default=0;
+}
+
+int_option factor_min_covered_exec_functions
+{
+  short="factor-min-covered-exec-functions";
+  long="factor-min-covered-exec-functions";
+  default=0;
+}

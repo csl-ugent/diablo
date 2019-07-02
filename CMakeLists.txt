@@ -38,7 +38,9 @@ include_directories(${diablo_configs_dir})
 # Set the output directory for executables
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR})
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/lib)
+
 option(BUILD_SHARED_LIBS "Generate libraries" ON)
+string(APPEND CMAKE_SHARED_LINKER_FLAGS "-Wl,--no-undefined")
 
 # Allow Diablo binaries to find the shared libraries also built from the source, when installed somewhere else
 SET(CMAKE_SKIP_RPATH TRUE)
@@ -50,7 +52,7 @@ APPEND_CMAKE_INSTALL_RPATH("./lib")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # We require C++0x and gnu99
-set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "-std=c++14 ${CMAKE_CXX_FLAGS}")
 set(CMAKE_C_FLAGS "-std=gnu99 ${CMAKE_C_FLAGS}")
 
 # Some common C/C++ options
@@ -61,6 +63,10 @@ endif()
 option(Profiling "Compile with profiling (GNU gprof) enabled. Run gprof in the directory from which Diablo is run, not the build directory." OFF)
 if (Profiling)
   set(COMMON_FLAGS "-pg ${COMMON_FLAGS}")
+
+  if (BUILD_SHARED_LIBS)
+    message(FATAL_ERROR "GNU gprof can't be used to profile shared libraries. Build a statically linked version of Diablo!")
+  endif()
 endif()
 
 # Optional option. If adding ASAN is supported by the compiler, add it as a CMake option
@@ -73,7 +79,7 @@ endif()
 
 # Optional option. If adding UBSAN is supported by the compiler, add it as a CMake option
 if (HAS_FLAG_SANITIZE_UNDEFINED)
-  option(UndefinedSanitizer "Compile with Undefined Behavior Sanitizer enabled." OFF)
+  option(UndefinedSanitizer "Compile with Undefined Behavior Sanitizer enabled. Use with UBSAN_OPTIONS=print_stacktrace=1." OFF)
 endif()
 if(UndefinedSanitizer)
   set(COMMON_FLAGS "-fsanitize=undefined ${COMMON_FLAGS}")

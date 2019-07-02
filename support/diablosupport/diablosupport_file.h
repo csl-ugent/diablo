@@ -112,6 +112,8 @@ t_bool FileExists (t_const_string);
 t_string RealFileGetLine (FORWARD_MALLOC_PROTOTYPE FILE *);
 t_string RealFileGetString (FORWARD_MALLOC_PROTOTYPE FILE *, char);
 
+t_string FileDirectory(t_string x);
+
 /* Tar */
 void Tar (t_const_string, t_const_string);
 void Untar (t_const_string);

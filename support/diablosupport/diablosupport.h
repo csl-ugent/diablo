@@ -104,6 +104,13 @@ void DiabloSupportInitCommon (int argc, char **argv);
 void DiabloSupportFini ();
 #endif
 
+#ifdef __cplusplus
+extern "C++"
+{
+#include "diablosupport.hpp"
+}
+#endif
+
 /* Needs to be included after defining DIABLOSUPPORT_FUNCTIONS */
 #include <diablosupport_logging.h>
 #include <diablosupport_utils.h>

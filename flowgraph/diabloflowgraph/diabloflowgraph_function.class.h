@@ -48,7 +48,7 @@ MEMBER(t_cfg_edge *,marked_edges,MARKED_EDGES)
 /*! Pointer to the next marked bbl. Field is useful to remove dead code and data */
 MEMBER(t_bbl *,marked_bbls,MARKED_BBLS)
 /*! Flags of the function */
-MEMBER(t_uint32,flags,FLAGS)       
+IMEMBER(t_uint32,flags,FLAGS)       
 /*! The first basic block of this function. */
 MEMBER(t_bbl *,bbl_first,BBL_FIRST)
 /*! The last basic block of this function. If the function has a dummy exit
@@ -67,6 +67,7 @@ MEMBER(t_regset,regs_changed,REGS_CHANGED)
 MEMBER(t_regset,regs_used,REGS_USED)
 MEMBER(t_regset,arg_regs,ARG_REGS)
 MEMBER(t_regset,ret_regs,RET_REGS)
+MEMBER(t_regset,regs_overwritten,REGS_OVERWRITTEN)
 /*! The number of basic blocks in the function */
 MEMBER(t_uint32,nr_blocks,NR_BLOCKS)
 

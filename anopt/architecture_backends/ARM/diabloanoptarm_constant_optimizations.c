@@ -133,6 +133,14 @@ t_bool ArmInsOptMakeIndirectJumpsDirect(t_arm_ins * ins, t_procstate * before, t
 {
   t_register_content value;
 
+  /* check the function this instruction belongs to */
+  {
+    /* if it belongs to a factored function, don't do any more actions! */
+    t_string function_name = FUNCTION_NAME(BBL_FUNCTION(ARM_INS_BBL(ins)));
+    if (function_name && StringPatternMatch("af-0x*", function_name))
+      return TRUE;
+  }
+
   /* MOV pc,rXX with rXX == constant value
    * or
    * BX rXX with rXX == constant value and !(value & 1)
@@ -404,7 +412,7 @@ t_bool ArmInsOptSwitchOptimizer(t_arm_ins * ins, t_procstate * before, t_procsta
     }
     else
     {
-      /* ads-style switch table */
+      /* ads-style switch table, but also other switches */
       t_bbl * ft_block;
 
       VERBOSE(CONST_OPT_VERBOSITY,("switch_opt 1: @I\n", ins));
@@ -416,19 +424,21 @@ t_bool ArmInsOptSwitchOptimizer(t_arm_ins * ins, t_procstate * before, t_procsta
 
       ft_block = CFG_EDGE_TAIL(i_edge);
       BBL_FOREACH_SUCC_EDGE(ft_block,i_edge)
-	if (CFG_EDGE_CAT(i_edge) == ET_FALLTHROUGH)
-	  break;
-      ASSERT(i_edge,("Switch statement at @G has no case blocks!",ARM_INS_CADDRESS(ins)));
+      if (CFG_EDGE_CAT(i_edge) == ET_FALLTHROUGH)
+        break;
 
-      CfgEdgeKill(i_edge);
+      if (i_edge) {
+        /* only for ads-style switch table */
+        CfgEdgeKill(i_edge);
 
-      /* now also remove the EF_FROM_SWITCH_TABLE from the jump edge out of the fallthrough block */
-      BBL_FOREACH_SUCC_EDGE(ft_block,i_edge)
-	if (CFG_EDGE_CAT(i_edge) == ET_JUMP)
-	  break;
-      ASSERT(i_edge,("Switch statement at @G has no jump after fallthrough block!",ARM_INS_CADDRESS(ins)));
+        /* now also remove the EF_FROM_SWITCH_TABLE from the jump edge out of the fallthrough block */
+        BBL_FOREACH_SUCC_EDGE(ft_block,i_edge)
+        if (CFG_EDGE_CAT(i_edge) == ET_JUMP)
+          break;
+        ASSERT(i_edge,("Switch statement at @G has no jump after fallthrough block!",ARM_INS_CADDRESS(ins)));
 
-      CFG_EDGE_SET_FLAGS(i_edge,    CFG_EDGE_FLAGS(i_edge)  &(~EF_FROM_SWITCH_TABLE));
+        CFG_EDGE_SET_FLAGS(i_edge,    CFG_EDGE_FLAGS(i_edge)  &(~EF_FROM_SWITCH_TABLE));
+      }
     }
     /* }}} */
   }

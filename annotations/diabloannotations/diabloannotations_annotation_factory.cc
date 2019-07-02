@@ -8,7 +8,7 @@ using namespace std;
 
 typedef map<string, AbstractAnnotationInfoFactory *> t_token_factory_map;
 
-static t_token_factory_map token_factory_map;
+static t_token_factory_map token_factory_map = t_token_factory_map();
 
 void RegisterAnnotationInfoFactory(string token, AbstractAnnotationInfoFactory *factory)
 {

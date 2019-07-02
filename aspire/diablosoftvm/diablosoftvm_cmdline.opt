@@ -27,3 +27,11 @@ group "DiabloSoftVM" int_option diversity_seed
   default=0;
   description="The seed passed to the X-translator for generating diversified SoftVM bytecode."
 }
+
+group "DiabloSoftVM" bool_option use_profile_information
+{
+	short="svmprofile";
+	long="softvm-use-profile-information";
+	default=off;
+	description="Use profile information when transforming binaries with the SoftVM";
+}

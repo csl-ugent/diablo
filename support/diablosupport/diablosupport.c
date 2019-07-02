@@ -5,8 +5,7 @@
 #define GENERATE_CLASS_CODE
 #include <diablosupport.h>
 
-//#define LINUX_TIMING
-#ifdef LINUX_TIMING
+#ifdef DIABLOSUPPORT_LINUX_TIMING
 #include <time.h>
 static clock_t start_times[100];
 #endif
@@ -45,7 +44,7 @@ StatusIo(t_uint32 id, t_const_string out)
     for (tel = 0; tel < indent; tel++)
       printf (" ");
     printf ("Start: %s\n", out);
-#ifdef LINUX_TIMING
+#ifdef DIABLOSUPPORT_LINUX_TIMING
     start_times[indent]=clock();
 #endif
     indent++;
@@ -54,12 +53,12 @@ StatusIo(t_uint32 id, t_const_string out)
   else
   {
     indent--;
-#ifdef LINUX_TIMING
+#ifdef DIABLOSUPPORT_LINUX_TIMING
     double CPUsecs = (double)(clock() - start_times[indent])/(double)CLOCKS_PER_SEC;
 #endif
     for (tel = 0; tel < indent; tel++)
       printf (" ");
-#ifdef LINUX_TIMING
+#ifdef DIABLOSUPPORT_LINUX_TIMING
     printf ("End:   %s (cpu time %7.2fs)\n", out, CPUsecs);
 #else
     printf ("End:   %s\n", out);

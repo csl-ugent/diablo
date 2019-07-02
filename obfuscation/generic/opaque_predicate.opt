@@ -6,6 +6,14 @@ group "obfuscation" bool_option opaque_predicates
   default=off;
 }
 
+group "obfuscation" int_option opaque_predicate_chance
+{
+  short="oopchance";
+  long="obfuscationOpaquePredicateChance";
+  description="Percent chance of inserting an opaque predicate";
+  default=50;
+}
+
 usage_option help
 {
    long="help";

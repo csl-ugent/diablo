@@ -5,8 +5,6 @@
 #ifndef GEN_OBFUSCATION_TRANSFORMATION_H
 #define GEN_OBFUSCATION_TRANSFORMATION_H
 
-#include <obfuscation/obfuscation_transformation.h>
-
 class BranchFunctionTransformation : public BBLObfuscationTransformation {
   static constexpr const char* _name = "branchfunction";
 public:

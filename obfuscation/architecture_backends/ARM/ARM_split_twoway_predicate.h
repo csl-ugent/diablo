@@ -5,7 +5,6 @@
 #ifndef ARM_SPLIT_TWOWAY_PREDICATE_TRANSFORMATION_H
 #define ARM_SPLIT_TWOWAY_PREDICATE_TRANSFORMATION_H
 
-#include <obfuscation/obfuscation_transformation.h>
 #include <obfuscation/generic/split_twoway_predicate.h>
 
 class ARMSplitWithTwoWayPredicateTransformation : public SplitWithTwoWayPredicateTransformation {

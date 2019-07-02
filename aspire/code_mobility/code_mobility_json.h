@@ -4,7 +4,6 @@
 #define CODE_MOBILITY_JSON_H
 
 #include <diabloannotations.h>
-#include "code_mobility.h"
 
 static const std::string codemobility_token = "code_mobility";
 
@@ -43,5 +42,7 @@ struct CodeMobilityAnnotationInfoFactory
 #define CFG_FOREACH_CODEMOBILITY_REGION(cfg, region, info)\
   CFG_FOREACH_REGION(cfg, region)\
     for (auto request_it__ = CreateRegionIterator<CodeMobilityAnnotationInfo>(region->requests); (request_it__ != region->requests.end()) ? (info = static_cast<CodeMobilityAnnotationInfo *>(*request_it__), TRUE) : FALSE; ++request_it__)
+
+void BblIsInCodeMobilityRegionBroker(t_bbl *bbl, t_bool *result);
 
 #endif /* CODE_MOBILITY_JSON_H */

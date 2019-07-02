@@ -50,5 +50,6 @@ struct Attestator
 #include "attestation_json.h"
 
 void AttestationInit(t_object* obj, t_const_string AID_string, t_const_string output_name);
+void AttestationActivate(t_cfg *cfg);
 
 #endif

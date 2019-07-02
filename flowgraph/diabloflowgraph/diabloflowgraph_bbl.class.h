@@ -23,7 +23,7 @@
 DIABLO_CLASS_BEGIN
 EXTENDS(t_relocatable)
 /*! The function to which this basic block belongs */
-MEMBER(t_function *, function, FUNCTION)
+IMEMBER(t_function *, function, FUNCTION)
 /*! The control flow graph to which this basic block belongs */
 MEMBER(t_cfg *, cfg, CFG)
 /*! Pointer to the next basic block in the function to which this basic block
@@ -36,19 +36,19 @@ MEMBER(t_CLASS *, prev_in_fun, PREV_IN_FUN)
  * block belongs */
 MEMBER(t_CLASS *, next_marked_in_fun, NEXT_MARKED_IN_FUN)
 /*! Pointer to the first instruction in this basic block */
-MEMBER(t_ins *, ins_first, INS_FIRST)
+IMEMBER(t_ins *, ins_first, INS_FIRST)
 /*! Pointer to the last instruction in this basic block */
 MEMBER(t_ins *, ins_last, INS_LAST)
 /*! The number of instructions in this basic block */
-MEMBER(t_uint32, nins, NINS)
+IMEMBER(t_uint32, nins, NINS)
 /*! A list of attributes for this basic block (as a bitvector) */
-MEMBER(t_uint32, attrib, ATTRIB)
+IMEMBER(t_uint32, attrib, ATTRIB)
 /*! A pointer to an overlay definition, if the code in the basic block
  *  comes from an overlay */
 MEMBER(t_overlay_sec *, overlay, OVERLAY)
 /*! A set of registers that are live at the end of the basic block. This field
  * is used during liveness analysis*/
-MEMBER(t_regset, regs_live_out, REGS_LIVE_OUT)
+IMEMBER(t_regset, regs_live_out, REGS_LIVE_OUT)
 /*! A set of registers that are used by the instructions in the basic block */
 MEMBER(t_regset, regs_use, REGS_USE)
 /*! A set of registers that are overwritten by the instructions in the basic block */
@@ -65,15 +65,15 @@ MEMBER(t_regset, regs_def_certain, REGS_DEF_CERTAIN)
 MEMBER(t_regset, regs_def_perhaps, REGS_DEF_PERHAPS)
 /*! The register that cannot be live under any circumstances. These are
  * determined e.g. by using debug information */
-MEMBER(t_regset, regs_never_live, REGS_NEVER_LIVE)
+IMEMBER(t_regset, regs_never_live, REGS_NEVER_LIVE)
 /*! During layout basic blocks are stored in "chains", i.e. lists of basic
  * blocks that need to be place one after the other. This field is a pointer to
  * the previous basic block in the chain to which this basic block belongs */
-MEMBER(t_CLASS *, prev_in_chain, PREV_IN_CHAIN)
+IMEMBER(t_CLASS *, prev_in_chain, PREV_IN_CHAIN)
 /*! During layout basic blocks are stored in "chains", i.e. lists of basic
  * blocks that need to be place one after the other. This field is a pointer to
  * the next basic block in the chain to which this basic block belongs */
-MEMBER(t_CLASS *, next_in_chain, NEXT_IN_CHAIN)
+IMEMBER(t_CLASS *, next_in_chain, NEXT_IN_CHAIN)
 /*! During layout basic blocks are stored in "chains", i.e. lists of basic
  * blocks that need to be place one after the other. This field is a pointer to
  * the first basic block in the chain to which this basic block belongs */
@@ -94,9 +94,9 @@ MEMBER(t_bbl_list *, dominated_by, DOMINATED_BY)
  * basic block was executed according to the profile */
 MEMBER(t_int64, exec_count, EXEC_COUNT)
 /* An id that uniquely identifies each BBL, and can be used to order BBLs */
-MEMBER(t_uint32, id, ID)
+IMEMBER(t_uint32, id, ID)
 /*! Bbl is part of a hell function */
-MEMBER(t_bool, is_hell, IS_HELL)
+IMEMBER(t_bool, is_hell, IS_HELL)
 /*! Bbl is call-hell-like (IS_HELL should be set as well for these blocks)
  *    BBL_CH_NORMAL  - regular call hell
  *    BBL_CH_DYNCALL - dynamic call hell
@@ -117,6 +117,11 @@ MEMBER(void *, tmp, TMP)
  * \deprecated Use DYNAMIC_MEMBERS instead
  * */
 MEMBER(void *, tmp2, TMP2)
+
+IMEMBER(t_regset, cached_regs_live_before, CACHED_REGS_LIVE_BEFORE)
+IMEMBER(t_uint16, af_flags, AF_FLAGS)
+IMEMBER(t_uint32, object_set, OBJECT_SET)
+IMEMBER(t_uint32, original_function, ORIGINAL_FUNCTION)
 /*!
  * \brief The default destructor
  *
@@ -135,6 +140,8 @@ CONSTRUCTOR(
               BBL_SET_CSIZE(ret,AddressNullForCfg(cfg));
               BBL_SET_IS_HELL(ret, FALSE);
               BBL_SET_ID(ret, bbl_global_id++);
+              BBL_SET_AF_FLAGS(ret, 0);
+              BBL_SET_OBJECT_SET(ret, -1);
             }
            )
 
@@ -159,6 +166,8 @@ DUPLICATOR(
              BBL_SET_CSIZE(ret,AddressNullForCfg(cfg));
              BBL_SET_NEXT_MARKED_IN_FUN(ret, NULL);
              BBL_SET_ID(ret, bbl_global_id++);
+             BBL_SET_AF_FLAGS(ret, 0);
+             BBL_SET_OBJECT_SET(ret, -1);
              BBL_FOREACH_INS(to_dup, ins)
              {
                copy = InsDup (ins);

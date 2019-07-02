@@ -106,7 +106,7 @@ BblRegsDef (t_bbl * bbl)
   t_function *fun = BBL_FUNCTION(bbl);
   t_cfg *cfg = BBL_CFG(bbl);
 
-  if (!fun || 
+  if (!fun ||
       BBL_IS_HELL(bbl) ||
       bbl == CFG_UNIQUE_ENTRY_NODE(cfg) || bbl == CFG_UNIQUE_EXIT_NODE(cfg))
   {
@@ -140,7 +140,7 @@ BblRegsMaybeDef (t_bbl * bbl)
   t_function *fun = BBL_FUNCTION(bbl);
   t_cfg *cfg = BBL_CFG(bbl);
 
-  if (!fun || 
+  if (!fun ||
       BBL_IS_HELL(bbl) ||
       bbl == CFG_UNIQUE_ENTRY_NODE(cfg) || bbl == CFG_UNIQUE_EXIT_NODE(cfg))
   {
@@ -174,7 +174,7 @@ BblRegsUse (t_bbl * bbl)
   t_function *fun = BBL_FUNCTION(bbl);
   t_cfg *cfg = BBL_CFG(bbl);
 
-  if (!fun || 
+  if (!fun ||
       BBL_IS_HELL(bbl) ||
       bbl == CFG_UNIQUE_ENTRY_NODE(cfg) || bbl == CFG_UNIQUE_EXIT_NODE(cfg))
   {
@@ -223,7 +223,7 @@ BblRegsNeverLive(t_bbl * bbl)
   {
     return RegsetDiff(description->argument_regs, FUNCTION_ARG_REGS(fun));
   }
-  
+
   return NullRegs;
 }
 /* registers live before a bbl */
@@ -304,6 +304,8 @@ realBblInsertInFunction (const char *file, int lnno, t_bbl * bbl, t_function * f
       BBL_SET_PREV_IN_FUN(FUNCTION_BBL_LAST(fun), bbl);
     }
   }
+  
+  UpdateObjectTrackingAfterBblInsertInFunction(bbl);
 }
 
 /* Get a successor edge */
@@ -546,6 +548,8 @@ RealBblSplitBlock (t_bbl * orig_bbl, t_ins * where, t_bool before, t_bool test_b
 
   /* hook for others to add functionality: setting dynamic member fields etc. */
   DiabloBrokerCall ("BblSplitAfter", orig_bbl, split_off);
+  
+  UpdateObjectTrackingAfterBblSplit(orig_bbl, split_off);
 
   return split_off;
 }

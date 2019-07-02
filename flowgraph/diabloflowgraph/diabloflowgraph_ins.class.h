@@ -22,6 +22,8 @@
 #undef INS_PREV
 #endif
 
+t_address GenerateOldAddressForNewInstruction(t_cfg *cfg);
+
 /*! \brief This class is used to represent instructions.
  *
  * It extends t_relocatable, so it can be used as the target (or origin)
@@ -44,7 +46,7 @@ MEMBER(t_CLASS *, iprev, IPREV)
  * some optimizations and during flowgraph construction */
 MEMBER(t_CLASS *, copy, COPY)
 /*! The registers that are defined by this instruction */
-MEMBER(t_regset, regs_def, REGS_DEF)
+IMEMBER(t_regset, regs_def, REGS_DEF)
 /*! The registers that are used by this instruction */
 MEMBER(t_regset, regs_use, REGS_USE)
 /*! The section in which this instruction resides.
@@ -56,14 +58,14 @@ MEMBER(t_section *, section, SECTION)
  *
  * \todo Add documentation on instruction attributes and a link to this
  * documentation */
-MEMBER(t_instruction_flags, attrib, ATTRIB)
+IMEMBER(t_instruction_flags, attrib, ATTRIB)
 /*! The type of the instruction
  *
  * \todo Add documentation on instruction types and a link to this
  * documentation */
 MEMBER(t_uint16, type, TYPE)
 /*! The bbl in which this instruction resides */
-MEMBER(t_bbl *, bbl, BBL)
+IMEMBER(t_bbl *, bbl, BBL)
 /*! Temporary field
  *
  * \todo remove this field, use dynamic members instead 
@@ -75,6 +77,7 @@ MEMBER(t_int64, exec_count, EXEC_COUNT)
 
 /*Auxiliary data that will be set whenever an instruction is created in some phase of Diablo */
 MEMBER(t_uint32, phase, PHASE)
+MEMBER(t_uint64, transformation_id, TRANSFORMATION_ID)
 
 /* Corresponding line and file in source code */
 MEMBER(t_uint32, src_line, SRC_LINE)
@@ -88,6 +91,7 @@ CONSTRUCTOR(
             {
               INS_SET_RELOCATABLE_TYPE(ret, RT_INS);
               INS_SET_PHASE(ret,GetDiabloPhase());
+              INS_SET_TRANSFORMATION_ID(ret,GetTransformationId());
               INS_SET_SRC_FILE(ret,NULL);
               INS_SET_SRC_LINE(ret,0);
             }
@@ -115,12 +119,15 @@ DUPLICATOR(
                FATAL(("Cannot duplicate instructions in fase %c", SECTION_TYPE(sec)));}
                Free (ret); 
                ret = InsNewForSec (sec); 
-               if (INS_BBL(to_dup)) 
-                 desc = CFG_DESCRIPTION(BBL_CFG(INS_BBL(to_dup)));
-               else
-                 desc = CFG_DESCRIPTION(OBJECT_CFG(obj)); 
+               if (INS_BBL(to_dup)) {
+                desc = CFG_DESCRIPTION(BBL_CFG(INS_BBL(to_dup)));
+                INS_SET_OLD_ADDRESS(ret, GenerateOldAddressForNewInstruction(BBL_CFG(INS_BBL(to_dup))));
+               }
+               else {
+                desc = CFG_DESCRIPTION(OBJECT_CFG(obj)); 
+                INS_SET_OLD_ADDRESS(ret, GenerateOldAddressForNewInstruction(OBJECT_CFG(obj)));
+               }
                memcpy (ret, to_dup, desc->decoded_instruction_size); 
-               INS_SET_OLD_ADDRESS(ret, AddressNullForIns (to_dup)); 
                INS_SET_CADDRESS(ret, AddressNullForIns (to_dup)); 
                INS_SET_OLD_SIZE(ret, AddressNullForIns (to_dup)); 
                INS_SET_CSIZE(ret, INS_CSIZE(to_dup)); 
@@ -133,6 +140,7 @@ DUPLICATOR(
                INS_SET_COPY(to_dup, ret); 
                INS_SET_EXEC_COUNT(ret, INS_EXEC_COUNT(to_dup)); 
                INS_SET_PHASE(ret,GetDiabloPhase());
+               INS_SET_TRANSFORMATION_ID(ret, GetTransformationId());
                while (refs)
                { /* Duplicate the reference */
                  t_reloc * copy = RelocTableDupReloc (OBJECT_RELOC_TABLE(obj), RELOC_REF_RELOC(refs)); 

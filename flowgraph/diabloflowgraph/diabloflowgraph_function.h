@@ -72,30 +72,38 @@ typedef enum
 #define T_FUN(fun) ((t_function*)(fun))
 
 #define FunctionMark(fun)     FUNCTION_SET_FLAGS(fun, FUNCTION_FLAGS(fun) | FF_IS_MARKED)
+#define FunctionMark2(fun)    FUNCTION_SET_FLAGS(fun, FUNCTION_FLAGS(fun) | FF_IS_MARKED2)
 #define FunctionUnmark(fun)   FUNCTION_SET_FLAGS(fun, FUNCTION_FLAGS(fun) & (~FF_IS_MARKED))
+#define FunctionUnmark2(fun)  FUNCTION_SET_FLAGS(fun, FUNCTION_FLAGS(fun) & (~FF_IS_MARKED2))
 #define FunctionIsMarked(fun) (FUNCTION_FLAGS(fun) & FF_IS_MARKED)
+#define FunctionIsMarked2(fun)(FUNCTION_FLAGS(fun) & FF_IS_MARKED2)
 
 #define T_FUN(fun) ((t_function*)(fun))
 
-#define FUNCTION_DYNAMIC_MEMBER(lcasename,name,ccname,type,defval) \
-  static void ccname ## Init(t_function *fun, type *valp) { *valp = defval; } \
-  static void ccname ## Fini(t_function *fun, type *valp) { } \
-  static void ccname ## Dup (t_function *fun, type *valp) { *valp = defval; } \
+#define FUNCTION_DYNAMIC_MEMBER_BODY(lcasename,name,ccname,type,initbody,finibody,dupbody) \
+  static void Function ## ccname ## Init(t_function *fun, type *valp) initbody \
+  static void Function ## ccname ## Fini(t_function *fun, type *valp) finibody \
+  static void Function ## ccname ## Dup (t_function *fun, type *valp) dupbody \
   t_dynamic_member_info lcasename ## _l_fun_array; \
-  DYNAMIC_MEMBER(function, t_cfg *, lcasename ## _l_fun_array, type, lcasename, name, ccname, CFG_FOREACH_FUN, ccname ## Init, ccname ## Fini, ccname ## Dup)
+  DYNAMIC_MEMBER(function, t_cfg *, lcasename ## _l_fun_array, type, lcasename, name, ccname, CFG_FOREACH_FUN, Function ## ccname ## Init, Function ## ccname ## Fini, Function ## ccname ## Dup)
+
+#define FUNCTION_DYNAMIC_MEMBER(lcasename,name,ccname,type,defval) \
+  FUNCTION_DYNAMIC_MEMBER_BODY(lcasename,name,ccname,type,{*valp=defval;},{},{*valp=defval;})
 
 #define FUNCTION_DYNAMIC_MEMBER_GLOBAL_BODY(lcasename,name,ccname,type,initbody,finibody,dupbody) \
-  static void ccname ## Init(t_function *fun, type *valp) initbody \
-  static void ccname ## Fini(t_function *fun, type *valp) finibody \
-  static void ccname ## Dup (t_function *fun, type *valp) dupbody \
+  static void Function ## ccname ## Init(t_function *fun, type *valp) initbody \
+  static void Function ## ccname ## Fini(t_function *fun, type *valp) finibody \
+  static void Function ## ccname ## Dup (t_function *fun, type *valp) dupbody \
   extern t_dynamic_member_info lcasename ## _g_fun_array; \
-  DYNAMIC_MEMBER(function, t_cfg *, lcasename ## _g_fun_array, type, lcasename, name, ccname, CFG_FOREACH_FUN, ccname ## Init, ccname ## Fini, ccname ## Dup)
+  DYNAMIC_MEMBER(function, t_cfg *, lcasename ## _g_fun_array, type, lcasename, name, ccname, CFG_FOREACH_FUN, Function ## ccname ## Init, Function ## ccname ## Fini, Function ## ccname ## Dup)
 
 #define FUNCTION_DYNAMIC_MEMBER_GLOBAL(lcasename,name,ccname,type,defval) \
-  FUNCTION_DYNAMIC_MEMBER_GLOBAL_BODY(lcasename,name,ccname,type,{*valp=defval;},{},{*valp=defval;})
+  FUNCTION_DYNAMIC_MEMBER_GLOBAL_BODY(lcasename,name,ccname,type,{ *valp = defval; }, {}, { *valp = defval; })
 
 #define FUNCTION_DYNAMIC_MEMBER_GLOBAL_ARRAY(lcasename) \
   t_dynamic_member_info lcasename ## _g_fun_array
+#define FUNCTION_DYNAMIC_MEMBER_GLOBAL_ARRAY_INIT(lcasename) \
+  lcasename ## _g_fun_array.init
 
 #endif
 /* }}} */
@@ -145,6 +153,7 @@ void FunctionDrawGraphAnnotated (
                                  void (*bbl_annotator) (t_bbl *, t_bbl_draw_data *),
                                  void (*edge_annotator) (t_cfg_edge *, t_edge_draw_data *));
 
+void FunctionCreateExitBlock(t_function *ret);
 
 #endif
 /* }}} */

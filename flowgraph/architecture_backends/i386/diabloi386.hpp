@@ -6,6 +6,7 @@ extern "C" {
 #include <diabloi386.h>
 }
 
+#include <diabloflowgraph.hpp>
 #include "diabloi386_transformation.hpp"
 
 #endif

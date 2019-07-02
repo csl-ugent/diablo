@@ -2,11 +2,7 @@
 
 #ifndef DIABLOANNOTATIONS_REGIONS_H
 #define DIABLOANNOTATIONS_REGIONS_H
-
-extern "C" {
-#include <diabloflowgraph.h>
-}
-
+#include "diabloflowgraph.hpp"
 #include "diabloannotations.h"
 
 #include <vector>
@@ -27,6 +23,8 @@ struct Region {
   /* Delegated constructor */
   Region(t_cfg* cfg, Annotation* annotation, const BblVector& bbls, AbstractAnnotationInfo* request)
     : Region(cfg, annotation, BblSet(bbls.begin(), bbls.end()), request) {}
+
+  std::string Print() const;
 };
 
 struct regioncmp {

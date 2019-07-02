@@ -1,16 +1,10 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 /* The development of portions of the code contained in this file was sponsored by Samsung Electronics UK. */
-
-#include <iostream>
-
 #include <obfuscation/obfuscation_architecture_backend.h>
 #include "branch_function.h"
 #include "branch_function_opt.h"
-
-extern "C" {
-#include <diabloanopt.h>
-}
+using namespace std;
 
 LogFile* L_OBF_BF = NULL;
 
@@ -64,7 +58,8 @@ bool BranchFunctionTransformation::canTransform(const t_bbl* bbl) const {
   
   t_cfg_edge* edge;
   BBL_FOREACH_SUCC_EDGE(bbl, edge) {
-    if (CFG_EDGE_CAT(edge) == ET_SWITCH)
+    if (CFG_EDGE_CAT(edge) == ET_SWITCH
+        || CFG_EDGE_CAT(edge) == ET_IPSWITCH)
       return false;
   }
   
@@ -106,7 +101,8 @@ bool CallFunctionTransformation::canTransform(const t_bbl* bbl) const {
 
   t_cfg_edge* edge;
   BBL_FOREACH_SUCC_EDGE(bbl, edge) {
-    if (CFG_EDGE_CAT(edge) == ET_SWITCH)
+    if (CFG_EDGE_CAT(edge) == ET_SWITCH
+        || CFG_EDGE_CAT(edge) == ET_IPSWITCH)
       return false;
   }
 
@@ -354,4 +350,3 @@ bool SplitOffFunctionHeadTransformation::doTransform(t_function* fun, t_randomnu
 void SplitOffFunctionHeadTransformation::dumpStats(const std::string& prefix) {
   VERBOSE(0, ("%sSplitFirstBBL_Stats,calls_transformed,%i", prefix.c_str(), functionstransformed));
 }
-

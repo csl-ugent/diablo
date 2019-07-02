@@ -3,13 +3,14 @@
 #ifndef ARM_SCHEDULE_INSTRUCTIONS_H
 #define ARM_SCHEDULE_INSTRUCTIONS_H
 
-#include <obfuscation/obfuscation_transformation.h>
-#include <schedule_instructions.h>
+#include <obfuscation/generic/schedule_instructions.h>
 
 class ARMScheduleInstructionsTransformation : public ScheduleInstructionsTransformation {
 protected:
   bool modifiesStackPointer(t_ins* ins) const;
   bool hasSideEffects(t_ins* ins) const;
 };
+
+void ShouldKeepInsCombination(t_ins *last_ins, t_ins *prev_ins, bool *b);
 
 #endif /* ARM_SCHEDULE_INSTRUCTIONS_H */

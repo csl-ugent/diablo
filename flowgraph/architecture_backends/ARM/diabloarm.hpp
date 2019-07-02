@@ -6,6 +6,7 @@ extern "C" {
 #include <diabloarm.h>
 }
 
+#include <diabloflowgraph.hpp>
 #include "diabloarm_transformation.hpp"
 
 #endif

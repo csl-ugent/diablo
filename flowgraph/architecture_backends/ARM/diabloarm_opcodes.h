@@ -813,8 +813,11 @@ typedef enum _t_arm_opcode
   ARM_VFPFLOAT_PRODUCER,
   /* Pseudo instruction to detect thumb versions of BX pc in order to align them correctly */
   TH_BX_R15,
+  /* Pseudo instruction used in Advanced Factoring for swapping two registers */
+  ARM_PSEUDO_SWAP,
   /*! Pseudo instruction, used to add calls during instrumentation */
   ARM_PSEUDO_CALL
+#define ARM_NR_TOTAL_OPCODES (ARM_PSEUDO_CALL+1)
 } t_arm_opcode;
 
 #endif

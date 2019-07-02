@@ -24,6 +24,9 @@
 #define EF_CORR_EDGE_IS_REACHABLE (1<<29)
 #define EF_ALL_BLOCKS_REACHABLE_BETWEEN_ENTRY_AND_EXIT (1<<28)
 #define EF_CAN_SKIP (1<<27)
+#define EF_ADVANCED_FACTORING (1<<26)
+#define EF_FAKE (1<<25)
+#define EF_NEEDS_REDIRECT (1<<24)
 
 #define ET_INTERPROC          (ET_IPSWITCH | ET_CALL | ET_RETURN | ET_SWI | ET_IPUNKNOWN | ET_IPFALLTHRU | ET_IPJUMP | ET_COMPENSATING)
 #define ET_FORWARD_INTERPROC  (ET_IPSWITCH | ET_CALL |             ET_SWI | ET_IPUNKNOWN | ET_IPFALLTHRU | ET_IPJUMP )
@@ -42,6 +45,10 @@
 #define CfgEdgeMarkInit() EdgeMarkInit()
 #define CfgEdgeIsMarked(x) EdgeIsMarked(T_EDGE(x))
 #define CfgEdgeUnmark(x) EdgeUnmark(T_EDGE(x))
+#define CfgEdgeIsFake(x) (CFG_EDGE_FLAGS(x) & EF_FAKE)
+#define CfgEdgeMarkFake(x) (CFG_EDGE_SET_FLAGS(x, CFG_EDGE_FLAGS(x) | EF_FAKE))
+#define CfgEdgeNeedsRedirect(x) (CFG_EDGE_FLAGS(x) & EF_NEEDS_REDIRECT)
+#define CfgEdgeMarkNeedsRedirect(x) (CFG_EDGE_SET_FLAGS(x, CFG_EDGE_FLAGS(x) | EF_NEEDS_REDIRECT))
 
 #define EDGE_DYNAMIC_MEMBER(lcasename,name,ccname,type,defval) \
   static void Edge ## ccname ## Init(t_cfg_edge *edge, type *valp) { *valp = defval; } \
@@ -90,4 +97,5 @@ void CfgEdgeChangeHead(t_cfg_edge * edge, t_bbl *new_head);
 #endif
 /* }}} */
 #endif
+extern t_uint32 cfg_edge_global_id;
 /* vim: set shiftwidth=2 expandtab cinoptions=p5,t0,(0, foldmethod=marker tw=80 cindent: */

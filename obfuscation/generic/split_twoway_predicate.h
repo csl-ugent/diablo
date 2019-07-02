@@ -5,10 +5,6 @@
 #ifndef GEN_SPLIT_TWOWAY_PREDICATE_TRANSFORMATION_H
 #define GEN_SPLIT_TWOWAY_PREDICATE_TRANSFORMATION_H
 
-#include <obfuscation/obfuscation_transformation.h>
-
-#include <map>
-
 class SplitWithTwoWayPredicateTransformation : public BBLObfuscationTransformation {
   static constexpr const char* _name = "splittwoway";
   t_bbl* unfoldBblByEdge(t_bbl* bblOrig, t_cfg_edge * edgeToMove);

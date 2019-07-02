@@ -183,7 +183,10 @@ void InsertFineGrainedCheck(t_bbl* to_check, t_bbl* ok_path, t_reg reg, t_bbl* c
 
   t_bbl* false_path = SelectTargetFor(to_check, rng_csc, true /* need_to_fall_through */);
 
-  CfgEdgeCreate(BBL_CFG(to_check), to_check, false_path, ET_JUMP);
+  t_cfg_edge *fake = CfgEdgeCreate(BBL_CFG(to_check), to_check, false_path, ET_JUMP);
+  EdgeMakeInterprocedural(fake);
+  CfgEdgeMarkFake(fake);
+
   CfgEdgeCreate(BBL_CFG(to_check), to_check, ok_path, ET_FALLTHROUGH);
 }
 
@@ -239,6 +242,7 @@ void InsertRangeCheck(t_bbl* to_check, t_bbl* ok_path, t_reg reg) {
     ArmInsMakeAddressProducer(ins, 0/* immediate */, rel);
 
     t_bbl* to_check_2 = BblSplitBlock(to_check, T_INS(ins), TRUE /* before */);
+    DiabloBrokerCall("AFBblCopyFlags", to_check, to_check_2);
 
     BBL_FOREACH_SUCC_EDGE_SAFE(to_check, edge, edge_s) {
       CfgEdgeKill(edge);
@@ -247,8 +251,12 @@ void InsertRangeCheck(t_bbl* to_check, t_bbl* ok_path, t_reg reg) {
     ArmMakeInsForBbl(Cmp, Append, ins, to_check_2, FALSE /* isThumb */, ARM_REG_LR, reg, 0, ARM_CONDITION_AL);
     ArmMakeInsForBbl(CondBranch, Append, ins, to_check_2, FALSE /* isThumb */, ARM_CONDITION_HI);
 
-    CfgEdgeCreate(BBL_CFG(to_check), to_check, false_path, ET_JUMP);
-    CfgEdgeCreate(BBL_CFG(to_check), to_check_2, false_path, ET_JUMP);
+    t_cfg_edge *fake1 = CfgEdgeCreate(BBL_CFG(to_check), to_check, false_path, ET_JUMP);
+    EdgeMakeInterprocedural(fake1);
+    CfgEdgeMarkFake(fake1);
+    t_cfg_edge *fake2 = CfgEdgeCreate(BBL_CFG(to_check), to_check_2, false_path, ET_JUMP);
+    EdgeMakeInterprocedural(fake2);
+    CfgEdgeMarkFake(fake2);
 
     CfgEdgeCreate(BBL_CFG(to_check), to_check, to_check_2, ET_FALLTHROUGH);
     CfgEdgeCreate(BBL_CFG(to_check), to_check_2, ok_path, ET_FALLTHROUGH);
@@ -274,6 +282,7 @@ bool InsertCheckInBblSinglePredecessor(t_bbl* to_check, t_bbl* correct_callee_lr
   auto insert_here = insertionpoints.at(RNGGenerateWithRange(rng_csc, 0, insertionpoints.size() - 1));
 
   t_bbl* ok_path = BblSplitBlock(to_check, T_INS(insert_here.first), FALSE /* before */);
+  DiabloBrokerCall("AFBblCopyFlags", to_check, ok_path);
 
   t_cfg_edge* edge;
   t_cfg_edge* edge_s;

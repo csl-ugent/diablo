@@ -108,10 +108,11 @@ int ArmInsHasShiftedFlexible(t_arm_ins * ins) {
  * \return t_regset
 */
 /* ArmUsedRegisters {{{ */
-t_regset ArmUsedRegisters(t_arm_ins * ins)
+t_regset ArmUsedRegistersX(t_arm_ins * ins, t_uint8 *used)
 {
 
   t_regset mask = NullRegs;
+  t_uint8 use = 0;
 
   if (ins == NULL) return NullRegs;
   if (ArmInsIsNOOP(ins)) return NullRegs;
@@ -169,11 +170,13 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
 	      if (ARM_INS_REGB(ins) != ARM_REG_NONE)
 	      {
 	        RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+          use |= ARM_INS_USEDEF_REGB;
 	      }
       }
       if (ARM_INS_REGC(ins) != ARM_REG_NONE)
       {
         RegsetSetAddReg(mask, ARM_INS_REGC(ins));
+        use |= ARM_INS_USEDEF_REGC;
       }
       break;
 
@@ -215,9 +218,10 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
     case IT_DATAPROC:
       /* all dataprocessing instructions look the same in a certain way: the only registers */
       /* whose contents may be used in the instruction are ARM_REGB, ARM_REGC and ARM_REGS */
-      if (ARM_INS_REGB(ins) != ARM_REG_NONE) RegsetSetAddReg(mask,ARM_INS_REGB(ins));
-      if (ARM_INS_REGC(ins) != ARM_REG_NONE) RegsetSetAddReg(mask,ARM_INS_REGC(ins));
-      if (ARM_INS_REGS(ins) != ARM_REG_NONE) RegsetSetAddReg(mask,ARM_INS_REGS(ins));
+      if (ARM_INS_OPCODE(ins) == ARM_PSEUDO_SWAP) {RegsetSetAddReg(mask,ARM_INS_REGA(ins)); use |= ARM_INS_USEDEF_REGA;}
+      if (ARM_INS_REGB(ins) != ARM_REG_NONE) {RegsetSetAddReg(mask,ARM_INS_REGB(ins)); use |= ARM_INS_USEDEF_REGB;}
+      if (ARM_INS_REGC(ins) != ARM_REG_NONE) {RegsetSetAddReg(mask,ARM_INS_REGC(ins)); use |= ARM_INS_USEDEF_REGC;}
+      if (ARM_INS_REGS(ins) != ARM_REG_NONE) {RegsetSetAddReg(mask,ARM_INS_REGS(ins)); use |= ARM_INS_USEDEF_REGS;}
       if (ARM_INS_OPCODE(ins) == ARM_ADC) RegsetSetAddReg(mask,ARM_REG_C_CONDITION);
       if (ARM_INS_OPCODE(ins) == ARM_SBC) RegsetSetAddReg(mask,ARM_REG_C_CONDITION);
       if (ARM_INS_OPCODE(ins) == ARM_RSC) RegsetSetAddReg(mask,ARM_REG_C_CONDITION);
@@ -235,9 +239,9 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
       if (ARM_INS_OPCODE(ins) == ARM_SSAT16) RegsetSetAddReg(mask,ARM_REG_Q_CONDITION);
       if (ARM_INS_OPCODE(ins) == ARM_USAT16) RegsetSetAddReg(mask,ARM_REG_Q_CONDITION);
 
-      if (ARM_INS_OPCODE(ins) == ARM_MOVT) RegsetSetAddReg(mask,ARM_INS_REGA(ins));
-      if (ARM_INS_OPCODE(ins) == ARM_BFI) RegsetSetAddReg(mask,ARM_INS_REGA(ins));
-      if (ARM_INS_OPCODE(ins) == ARM_BFC) RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+      if (ARM_INS_OPCODE(ins) == ARM_MOVT) {RegsetSetAddReg(mask,ARM_INS_REGA(ins)); use |= ARM_INS_USEDEF_REGA;}
+      if (ARM_INS_OPCODE(ins) == ARM_BFI) {RegsetSetAddReg(mask,ARM_INS_REGA(ins)); use |= ARM_INS_USEDEF_REGA;}
+      if (ARM_INS_OPCODE(ins) == ARM_BFC) {RegsetSetAddReg(mask,ARM_INS_REGA(ins)); use |= ARM_INS_USEDEF_REGA;}
 
       if (ARM_INS_OPCODE(ins) == ARM_SEL) RegsetSetAddReg(mask,ARM_REG_GE_CONDITION);
       break;
@@ -249,7 +253,9 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
        * ARM_REGS is read with MLA and written with all but MUL and MLA
        */
       RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+      use |= ARM_INS_USEDEF_REGB;
       RegsetSetAddReg(mask,ARM_INS_REGC(ins));
+      use |= ARM_INS_USEDEF_REGC;
       if (ARM_INS_OPCODE(ins) == ARM_MLA ||
           ARM_INS_OPCODE(ins) == ARM_MLS ||
           ARM_INS_OPCODE(ins) == ARM_SMLAL ||
@@ -276,8 +282,10 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
           ARM_INS_OPCODE(ins) == ARM_SMMLAR ||
           ARM_INS_OPCODE(ins) == ARM_SMMLS ||
           ARM_INS_OPCODE(ins) == ARM_SMMLSR ||
-          ARM_INS_OPCODE(ins) == ARM_UMAAL)
+          ARM_INS_OPCODE(ins) == ARM_UMAAL) {
             RegsetSetAddReg(mask,ARM_INS_REGS(ins));
+            use |= ARM_INS_USEDEF_REGS;
+      }
 
       if (ARM_INS_OPCODE(ins) == ARM_SMLAL ||
           ARM_INS_OPCODE(ins) == ARM_UMLAL ||
@@ -289,8 +297,10 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
           ARM_INS_OPCODE(ins) == ARM_SMLALDX ||
           ARM_INS_OPCODE(ins) == ARM_SMLSLD ||
           ARM_INS_OPCODE(ins) == ARM_SMLSLDX ||
-          ARM_INS_OPCODE(ins) == ARM_UMAAL)
+          ARM_INS_OPCODE(ins) == ARM_UMAAL) {
             RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+            use |= ARM_INS_USEDEF_REGA;
+      }
 
       /* saturated arithmetic instructions _can_ alter the Q flag, but there's no
        * guarantee they actually will. So even though the Q flag is not used during
@@ -325,18 +335,24 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
       /* ARM_REGB is always read, ARM_REGC if the offset is stored in a register,
        * ARM_REGS if the shift amount is stored in a register */
       RegsetSetAddReg(mask,ARM_INS_REGB(ins));
-      if (ARM_INS_REGC(ins) != ARM_REG_NONE) RegsetSetAddReg(mask,ARM_INS_REGC(ins));
-      if (ARM_INS_REGS(ins) != ARM_REG_NONE) RegsetSetAddReg(mask,ARM_INS_REGS(ins));
+      use |= ARM_INS_USEDEF_REGB;
+      if (ARM_INS_REGC(ins) != ARM_REG_NONE) {RegsetSetAddReg(mask,ARM_INS_REGC(ins)); use |= ARM_INS_USEDEF_REGC;}
+      if (ARM_INS_REGS(ins) != ARM_REG_NONE) {RegsetSetAddReg(mask,ARM_INS_REGS(ins)); use |= ARM_INS_USEDEF_REGS;}
       if (ARM_INS_SHIFTTYPE(ins) == ARM_SHIFT_TYPE_RRX) RegsetSetAddReg(mask,ARM_REG_C_CONDITION);
       break;
 
     case IT_STORE:
       if (ARM_INS_OPCODE(ins) == ARM_STR)
       {
-        if (ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE)
+        if (ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE) {
           mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGA(ins));
+          use |= ARM_INS_USEDEF_REGA;
+        }
         else
+        {
           RegsetSetAddReg(mask, ARM_INS_REGA(ins));
+          use |= ARM_INS_USEDEF_REGA;
+        }
       }
       else
       {
@@ -344,16 +360,18 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
         /* ARM_REGB is always used, ARM_REGC only if the offset is stored in a register,
          * ARM_REGS if the shift amount is stored in a register */
         RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+        use |= ARM_INS_USEDEF_REGA;
         /* in case of a DoubleWord store, REGA+1 is also read */
-        if (ARM_INS_OPCODE(ins) == ARM_STRD || ARM_INS_OPCODE(ins)==ARM_STREXD) RegsetSetAddReg(mask,ARM_INS_REGABIS(ins));
+        if (ARM_INS_OPCODE(ins) == ARM_STRD || ARM_INS_OPCODE(ins)==ARM_STREXD) {RegsetSetAddReg(mask,ARM_INS_REGABIS(ins)); use |= ARM_INS_USEDEF_REGABIS;}
       }
 
       RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+      use |= ARM_INS_USEDEF_REGB;
 
       if((ARM_INS_OPCODE(ins) <= ARM_LDRSTREX_FIRST) || (ARM_LDRSTREX_LAST <= ARM_INS_OPCODE(ins)))
       {
-        if (ARM_INS_REGC(ins) != ARM_REG_NONE) RegsetSetAddReg(mask,ARM_INS_REGC(ins));
-        if (ARM_INS_REGS(ins) != ARM_REG_NONE) RegsetSetAddReg(mask,ARM_INS_REGS(ins));
+        if (ARM_INS_REGC(ins) != ARM_REG_NONE) {RegsetSetAddReg(mask,ARM_INS_REGC(ins)); use |= ARM_INS_USEDEF_REGC;}
+        if (ARM_INS_REGS(ins) != ARM_REG_NONE) {RegsetSetAddReg(mask,ARM_INS_REGS(ins)); use |= ARM_INS_USEDEF_REGS;}
         if (ARM_INS_SHIFTTYPE(ins) == ARM_SHIFT_TYPE_RRX) RegsetSetAddReg(mask,ARM_REG_C_CONDITION);
       }
       break;
@@ -364,21 +382,27 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
           (ARM_INS_OPCODE(ins)==ARM_FSTD))
       {
         RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+        use |= ARM_INS_USEDEF_REGA;
         if (ARM_INS_FLAGS(ins)&FL_VFP_DOUBLE)
           RegsetSetAddReg(mask,ARM_INS_REGA(ins)+1);
         RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+        use |= ARM_INS_USEDEF_REGB;
       } else if (ARM_INS_OPCODE(ins)==ARM_VSTR) {
         if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE) {
           mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGA(ins));
+          use |= ARM_INS_USEDEF_REGA;
         } else {
           RegsetSetAddReg(mask, ARM_INS_REGA(ins));
+          use |= ARM_INS_USEDEF_REGA;
         }
         RegsetSetAddReg(mask, ARM_INS_REGB(ins));
+        use |= ARM_INS_USEDEF_REGB;
       }
       break;
 
     case IT_FLT_LOAD:
       RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+      use |= ARM_INS_USEDEF_REGB;
       break;
 
     case IT_FLT_ALU:
@@ -394,36 +418,52 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
          */
 
         /* if the VFP_DOUBLE-flag is defined, all operands (destination register also) are double-sized */
-        if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE)
+        if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE) {
           mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGB(ins));
+          use |= ARM_INS_USEDEF_REGB;
+        }
         else
         {
           if(ARM_INS_DATATYPEOP(ins) != DT_NONE)
           {
-            if(ARM_INS_DATATYPEOP(ins) == DT_F64)
+            if(ARM_INS_DATATYPEOP(ins) == DT_F64) {
               mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGB(ins));
-            else
+              use |= ARM_INS_USEDEF_REGB;
+            }
+            else {
               RegsetSetAddReg(mask, ARM_INS_REGB(ins));
+              use |= ARM_INS_USEDEF_REGB;
+            }
           }
-          else
+          else {
             RegsetSetAddReg(mask, ARM_INS_REGB(ins));
+            use |= ARM_INS_USEDEF_REGB;
+          }
         }
       }
       else if ( (ARM_FP_FIRST <= ARM_INS_OPCODE(ins)) && (ARM_INS_OPCODE(ins) <= ARM_FP_LAST) )
       {
         if(ARM_INS_REGB(ins) != ARM_REG_NONE)
         {
-          if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE)
+          if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE) {
             mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGB(ins));
-          else
+            use |= ARM_INS_USEDEF_REGB;
+          }
+          else {
             RegsetSetAddReg(mask, ARM_INS_REGB(ins));
+            use |= ARM_INS_USEDEF_REGB;
+          }
         }
         if(ARM_INS_REGC(ins) != ARM_REG_NONE)
         {
-          if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE)
+          if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE) {
             mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGC(ins));
-          else
+            use |= ARM_INS_USEDEF_REGC;
+          }
+          else {
             RegsetSetAddReg(mask, ARM_INS_REGC(ins));
+            use |= ARM_INS_USEDEF_REGC;
+          }
         }
       }
       else
@@ -433,10 +473,12 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
             (ARM_INS_OPCODE(ins)!=ARM_FMRRS))
         {
           RegsetSetAddReg(mask,ARM_INS_REGC(ins));
+          use |= ARM_INS_USEDEF_REGC;
           if (ARM_INS_FLAGS(ins)&FL_VFP_DOUBLE)
             RegsetSetAddReg(mask,ARM_INS_REGC(ins)+1);
         }
         RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+        use |= ARM_INS_USEDEF_REGB;
         /* FMRRS also transfers two successive single-precision vfp regs */
         if ((ARM_INS_FLAGS(ins)&FL_VFP_DOUBLE) ||
             (ARM_INS_OPCODE(ins)==ARM_FMRRS))
@@ -462,9 +504,12 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
       /* ARM_REGB is always used and the other used registers are stored in the immediate field, */
       /* provided that we're dealing with an STM instruction! */
       RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+      use |= ARM_INS_USEDEF_REGB;
 
-      if(ARM_INS_REGC(ins) != ARM_REG_NONE)
+      if(ARM_INS_REGC(ins) != ARM_REG_NONE) {
         RegsetSetAddReg(mask, ARM_INS_REGC(ins));
+        use |= ARM_INS_USEDEF_REGC;
+      }
 
       if((ARM_INS_OPCODE(ins) == ARM_VPUSH) || (ARM_INS_OPCODE(ins) == ARM_VPOP))
         RegsetSetAddReg(mask, ARM_REG_R13);
@@ -494,15 +539,21 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
 
       if ((ARM_SIMD_FIRSTLOAD <= ARM_INS_OPCODE(ins)) && (ARM_INS_OPCODE(ins) <= ARM_SIMD_LASTLOAD))
       {
-        if (!(ARM_INS_OPCODE(ins)==ARM_VLD1_ALL || ARM_INS_OPCODE(ins)==ARM_VLD2_ALL || ARM_INS_OPCODE(ins)==ARM_VLD3_ALL || ARM_INS_OPCODE(ins)==ARM_VLD4_ALL))
-        RegsetSetUnion(mask,ArmDefinedRegisters(ins));
+        if (!(ARM_INS_OPCODE(ins)==ARM_VLD1_ALL || ARM_INS_OPCODE(ins)==ARM_VLD2_ALL || ARM_INS_OPCODE(ins)==ARM_VLD3_ALL || ARM_INS_OPCODE(ins)==ARM_VLD4_ALL)) {
+          t_uint8 tmp_used = 0;
+          RegsetSetUnion(mask,ArmDefinedRegistersX(ins, &tmp_used));
+          use |= tmp_used;
+        }
       }
       break;
 
     case IT_SWAP:
       RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+      use |= ARM_INS_USEDEF_REGA;
       RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+      use |= ARM_INS_USEDEF_REGB;
       RegsetSetAddReg(mask,ARM_INS_REGC(ins));
+      use |= ARM_INS_USEDEF_REGC;
       break;
 
     case IT_STATUS:
@@ -519,12 +570,15 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
           RegsetSetAddReg(mask,ARM_REG_Z_CONDITION);
         }
       }
-      else if (ARM_INS_REGC(ins) != ARM_REG_NONE)
+      else if (ARM_INS_REGC(ins) != ARM_REG_NONE) {
         RegsetSetAddReg(mask,ARM_INS_REGC(ins));
+        use |= ARM_INS_USEDEF_REGC;
+      }
       break;
 
     case IT_FLT_STATUS:
       RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+      use |= ARM_INS_USEDEF_REGB;
       break;
 
     case IT_DATA:
@@ -553,6 +607,7 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
         case ARM_MCR:
         case ARM_MCR2:
           RegsetSetAddReg(mask,ARM_INS_REGC(ins));
+          use |= ARM_INS_USEDEF_REGC;
           break;
 
         case ARM_MRRC:
@@ -563,7 +618,9 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
         case ARM_MCRR:
         case ARM_MCRR2:
           RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+          use |= ARM_INS_USEDEF_REGB;
           RegsetSetAddReg(mask,ARM_INS_REGC(ins));
+          use |= ARM_INS_USEDEF_REGC;
           break;
 
         case ARM_LDC:
@@ -571,14 +628,18 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
         case ARM_STC:
         case ARM_STC2:
           RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+          use |= ARM_INS_USEDEF_REGB;
           break;
 
         case ARM_PLD:
         case ARM_PLDW:
         case ARM_PLI:
           RegsetSetAddReg(mask,ARM_INS_REGB(ins));
-          if (ARM_INS_REGC(ins) != ARM_REG_NONE)
+          use |= ARM_INS_USEDEF_REGB;
+          if (ARM_INS_REGC(ins) != ARM_REG_NONE) {
             RegsetSetAddReg(mask,ARM_INS_REGC(ins));
+            use |= ARM_INS_USEDEF_REGC;
+          }
           break;
 
         case ARM_CDP:
@@ -609,23 +670,35 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
 
       if(ARM_INS_REGB(ins) != ARM_REG_NONE)
       {
-        if(ARM_INS_NEONFLAGS(ins) & NEONFL_B_QUAD)
+        if(ARM_INS_NEONFLAGS(ins) & NEONFL_B_QUAD) {
           mask = ArmRegsetAddQuadReg(mask, ARM_INS_REGB(ins));
-        else if((ARM_INS_NEONFLAGS(ins) & NEONFL_B_DOUBLE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_B_SCALAR))
+          use |= ARM_INS_USEDEF_REGB;
+        }
+        else if((ARM_INS_NEONFLAGS(ins) & NEONFL_B_DOUBLE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_B_SCALAR)) {
           mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGB(ins));
-        else if((ARM_INS_NEONFLAGS(ins) & NEONFL_B_CORE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_B_SINGLE))
+          use |= ARM_INS_USEDEF_REGB;
+        }
+        else if((ARM_INS_NEONFLAGS(ins) & NEONFL_B_CORE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_B_SINGLE)) {
           RegsetSetAddReg(mask, ARM_INS_REGB(ins));
+          use |= ARM_INS_USEDEF_REGB;
+        }
         else
           FATAL(("Illegal first operand register type"));
       }
       if(ARM_INS_REGC(ins) != ARM_REG_NONE)
       {
-        if(ARM_INS_NEONFLAGS(ins) & NEONFL_C_QUAD)
+        if(ARM_INS_NEONFLAGS(ins) & NEONFL_C_QUAD) {
           mask = ArmRegsetAddQuadReg(mask, ARM_INS_REGC(ins));
-        else if((ARM_INS_NEONFLAGS(ins) & NEONFL_C_DOUBLE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_C_SCALAR))
+          use |= ARM_INS_USEDEF_REGC;
+        }
+        else if((ARM_INS_NEONFLAGS(ins) & NEONFL_C_DOUBLE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_C_SCALAR)) {
           mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGC(ins));
-        else if((ARM_INS_NEONFLAGS(ins) & NEONFL_C_CORE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_C_SINGLE))
+          use |= ARM_INS_USEDEF_REGC;
+        }
+        else if((ARM_INS_NEONFLAGS(ins) & NEONFL_C_CORE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_C_SINGLE)) {
           RegsetSetAddReg(mask, ARM_INS_REGC(ins));
+          use |= ARM_INS_USEDEF_REGC;
+        }
         else
           FATAL(("Illegal second operand register type: @I", ins));
       }
@@ -702,11 +775,18 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
   case ARM_VSWP:
   case ARM_VORR_IMM_0:
   case ARM_VORR_IMM_1:
-	 RegsetSetUnion(mask,ArmDefinedRegisters(ins));
+  {
+    t_uint8 tmp_used = 0;
+	  RegsetSetUnion(mask,ArmDefinedRegistersX(ins, &tmp_used));
+    use |= tmp_used;
+  }
   default:
 	 break;
   }
 
+  if (used != NULL)
+    *used = use;
+  ARM_INS_SET_USE(ins, use);
   return mask;
 }
 /* }}} */
@@ -722,10 +802,11 @@ t_regset ArmUsedRegisters(t_arm_ins * ins)
  * \return t_regset
 */
 /* ArmDefinedRegisters {{{ */
-t_regset ArmDefinedRegisters(t_arm_ins * ins)
+t_regset ArmDefinedRegistersX(t_arm_ins * ins, t_uint8 *defined)
 {
 
   t_regset mask = NullRegs;
+  t_uint8 def = 0;
 
   if (ins == NULL) return NullRegs;
   if (ArmInsIsNOOP(ins)) return NullRegs;
@@ -827,7 +908,8 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
     /* all dataprocessing instructions look the same in a certain way: */
     /* only ARM_REGA can be defined */
 
-    if (ARM_INS_REGA(ins) != ARM_REG_NONE)  RegsetSetAddReg(mask,ARM_INS_REGA(ins));/*mask |= (1 << ARM_INS_REGA(ins)); */
+    if (ARM_INS_REGA(ins) != ARM_REG_NONE)  {RegsetSetAddReg(mask,ARM_INS_REGA(ins));/*mask |= (1 << ARM_INS_REGA(ins)); */ def |= ARM_INS_USEDEF_REGA;}
+    if (ARM_INS_OPCODE(ins) == ARM_PSEUDO_SWAP)  {RegsetSetAddReg(mask,ARM_INS_REGB(ins));/*mask |= (1 << ARM_INS_REGB(ins)); */ def |= ARM_INS_USEDEF_REGB;}
     /* saturated arithmetic instructions may also define the Q flag
      * Note this has nothing to do with FL_S: these instructions don't even have a FL_S */
     if (ARM_INS_OPCODE(ins) == ARM_QADD) RegsetSetAddReg(mask, ARM_REG_Q_CONDITION);
@@ -856,6 +938,7 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
   case IT_MUL:
     /* the values in ARM_REGB and ARM_REGC are certainly read, ARM_REGA is only read in SMLAL and UMLAL, and always written, */
     RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+    def |= ARM_INS_USEDEF_REGA;
     /* ARM_REGS is written in all the long (L) variants */
     if (ARM_INS_OPCODE(ins) == ARM_SMLAL ||
         ARM_INS_OPCODE(ins) == ARM_UMLAL ||
@@ -869,8 +952,10 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
         ARM_INS_OPCODE(ins) == ARM_SMLALDX ||
         ARM_INS_OPCODE(ins) == ARM_SMLSLD ||
         ARM_INS_OPCODE(ins) == ARM_SMLSLDX ||
-        ARM_INS_OPCODE(ins) == ARM_UMAAL)
+        ARM_INS_OPCODE(ins) == ARM_UMAAL) {
       RegsetSetAddReg(mask,ARM_INS_REGS(ins));
+      def |= ARM_INS_USEDEF_REGS;
+    }
 
     /* saturated arithmetic instructions may set the Q flag */
     if (ARM_INS_OPCODE(ins) == ARM_SMLABB ||
@@ -901,9 +986,10 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
   case IT_LOAD:
     /* ARM_REGA is always defined, ARM_REGB is defined if writeback is specified */
     RegsetSetAddReg(mask,ARM_INS_REGA(ins));/*mask |= (1 << ARM_INS_REGA(ins));*/
+    def |= ARM_INS_USEDEF_REGA;
     /* in case of a DoubleWord load, REGA+1 is also defined */
-    if (ARM_INS_OPCODE(ins)==ARM_LDRD || ARM_INS_OPCODE(ins)==ARM_LDREXD) RegsetSetAddReg(mask,ARM_INS_REGABIS(ins));
-    if (ArmInsWriteBackHappens(ins)) RegsetSetAddReg(mask,ARM_INS_REGB(ins));/*mask |= (1 << ARM_INS_REGB(ins));*/
+    if (ARM_INS_OPCODE(ins)==ARM_LDRD || ARM_INS_OPCODE(ins)==ARM_LDREXD) {RegsetSetAddReg(mask,ARM_INS_REGABIS(ins));def |= ARM_INS_USEDEF_REGABIS;}
+    if (ArmInsWriteBackHappens(ins)) {RegsetSetAddReg(mask,ARM_INS_REGB(ins));/*mask |= (1 << ARM_INS_REGB(ins));*/def |= ARM_INS_USEDEF_REGB;}
     break;
 
   case IT_STORE:
@@ -912,8 +998,9 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
     {
       /* define the result register for the exclusive stores */
       RegsetSetAddReg(mask, ARM_INS_REGC(ins));
+      def |= ARM_INS_USEDEF_REGC;
     }
-    if (ArmInsWriteBackHappens(ins)) RegsetSetAddReg(mask,ARM_INS_REGB(ins));/*mask |= (1 << ARM_INS_REGB(ins));*/
+    if (ArmInsWriteBackHappens(ins)) {RegsetSetAddReg(mask,ARM_INS_REGB(ins));/*mask |= (1 << ARM_INS_REGB(ins));*/def |= ARM_INS_USEDEF_REGB;}
     break;
 
   case IT_LOAD_MULTIPLE:
@@ -942,12 +1029,13 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
             RegsetSetAddReg(mask, dreg+1);
       }
     }
-    if (ArmInsWriteBackHappens(ins)) RegsetSetAddReg(mask,ARM_INS_REGB(ins));/*mask |= (1 << ARM_INS_REGB(ins));  */
+    if (ArmInsWriteBackHappens(ins)) {RegsetSetAddReg(mask,ARM_INS_REGB(ins));/*mask |= (1 << ARM_INS_REGB(ins));  */def |= ARM_INS_USEDEF_REGB;}
     if (ARM_INS_OPCODE(ins) == ARM_LDM) RegsetSetAddMultipleRegs(mask,ARM_INS_IMMEDIATE(ins));/*mask |= ARM_INS_IMMEDIATE(ins);*/
     break;
 
   case IT_SWAP:
     RegsetSetAddReg(mask,ARM_INS_REGA(ins));/*mask |= (1 << ARM_INS_REGA(ins));*/
+    def |= ARM_INS_USEDEF_REGA;
     break;
 
   case IT_STATUS:
@@ -955,6 +1043,7 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
     /* MSR defines CPSR or SPSR depending on the value of the FL_SPSR flag */
     if (ARM_INS_OPCODE(ins) == ARM_MRS) {
       RegsetSetAddReg(mask,ARM_INS_REGA(ins));/*mask |= (1 << ARM_INS_REGA(ins));*/
+      def |= ARM_INS_USEDEF_REGA;
     } else
       if (ARM_INS_FLAGS(ins) & FL_SPSR)
         RegsetSetAddReg(mask,17);/*mask |= (1 << 17);*/
@@ -969,29 +1058,31 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
 
   case IT_FLT_STATUS:
     RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+    def |= ARM_INS_USEDEF_REGA;
     break;
 
   case IT_FLT_STORE:
-    if (ArmInsWriteBackHappens(ins)) RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+    if (ArmInsWriteBackHappens(ins)) {RegsetSetAddReg(mask,ARM_INS_REGB(ins));def |= ARM_INS_USEDEF_REGB;}
     break;
 
   case IT_FLT_LOAD:
-    if (ArmInsWriteBackHappens(ins)) RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+    if (ArmInsWriteBackHappens(ins)) {RegsetSetAddReg(mask,ARM_INS_REGB(ins));def |= ARM_INS_USEDEF_REGB;}
     if ((ARM_INS_OPCODE(ins) == ARM_LDF) ||
         (ARM_INS_OPCODE(ins) == ARM_FLDS) ||
         (ARM_INS_OPCODE(ins) == ARM_FLDD))
     {
       RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+      def |= ARM_INS_USEDEF_REGA;
       if (ARM_INS_FLAGS(ins)&FL_VFP_DOUBLE)
         RegsetSetAddReg(mask,ARM_INS_REGA(ins)+1);
     }
     else if(ARM_INS_OPCODE(ins) == ARM_VLDR)
     {
-      if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE) {
+      def |= ARM_INS_USEDEF_REGA;
+      if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE)
         mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGA(ins));
-      } else {
+      else
         RegsetSetAddReg(mask, ARM_INS_REGA(ins));
-      }
     }
     else
     {
@@ -1008,9 +1099,9 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
     if ( (ARM_FP_VCVT_FIRST <= ARM_INS_OPCODE(ins)) && (ARM_INS_OPCODE(ins) <= ARM_FP_VCVT_LAST) )
     {
       /* if the VFP_DOUBLE-flag is defined, all operands (destination register also) are double-sized */
-      if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE) {
+      def |= ARM_INS_USEDEF_REGA;
+      if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE)
         mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGA(ins));
-      }
       else
       {
         if(ARM_INS_DATATYPE(ins) != DT_NONE)
@@ -1028,6 +1119,7 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
     {
       if(ARM_INS_REGA(ins) != ARM_REG_NONE)
       {
+        def |= ARM_INS_USEDEF_REGA;
         if(ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE)
           mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGA(ins));
         else
@@ -1039,6 +1131,7 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
       if (ARM_INS_REGA(ins)!=ARM_REG_NONE)
       {
         RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+        def |= ARM_INS_USEDEF_REGA;
         if (ARM_INS_FLAGS(ins)&FL_VFP_DOUBLE)
         {
           switch (ARM_INS_OPCODE(ins))
@@ -1062,8 +1155,10 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
      * two integer registers
      */
     if ((ARM_INS_OPCODE(ins)==ARM_FMRRD) ||
-        (ARM_INS_OPCODE(ins)==ARM_FMRRS))
+        (ARM_INS_OPCODE(ins)==ARM_FMRRS)) {
       RegsetSetAddReg(mask,ARM_INS_REGC(ins));
+      def |= ARM_INS_USEDEF_REGC;
+    }
     break;
 
   case IT_DATA:
@@ -1071,6 +1166,7 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
     break;
 
   case IT_CONSTS:
+    def |= ARM_INS_USEDEF_REGA;
     if (ARM_INS_FLAGS(ins) & FL_VFP_DOUBLE)
       mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGA(ins));
     else
@@ -1105,6 +1201,7 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
       }
       else
         RegsetSetAddReg(mask,ARM_INS_REGA(ins));
+        def |= ARM_INS_USEDEF_REGA;
       break;
 
     case ARM_MCR:
@@ -1117,14 +1214,16 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
     case ARM_STC:
     case ARM_STC2:
       if (ARM_INS_FLAGS(ins) & FL_WRITEBACK)
-        if (ARM_INS_IMMEDIATE(ins) & 0xff00) /* immediate offset != 0 */
+        if (ARM_INS_IMMEDIATE(ins) & 0xff00) /* immediate offset != 0 */ {
           RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+          def |= ARM_INS_USEDEF_REGB;
+        }
       break;
 
     case ARM_MRRC:
     case ARM_MRRC2:
-      RegsetSetAddReg(mask,ARM_INS_REGA(ins));
-      RegsetSetAddReg(mask,ARM_INS_REGB(ins));
+      RegsetSetAddReg(mask,ARM_INS_REGA(ins));def |= ARM_INS_USEDEF_REGA;
+      RegsetSetAddReg(mask,ARM_INS_REGB(ins));def |= ARM_INS_USEDEF_REGB;
       break;
 
     case ARM_MCRR:
@@ -1172,12 +1271,18 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
         RegsetSetAddReg(mask,ARM_REG_N_CONDITION);
         RegsetSetAddReg(mask,ARM_REG_C_CONDITION);
         RegsetSetAddReg(mask,ARM_REG_V_CONDITION);
-      } else if(ARM_INS_NEONFLAGS(ins) & NEONFL_A_QUAD)
+      } else if(ARM_INS_NEONFLAGS(ins) & NEONFL_A_QUAD) {
         mask = ArmRegsetAddQuadReg(mask, ARM_INS_REGA(ins));
-      else if((ARM_INS_NEONFLAGS(ins) & NEONFL_A_DOUBLE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_A_SCALAR))
+        def |= ARM_INS_USEDEF_REGA;
+      }
+      else if((ARM_INS_NEONFLAGS(ins) & NEONFL_A_DOUBLE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_A_SCALAR)) {
         mask = ArmRegsetAddDoubleReg(mask, ARM_INS_REGA(ins));
-      else if((ARM_INS_NEONFLAGS(ins) & NEONFL_A_CORE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_A_SINGLE))
+        def |= ARM_INS_USEDEF_REGA;
+      }
+      else if((ARM_INS_NEONFLAGS(ins) & NEONFL_A_CORE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_A_SINGLE)) {
         RegsetSetAddReg(mask, ARM_INS_REGA(ins));
+        def |= ARM_INS_USEDEF_REGA;
+      }
       else
         FATAL(("Illegal destination register type"));
     } else
@@ -1185,6 +1290,7 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
 
     if(ARM_INS_REGABIS(ins) != ARM_REG_NONE)
     {
+      def |= ARM_INS_USEDEF_REGABIS;
       if(ARM_INS_NEONFLAGS(ins) & NEONFL_A_QUAD)
         mask = ArmRegsetAddQuadReg(mask, ARM_INS_REGABIS(ins));
       else if((ARM_INS_NEONFLAGS(ins) & NEONFL_A_DOUBLE) || (ARM_INS_NEONFLAGS(ins) & NEONFL_A_SCALAR))
@@ -1202,6 +1308,7 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
       case ARM_VTRN:
       case ARM_VSWP:
         RegsetAddReg(mask,ARM_INS_REGB(ins));
+        def |= ARM_INS_USEDEF_REGB;
       default:
         break;
       }
@@ -1214,6 +1321,9 @@ t_regset ArmDefinedRegisters(t_arm_ins * ins)
     FATAL(("Implement type %d!",ARM_INS_TYPE(ins)));
   }
 
+  if (defined != NULL)
+    *defined = def;
+  ARM_INS_SET_DEF(ins, def);
   return mask;
 }
 /* }}} */
@@ -4200,6 +4310,44 @@ void ArmInstructionIsDirectControlTransfer(t_ins * ins_, t_bool* result) {
       *result = TRUE;
     return;
  }
+}
+
+t_bool ArmInsHasImmediateOp(t_arm_ins * ins)
+{
+  if (ARM_INS_FLAGS(ins) & FL_IMMEDW)
+    return true;
+
+  if (ARM_INS_FLAGS(ins) & FL_IMMED)
+    return true;
+
+  return false;
+}
+
+t_bool ArmInsCanReplaceImmediateWithRegister(t_arm_ins *ins)
+{
+  return true;
+}
+
+t_bool ArmInsIsInvariant(t_arm_ins *ins)
+{
+  if (ArmInsIsUnconditionalBranch(ins))
+    return true;
+
+  if (ArmInsIsConditional(ins)
+      && ARM_INS_OPCODE(ins) == ARM_B) {
+    /* check outgoing edges */
+    int outgoing_executed = 0;
+
+    t_cfg_edge *e;
+    BBL_FOREACH_SUCC_EDGE(ARM_INS_BBL(ins), e)
+      if (CFG_EDGE_EXEC_COUNT(e) > 0)
+        outgoing_executed++;
+
+    if (outgoing_executed == 1)
+      return true;
+  }
+
+  return false;
 }
 
 

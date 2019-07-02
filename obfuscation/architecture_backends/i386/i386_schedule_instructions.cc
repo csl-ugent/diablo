@@ -1,10 +1,7 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
-
-extern "C" {
-#include "diabloi386.h"
-}
-
+#include "i386_obfuscations.h"
 #include "i386_schedule_instructions.h"
+using namespace std;
 
 /* The functions here are adopted (i.e., *mostly* copy-pasted) from diabloarm_instructions.c */
 

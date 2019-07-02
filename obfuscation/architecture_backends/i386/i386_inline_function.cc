@@ -29,15 +29,10 @@
 /* }}} */
 
 /* TODO: I think this can be made architecture-independent with only a little additional work, do so */
-
-extern "C" {
-#include <diabloanopti386.h>
-
-#include "i386_inline_function_opt.h"
-}
-
-#include <obfuscation/obfuscation_architecture_backend.h>
+#include "i386_obfuscations.h"
 #include "i386_inline_function.h"
+#include "i386_inline_function_opt.h"
+using namespace std;
 
 static t_bool canInlineFunctionHere(const t_bbl* callSite, t_function* caller, t_function* callee, t_bool failWhenNrPredsTooSmall);
 
@@ -354,4 +349,3 @@ void I386InlineFunctionTransformation::dumpStats(const std::string& prefix) {
 }
 
 /* }}} */
-

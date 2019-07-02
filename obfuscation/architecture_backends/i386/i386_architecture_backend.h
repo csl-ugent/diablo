@@ -5,8 +5,6 @@
 #ifndef I386_ARCHITECTURE_BACKEND_H
 #define I386_ARCHITECTURE_BACKEND_H
 
-#include <obfuscation/obfuscation_architecture_backend.h>
-
 struct I386ObfuscationArchitectureInitializer : public ObfuscationArchitectureInitializer {
   I386ObfuscationArchitectureInitializer();
   virtual void Init(t_uint32 argc, char **argv);

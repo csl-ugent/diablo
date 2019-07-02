@@ -3,14 +3,14 @@
 /* TODO ugly hack! */
 extern t_argstate *current_argstate;
 
-void I386TestAndSetConditionAllPaths(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void I386TestAndSetConditionAllPaths(t_cfg_edge* edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   *state_true  = ProcStateNew(&i386_description);
   *state_false = state;
   ProcStateDup(*state_true,state,&i386_description);
 }
 
-void I386TestAndSetConditionAlways(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void I386TestAndSetConditionAlways(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   *state_true  = state;
   *state_false = NULL;
@@ -22,7 +22,7 @@ void I386TestAndSetConditionNever(t_cfg_edge * edge,t_procstate* state, t_procst
   *state_true = NULL;
 }
 
-void I386TestAndSetConditionSetAllToBot(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+void I386TestAndSetConditionSetAllToBot(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   *state_true  = ProcStateNew(&i386_description);
   *state_false = state;
@@ -51,7 +51,7 @@ do {                                                                   \
     FATAL(("should not happen"));                                      \
 } while (0)
 
-static void I386TestAndSetConditionJO(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJO(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_O,state);
   t_tristate maybe_false = I386ConditionHolds(I386_CONDITION_NO,state);
@@ -64,12 +64,12 @@ static void I386TestAndSetConditionJO(t_cfg_edge * edge,t_procstate* state, t_pr
     ProcStateSetCond(*state_false,I386_CONDREG_OF,FALSE);
 }
 
-static void I386TestAndSetConditionJNO(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJNO(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJO(edge,state,state_false,state_true);
+  I386TestAndSetConditionJO(edge,state,state_false,state_true, state_conditional);
 }
 
-static void I386TestAndSetConditionJB(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJB(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_B,state);
   t_tristate maybe_false = I386ConditionHolds(I386_CONDITION_AE,state);
@@ -82,12 +82,12 @@ static void I386TestAndSetConditionJB(t_cfg_edge * edge,t_procstate* state, t_pr
     ProcStateSetCond(*state_false,I386_CONDREG_CF,FALSE);
 }
 
-static void I386TestAndSetConditionJAE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJAE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJB(edge,state,state_false,state_true);
+  I386TestAndSetConditionJB(edge,state,state_false,state_true, state_conditional);
 }
 
-static void I386TestAndSetConditionJZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_Z,state);
   t_tristate maybe_false = I386ConditionHolds(I386_CONDITION_NZ,state);
@@ -100,12 +100,12 @@ static void I386TestAndSetConditionJZ(t_cfg_edge * edge,t_procstate* state, t_pr
     ProcStateSetCond(*state_false,I386_CONDREG_ZF,FALSE);
 }
 
-static void I386TestAndSetConditionJNZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJNZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJZ(edge,state,state_false,state_true);
+  I386TestAndSetConditionJZ(edge,state,state_false,state_true, state_conditional);
 }
 
-static void I386TestAndSetConditionJBE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJBE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_BE,state);
   t_tristate maybe_false = I386ConditionHolds(I386_CONDITION_A,state);
@@ -127,12 +127,12 @@ static void I386TestAndSetConditionJBE(t_cfg_edge * edge,t_procstate* state, t_p
   }
 }
 
-static void I386TestAndSetConditionJA(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJA(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJBE(edge,state,state_false,state_true);
+  I386TestAndSetConditionJBE(edge,state,state_false,state_true, state_conditional);
 }
 
-static void I386TestAndSetConditionJS(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJS(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_S,state);
   t_tristate maybe_false = I386ConditionHolds(I386_CONDITION_NS,state);
@@ -145,12 +145,12 @@ static void I386TestAndSetConditionJS(t_cfg_edge * edge,t_procstate* state, t_pr
     ProcStateSetCond(*state_false,I386_CONDREG_SF,FALSE);
 }
 
-static void I386TestAndSetConditionJNS(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJNS(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJS(edge,state,state_false,state_true);
+  I386TestAndSetConditionJS(edge,state,state_false,state_true, state_conditional);
 }
 
-static void I386TestAndSetConditionJP(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJP(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_P,state);
   t_tristate maybe_false = I386ConditionHolds(I386_CONDITION_NP,state);
@@ -163,12 +163,12 @@ static void I386TestAndSetConditionJP(t_cfg_edge * edge,t_procstate* state, t_pr
     ProcStateSetCond(*state_false,I386_CONDREG_PF,FALSE);
 }
 
-static void I386TestAndSetConditionJNP(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJNP(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJP(edge,state,state_false,state_true);
+  I386TestAndSetConditionJP(edge,state,state_false,state_true, state_conditional);
 }
 
-static void I386TestAndSetConditionJL(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJL(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_L,state);
   t_tristate maybe_false = I386ConditionHolds(I386_CONDITION_GE,state);
@@ -193,12 +193,12 @@ static void I386TestAndSetConditionJL(t_cfg_edge * edge,t_procstate* state, t_pr
   }
 }
 
-static void I386TestAndSetConditionJGE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJGE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJL(edge,state,state_false,state_true);
+  I386TestAndSetConditionJL(edge,state,state_false,state_true, state_conditional);
 }
 
-static void I386TestAndSetConditionJLE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJLE(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_LE,state);
   t_tristate maybe_false = I386ConditionHolds(I386_CONDITION_G,state);
@@ -237,12 +237,12 @@ static void I386TestAndSetConditionJLE(t_cfg_edge * edge,t_procstate* state, t_p
   }
 }
 
-static void I386TestAndSetConditionJG(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJG(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJLE(edge,state,state_false,state_true);
+  I386TestAndSetConditionJLE(edge,state,state_false,state_true, state_conditional);
 }
 
-static void I386TestAndSetConditionJECXZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionJECXZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_register_content ecx;
 
@@ -257,26 +257,26 @@ static void I386TestAndSetConditionJECXZ(t_cfg_edge * edge,t_procstate* state, t
   }
 }
 
-static void I386TestAndSetConditionLOOP(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionLOOP(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
-  I386TestAndSetConditionJECXZ(edge,state,state_true,state_false);
+  I386TestAndSetConditionJECXZ(edge,state,state_true,state_false, state_conditional);
 }
 
-static void I386TestAndSetConditionLOOPZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionLOOPZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_LOOPZ,state);
   t_tristate maybe_false = (maybe_true == PERHAPS ? PERHAPS : (maybe_true == YES ? NO : YES));
   SetTrueAndFalse(state,state_true,state_false,maybe_true,maybe_false);
 }
 
-static void I386TestAndSetConditionLOOPNZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionLOOPNZ(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_tristate maybe_true = I386ConditionHolds(I386_CONDITION_LOOPNZ,state);
   t_tristate maybe_false = (maybe_true == PERHAPS ? PERHAPS : (maybe_true == YES ? NO : YES));
   SetTrueAndFalse(state,state_true,state_false,maybe_true,maybe_false);
 }
 
-static void I386TestAndSetConditionSwitch(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false)
+static void I386TestAndSetConditionSwitch(t_cfg_edge * edge,t_procstate* state, t_procstate **state_true, t_procstate** state_false, t_procstate **state_conditional)
 {
   t_i386_ins *ins = T_I386_INS(BBL_INS_LAST(CFG_EDGE_HEAD(edge)));
   if (ins
@@ -311,7 +311,7 @@ static void I386TestAndSetConditionSwitch(t_cfg_edge * edge,t_procstate* state, 
   else
   {
     /* don't recognize this kind of switch. be conservative */
-    I386TestAndSetConditionAllPaths(edge,state,state_true,state_false);
+    I386TestAndSetConditionAllPaths(edge,state,state_true,state_false, state_conditional);
   }
 }
 

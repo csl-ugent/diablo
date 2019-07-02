@@ -18,7 +18,7 @@
  * This procedure Extracts the Shift operand (i.e. the value that will be used
  * after all shifts are applied) from 1. a instruction and 2. the state in
  * which the instruction is executed and stores this value in shifted_value. It
- * also modifies the condition bits in case of a S-etting instruction 
+ * also modifies the condition bits in case of a S-etting instruction
  *
  * \todo Complete documentation
  *
@@ -26,7 +26,7 @@
  * \param state
  * \param shifted_value
  *
- * \return t_lattice_level 
+ * \return t_lattice_level
 */
 /* Utility function to emulate the shifter part of an instruction {{{ */
 t_lattice_level ArmInsExtractShift(t_arm_ins * ins, t_procstate * state, t_register_content * shifted_value)
@@ -52,30 +52,30 @@ t_lattice_level ArmInsExtractShift(t_arm_ins * ins, t_procstate * state, t_regis
     }
 
   /*}}}*/
-  
+
   value_to_shift = G_T_UINT32(tmp_value_to_shift.i);
   shiftimmediate = ARM_INS_SHIFTLENGTH(ins);
-  
+
   switch (ARM_INS_SHIFTTYPE(ins)) /* perform the right shift and set carry if necessary */
     {
       /* Shifts over an immediate value {{{ */
     case ARM_SHIFT_TYPE_LSL_IMM:
-      if (shiftimmediate > 0) 
-	if (Uint32GetBit(value_to_shift, (32-shiftimmediate))) 
+      if (shiftimmediate > 0)
+	if (Uint32GetBit(value_to_shift, (32-shiftimmediate)))
 	  carry_set=TRUE;
       shifted_value->i=AddressNew32(value_to_shift << shiftimmediate);
       break;
-    case ARM_SHIFT_TYPE_LSR_IMM: 
-      if (Uint32GetBit(value_to_shift, (shiftimmediate-1))) 
+    case ARM_SHIFT_TYPE_LSR_IMM:
+      if (Uint32GetBit(value_to_shift, (shiftimmediate-1)))
 	carry_set=TRUE;
       shifted_value->i=AddressNew32((value_to_shift >> shiftimmediate));
       break;
-    case ARM_SHIFT_TYPE_ASR_IMM: 
-      if (Uint32GetBit(value_to_shift, (shiftimmediate-1))) 
+    case ARM_SHIFT_TYPE_ASR_IMM:
+      if (Uint32GetBit(value_to_shift, (shiftimmediate-1)))
 	carry_set=TRUE;
       if ((t_int32) value_to_shift < 0)
 	shifted_value->i=AddressNew32((value_to_shift >> shiftimmediate) | ~(0xFFFFFFFF >> shiftimmediate));
-      else 
+      else
 	shifted_value->i=AddressNew32(value_to_shift >> shiftimmediate);
       break;
     case ARM_SHIFT_TYPE_ROR_IMM:
@@ -84,7 +84,7 @@ t_lattice_level ArmInsExtractShift(t_arm_ins * ins, t_procstate * state, t_regis
 	  shifted_value->i=AddressNew32(value_to_shift);
 	  break;
 	}
-      if (Uint32GetBit(value_to_shift, (shiftimmediate-1))) 
+      if (Uint32GetBit(value_to_shift, (shiftimmediate-1)))
 	carry_set=TRUE;
       shifted_value->i=AddressNew32((value_to_shift >> shiftimmediate) | (value_to_shift << (32 - shiftimmediate)));
       break;
@@ -101,14 +101,14 @@ t_lattice_level ArmInsExtractShift(t_arm_ins * ins, t_procstate * state, t_regis
 	  return CP_BOT;
 	}
       shiftreg_value = G_T_UINT32(tmp_shiftreg_value.i);
-      
+
       if (ARM_SHIFT_AMOUNT(shiftreg_value) == 0) /* no carry can be shifted out here */
 	shifted_value->i=AddressNew32(value_to_shift);
       else if (ARM_SHIFT_AMOUNT(shiftreg_value) > 32) /* no carry can be shifted out here */
 	shifted_value->i=AddressNew32(0);
       else
 	{
-	  if (Uint32GetBit(value_to_shift, (32 - ARM_SHIFT_AMOUNT(shiftreg_value)))) 
+	  if (Uint32GetBit(value_to_shift, (32 - ARM_SHIFT_AMOUNT(shiftreg_value))))
 	    carry_set=TRUE;
 	  shifted_value->i=AddressNew32(value_to_shift << ARM_SHIFT_AMOUNT(shiftreg_value));
 	}
@@ -156,7 +156,7 @@ t_lattice_level ArmInsExtractShift(t_arm_ins * ins, t_procstate * state, t_regis
 	  shifted_value->i=AddressNew32(value_to_shift);
 	  break;
 	}
-      if (Uint32GetBit(value_to_shift, (ARM_ROTATE_AMOUNT(shiftreg_value)-1))) 
+      if (Uint32GetBit(value_to_shift, (ARM_ROTATE_AMOUNT(shiftreg_value)-1)))
 	carry_set=TRUE;
       shifted_value->i=AddressNew32((value_to_shift >> ARM_ROTATE_AMOUNT(shiftreg_value)) | (value_to_shift << (32 - ARM_ROTATE_AMOUNT(shiftreg_value)))  /* CHECK THIS */);
       break;
@@ -165,7 +165,7 @@ t_lattice_level ArmInsExtractShift(t_arm_ins * ins, t_procstate * state, t_regis
     case ARM_SHIFT_TYPE_RRX:
     {
       t_lattice_level carry_state;
-      
+
       /* can't let the code at the end do this, because we may
        * have to return CP_BOT
        */
@@ -182,7 +182,7 @@ t_lattice_level ArmInsExtractShift(t_arm_ins * ins, t_procstate * state, t_regis
       return CP_VALUE;
       break;
     }
-    default: 
+    default:
       FATAL(("Unknown shifttype while emulating!!"));
       break;
     }
@@ -231,19 +231,19 @@ static t_bool ArmInsEmulDetermineTag(t_arm_ins * ins, t_procstate * state)
 
   if ((opcode==ARM_RSB || opcode==ARM_SUB) && !ArmInsHasImmediate(ins) && ARM_INS_SHIFTTYPE(ins) == ARM_SHIFT_TYPE_NONE)
   {
-    /* Consider the following code fragment: 
+    /* Consider the following code fragment:
        ADR r9, begin_of_init_array
        ADR r8, end_of_init_array
        SUB r8, r9, r8
 
        When the produced addresses point to the same block, the above tag joins will have
        resulted in a value tag (i.e., reloc) for the destination of the sub, modeling the fact
-       that the sub computes an address at some offset of that reloc. 
+       that the sub computes an address at some offset of that reloc.
        But that is wrong: a true constant was computed, not an address at some offset of
-       some relocatable. So the tag needs to be removed. 
+       some relocatable. So the tag needs to be removed.
 
        So we need to set the tag to top. By doing so (below), the sub will eventually be replaced
-       by a true constant producer. 
+       by a true constant producer.
     */
 
     t_reloc * relocB;
@@ -266,7 +266,7 @@ static t_bool ArmGetRegisterB(t_arm_ins * ins, t_procstate * state, t_register_c
   {
     return FALSE;
   }
- 
+
   return TRUE;
 }
 
@@ -301,7 +301,7 @@ static t_bool ArmGetRegisterS(t_arm_ins * ins, t_procstate * state, t_register_c
   {
     return FALSE;
   }
- 
+
   return TRUE;
 }
 
@@ -322,7 +322,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
   t_register_content tmp_src1, tmp_src2, tmp_src3, dest;
   t_uint32 src1,src2;
   t_regset mask = NullRegs;
-  t_int64 tmp = 0L; 
+  t_int64 tmp = 0L;
   t_int64 carry_set=FALSE; /* Just to keep the compiler happy, value is never used! */
   t_bool carry_flag;
   t_bool can_emulate=TRUE;
@@ -368,7 +368,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
 	}
 	else
 	  FATAL(("Implement 2"));
-	
+
       }
       else
       FATAL(("Adding two relocations, @R and @R\n",rel1,rel2));
@@ -378,7 +378,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
       result_is_tagged = ArmInsEmulDetermineTag(ins,state);
   }
   /*}}}*/
- 
+
   {
     t_reg reg;
     t_regset regs_used = ARM_INS_REGS_USE(ins);
@@ -410,7 +410,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
     }
   }
 
-  if (ArmOpcodeRegisterBMatters(opcode)) 
+  if (ArmOpcodeRegisterBMatters(opcode))
     can_emulate&=ArmGetRegisterB(ins,state,&tmp_src1);
   can_emulate&=ArmGetRegisterC(ins,state,&tmp_src2);
   if (ArmOpcodeNeedsCarry(opcode))  // shouldn't this come first, because ArmGetRegisterC might already update the carry flag ???
@@ -442,7 +442,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
     }
     return;
   }
-  
+
   src1 = G_T_UINT32(tmp_src1.i);
   src2 = G_T_UINT32(tmp_src2.i);
 
@@ -486,33 +486,33 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
 
     /* Arithmitic */
     case ARM_CMN:
-      tmp =  (t_int32) src1;  
+      tmp =  (t_int32) src1;
       tmp +=  (t_int32) src2;
        dest.i=AddressNew32((t_uint32) ((t_uint64) tmp));
       carry_set = CARRY_FROM(src1, src2, (t_uint32) ((t_uint64) tmp));
       break;
     case ARM_CMP:
-      tmp =  (t_int32) src1;  
+      tmp =  (t_int32) src1;
       tmp -=  (t_int32) src2;
        dest.i=AddressNew32((t_uint32) ((t_uint64) tmp));
       carry_set = !BORROWED_FROM(src1, src2, (t_uint32) ((t_uint64) tmp));
       break;
     case ARM_RSB:
-      tmp =  (t_int32) src2;  
+      tmp =  (t_int32) src2;
       tmp -=  (t_int32) src1;
        dest.i=AddressNew32((t_uint32) ((t_uint64) tmp));
       ProcStateSetReg(state,ARM_INS_REGA(ins),dest);
       carry_set = !BORROWED_FROM(src2, src1, (t_uint32) ((t_uint64) tmp));
       break;
     case ARM_SUB:
-      tmp =  (t_int32) src1;  
+      tmp =  (t_int32) src1;
       tmp -=  (t_int32) src2;
        dest.i=AddressNew32((t_uint32) ((t_uint64) tmp));
       ProcStateSetReg(state,ARM_INS_REGA(ins),dest);
       carry_set = !BORROWED_FROM(src1, src2, (t_uint32) ((t_uint64) tmp));
       break;
     case ARM_RSC:
-      tmp =  (t_int32) src2;  
+      tmp =  (t_int32) src2;
       tmp -=  (t_int32) src1;
       if (!carry_flag)
 	tmp--;
@@ -521,7 +521,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
       carry_set = !BORROWED_FROM(src2, src1, (t_uint32) ((t_uint64) tmp));
       break;
     case ARM_SBC:
-      tmp =  (t_int32) src1;  
+      tmp =  (t_int32) src1;
       tmp -=  (t_int32) src2;
       if (!carry_flag)
 	tmp--;
@@ -530,14 +530,14 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
       carry_set = !BORROWED_FROM(src1, src2, (t_uint32) ((t_uint64) tmp));
       break;
     case ARM_ADD:
-      tmp =  (t_int32) src1;  
+      tmp =  (t_int32) src1;
       tmp +=  (t_int32) src2;
        dest.i=AddressNew32((t_uint32) ((t_uint64) tmp));
       ProcStateSetReg(state,ARM_INS_REGA(ins),dest);
       carry_set = CARRY_FROM(src1, src2, (t_uint32) ((t_uint64) tmp));
       break;
     case ARM_ADC:
-      tmp =  (t_int32) src1;  
+      tmp =  (t_int32) src1;
       tmp +=  (t_int32) src2;
       if (carry_flag)
 	tmp++;
@@ -576,7 +576,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
       break;
     }
   /*}}}*/
-  
+
   /* If necessary: Set Conditions {{{*/
   if (ArmInsUpdatesCond(ins))
     {
@@ -586,7 +586,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
 	ProcStateSetCond(state,ARM_REG_Z_CONDITION,TRUE);
       else
 	ProcStateSetCond(state,ARM_REG_Z_CONDITION,FALSE);
-      
+
       if (ARM_SIGN_BIT(G_T_UINT32(dest.i))==1)
 	ProcStateSetCond(state,ARM_REG_N_CONDITION,TRUE);
       else
@@ -598,7 +598,7 @@ static void ArmInsEmulNumericalAndLogical(t_arm_ins * ins, t_procstate * state)
 	  ProcStateSetCond(state,ARM_REG_C_CONDITION,TRUE);
 	else
 	  ProcStateSetCond(state,ARM_REG_C_CONDITION,FALSE);
-      
+
 	/* might be undefined however */
 	if (((tmp >> 32) & 0x1) != ARM_SIGN_BIT(tmp))
 	  ProcStateSetCond(state,ARM_REG_V_CONDITION,TRUE);
@@ -665,7 +665,7 @@ load_value_from_insdata_in_reg(t_arm_ins * ins, t_arm_ins * data, t_reg reg, t_u
 {
   t_uint32 val;
   t_register_content dest;
-  
+
   val = ARM_INS_IMMEDIATE (data) >> (8*byte);
   val = adjust_loaded_value (ins, val);
   dest.i=AddressNew32(val);
@@ -705,8 +705,8 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
   preindex = (ARM_INS_FLAGS (ins) & FL_PREINDEX) != 0;
   up = (ARM_INS_FLAGS (ins) & FL_DIRUP) != 0;
 
-  if (ARM_INS_OPCODE(ins) == ARM_LDM) 
-    for (i=0; i<16; i++) 
+  if (ARM_INS_OPCODE(ins) == ARM_LDM)
+    for (i=0; i<16; i++)
       if (ARM_INS_IMMEDIATE(ins) & (1 << i)) num_regs++;
 
   /* get the base address and reloc from the state */
@@ -714,7 +714,7 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
   can_emulate &= ISVALUE (base_reloc_unknown);
   can_emulate &= ArmGetRegisterB(ins,state,&tmp_base_address);
   /* {{{ get the offset from the flexible operand */
-  if (ARM_INS_OPCODE(ins)!=ARM_LDM) 
+  if (ARM_INS_OPCODE(ins)!=ARM_LDM)
   {
     t_bool known = ArmGetRegisterC(ins,state,&tmp_offset);
     if (ARM_INS_REGC (ins) != ARM_REG_NONE)
@@ -745,7 +745,7 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
     {
       if (up)
 	loadaddr = AddressAdd (loadaddr, tmp_offset.i);
-      else 
+      else
 	loadaddr = AddressSub (loadaddr, tmp_offset.i);
     }
     switch (ARM_INS_OPCODE (ins))
@@ -782,7 +782,7 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
 	     from = NULL;
 	     can_emulate = FALSE;
      }
-     
+
   }
   else
     from = NULL;
@@ -836,7 +836,7 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
       if (AddressIsGe (loadoffset, RELOCATABLE_CSIZE (from)))
 	out_of_block = TRUE;
       if (ARM_INS_OPCODE (ins) == ARM_LDRD &&
-          AddressIsGt (AddressAddUint32 (loadoffset, 4), RELOCATABLE_CSIZE (from)))
+          AddressIsGe (AddressAddUint32 (loadoffset, 4), RELOCATABLE_CSIZE (from)))
         out_of_block = TRUE;
     }
     if (out_of_block)
@@ -851,8 +851,8 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
     /* {{{ emulate the load if it comes from a constant memory location
      * at this point, we know
      * 	- the address to load from
-     * 	- the relocation associated with the load address 
-     * 	- the relocatable from which we will load 
+     * 	- the relocation associated with the load address
+     * 	- the relocatable from which we will load
      * 	- we are sure the load offset falls within the block */
 
     switch (ARM_INS_OPCODE (ins))
@@ -935,7 +935,7 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
                         }
 		}
 		/* is the memory location relocated? */
-		
+
                 if (ARM_INS_OPCODE(ins)==ARM_LDR || ARM_INS_OPCODE(ins)==ARM_LDRD)
                   {
                     for (rr = SECTION_REFERS_TO (sec); rr; rr = RELOC_REF_NEXT(rr))
@@ -945,11 +945,11 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
                       ProcStateSetTag (state, ARM_INS_REGA (ins), RELOC_REF_RELOC(rr));
                     else
                       ProcStateSetTagTop (state, ARM_INS_REGA (ins));
-                    
+
                     if (ARM_INS_OPCODE (ins) == ARM_LDRD)
                       {
                         t_address nloadoffset = AddressAddInt32(loadoffset,4);
-                        
+
                         for (rr = SECTION_REFERS_TO (sec); rr; rr = RELOC_REF_NEXT(rr))
                           if (AddressIsEq (RELOC_FROM_OFFSET(RELOC_REF_RELOC(rr)), nloadoffset))
                             break;
@@ -959,9 +959,9 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
                           ProcStateSetTagTop (state, ARM_INS_REGA (ins)+1);
                       }
                   }
-                else if (ARM_INS_OPCODE(ins)==ARM_LDRB || 
-                         ARM_INS_OPCODE(ins)==ARM_LDRSB || 
-                         ARM_INS_OPCODE(ins)==ARM_LDRH || 
+                else if (ARM_INS_OPCODE(ins)==ARM_LDRB ||
+                         ARM_INS_OPCODE(ins)==ARM_LDRSB ||
+                         ARM_INS_OPCODE(ins)==ARM_LDRH ||
                          ARM_INS_OPCODE(ins)==ARM_LDRSH
                          )
                   {
@@ -996,7 +996,7 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
 	  {
 	    /* {{{ load from bbl */
 	    t_bbl * bbl = T_BBL (from);
-	    t_uint32 byte;	    
+	    t_uint32 byte;
 	    t_arm_ins *data;
 
 	    BBL_FOREACH_ARM_INS (bbl, data)
@@ -1211,7 +1211,7 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
 #ifdef LOAD_AGGRESSIVE
   else if (out_of_block)
   {
-    /* aggressive assumption: out of block loads mean that this code can never be 
+    /* aggressive assumption: out of block loads mean that this code can never be
      * executed in a correctly working program {{{ */
     if ((ARM_INS_OPCODE (ins) == ARM_LDM) ||
         (ARM_INS_OPCODE (ins) == ARM_LDRD))
@@ -1250,21 +1250,21 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
       if (!can_emulate)
       {
 	ProcStateSetRegBot(state,ARM_INS_REGB(ins));
-      } 
-      else 
+      }
+      else
       {
 #ifdef THUMB_SUPPORT
 	/* In thumb mode, it is legal to include the base register in the list of loaded registers. The final value
 	 * is the loaded value, and not the writeback value! */
-	if(!(ARM_INS_FLAGS(ins) & FL_THUMB) && 
-	    (ARM_INS_IMMEDIATE(ins) & (1 <<ARM_INS_REGB(ins)))) 
+	if(!(ARM_INS_FLAGS(ins) & FL_THUMB) &&
+	    (ARM_INS_IMMEDIATE(ins) & (1 <<ARM_INS_REGB(ins))))
 	  WARNING(("Result is unpredictable!"));
 	if(!(ARM_INS_IMMEDIATE(ins) & (1 <<ARM_INS_REGB(ins))))
 	{
 #endif
 	if (up)
 	  dest.i = AddressAddUint32 (loadaddr, 4*num_regs);
-	else 
+	else
 	  dest.i = AddressSubUint32 (loadaddr, 4*num_regs);
 	ProcStateSetReg(state,ARM_INS_REGB(ins),dest);
 #ifdef THUMB_SUPPORT
@@ -1273,13 +1273,13 @@ static void ArmInsEmulLoad(t_arm_ins * ins, t_procstate * state)
       }
     }
   }
-  else if (!preindex || (ARM_INS_FLAGS (ins) & FL_WRITEBACK)) 
+  else if (!preindex || (ARM_INS_FLAGS (ins) & FL_WRITEBACK))
   {
     if ((!can_emulate))
     {
       ProcStateSetRegBot(state,ARM_INS_REGB(ins));
-    } 
-    else 
+    }
+    else
     {
       if (preindex)
       {
@@ -1311,17 +1311,17 @@ static void ArmInsEmulMultipleStore(t_arm_ins * ins, t_procstate * state)
   t_instruction_flags insflags = ARM_INS_FLAGS(ins);
   t_uint32 num_regs = 0;
   int i;
-  
+
   for (i=0; i<16; i++)
-    if (ARM_INS_IMMEDIATE(ins) & (1 << i)) 
+    if (ARM_INS_IMMEDIATE(ins) & (1 << i))
       num_regs++;
-  
+
   /* get the base address and reloc from the state */
-  
+
   base_reloc_unknown = ProcStateGetTag(state,ARM_INS_REGB(ins),&base_reloc);
   base_address_unknown = ProcStateGetReg(state,ARM_INS_REGB(ins),&tmp_base_address);
   base_address = G_T_UINT32(tmp_base_address.i);
-  
+
   /* get the offset from the state */
 
   if (ArmInsHasImmediate(ins))
@@ -1335,29 +1335,29 @@ static void ArmInsEmulMultipleStore(t_arm_ins * ins, t_procstate * state)
     }
   else
     offset_unknown = ProcStateGetReg(state,ARM_INS_REGC(ins),&tmp_offset);
-  
+
   offset = G_T_UINT32(tmp_offset.i);
 
-  
-  if (ISBOT(base_address_unknown)) 
+
+  if (ISBOT(base_address_unknown))
     {
       ProcStateSetRegsetBot(state,ARM_INS_REGS_DEF(ins));
       ProcStateSetTagsetBot(state,ARM_INS_REGS_DEF(ins));
       return;
     }
 
-  
+
   if (insflags & FL_WRITEBACK)
     {	/* writeback enabled */
       if ((!ISVALUE(base_address_unknown)) || (!ISVALUE(offset_unknown)))
 	{
 	  ProcStateSetRegBot(state,ARM_INS_REGB(ins));
-	} 
-      else 
+	}
+      else
 	{
 	  if (insflags & FL_DIRUP)
 	    dest.i=AddressNew32(base_address + 4 * num_regs);
-	  else 
+	  else
 	    dest.i=AddressNew32(base_address - 4 * num_regs);
 	  if (ISVALUE(base_reloc_unknown))
 	    {
@@ -1381,11 +1381,11 @@ static void ArmInsEmulStore(t_arm_ins * ins, t_procstate * state)
   t_instruction_flags insflags = ARM_INS_FLAGS(ins);
 
   /* get the base address and reloc from the state */
-  
+
   base_reloc_unknown = ProcStateGetTag(state,ARM_INS_REGB(ins),&base_reloc);
   base_address_unknown = ProcStateGetReg(state,ARM_INS_REGB(ins),&tmp_base_address);
   base_address = G_T_UINT32(tmp_base_address.i);
-  
+
   /* get the offset from the state {{{ */
 
   if (ArmInsHasImmediate(ins))
@@ -1400,9 +1400,9 @@ static void ArmInsEmulStore(t_arm_ins * ins, t_procstate * state)
   else
     offset_unknown = ProcStateGetReg(state,ARM_INS_REGC(ins),&tmp_offset);
   /* }}} */
-  
+
   offset = G_T_UINT32(tmp_offset.i);
-  
+
   if (ISBOT(base_address_unknown))
     {
       ProcStateSetRegsetBot(state,ARM_INS_REGS_DEF(ins));
@@ -1410,18 +1410,18 @@ static void ArmInsEmulStore(t_arm_ins * ins, t_procstate * state)
     }
 
   bzero(&dest,sizeof(t_register_content));
-  
-  if (!(insflags & FL_PREINDEX) || (insflags & FL_WRITEBACK)) 
+
+  if (!(insflags & FL_PREINDEX) || (insflags & FL_WRITEBACK))
     {	/* writeback enabled */
       if ((!ISVALUE(base_address_unknown)) || (!ISVALUE(offset_unknown)))
 	{
 	  ProcStateSetRegBot(state,ARM_INS_REGB(ins));
-	} 
-      else 
+	}
+      else
 	{
 	  if (insflags & FL_DIRUP)
 	    dest.i=AddressNew32(base_address + offset);
-	  else 
+	  else
 	    dest.i=AddressNew32(base_address - offset);
 	  if (ISVALUE(base_reloc_unknown))
 	    ProcStateSetTag(state,ARM_INS_REGB(ins),base_reloc);
@@ -1429,6 +1429,11 @@ static void ArmInsEmulStore(t_arm_ins * ins, t_procstate * state)
 	}
     }
 }/*}}}*/
+
+static
+void ArmInsEmulSwap(t_arm_ins *ins, t_procstate *state) {
+  ProcStateSwapRegisterInfo(state, ARM_INS_REGA(ins), ARM_INS_REGB(ins));
+}
 
 /* }}} */
 
@@ -1439,7 +1444,7 @@ static void ArmInsEmulStore(t_arm_ins * ins, t_procstate * state)
  * \param state_a
  * \param state_b
  *
- * \return t_bool 
+ * \return t_bool
 */
 /* Move me to constant propagator {{{ */
 t_bool RegIsEqualAndKnown(t_reg reg, t_procstate * state_a, t_procstate * state_b)
@@ -1465,7 +1470,7 @@ t_bool RegIsEqualAndKnown(t_reg reg, t_procstate * state_a, t_procstate * state_
  * \param state_a
  * \param state_b
  *
- * \return t_bool 
+ * \return t_bool
 */
 /*  Move me to constant propagator {{{ */
 t_bool ConditionsAreEqualAndKnown(t_procstate * state_a, t_procstate * state_b)
@@ -1500,7 +1505,7 @@ t_bool ConditionsAreEqualAndKnown(t_procstate * state_a, t_procstate * state_b)
     return FALSE;
   if (value_a3!=value_b3)
     return FALSE;
-  
+
   if (ProcStateGetCond(state_a,ARM_REG_C_CONDITION,&value_a4))
     return FALSE;
   if (ProcStateGetCond(state_b,ARM_REG_C_CONDITION,&value_b4))
@@ -1518,7 +1523,7 @@ t_bool ConditionsAreEqualAndKnown(t_procstate * state_a, t_procstate * state_b)
  * \param ins
  * \param state
  *
- * \return void 
+ * \return void
 */
 /* The instruction emulator that ignores conditions {{{ */
 void ArmInsEmulNoConditions(t_arm_ins * ins, t_procstate * state)
@@ -1536,6 +1541,9 @@ void ArmInsEmulNoConditions(t_arm_ins * ins, t_procstate * state)
       break;
     case ARM_ADDRESS_PRODUCER:
       ArmInsEmulAddrProd(ins, state);
+      break;
+    case ARM_PSEUDO_SWAP:
+      ArmInsEmulSwap(ins, state);
       break;
     case ARM_UMULL:
     case ARM_MUL:
@@ -1620,11 +1628,11 @@ void ArmInsEmulNoConditions(t_arm_ins * ins, t_procstate * state)
  * \param ins
  * \param state
  *
- * \return void 
+ * \return void
 */
 /* The complete instruction emulator {{{ */
 
-void 
+void
 ArmInsEmulator(t_arm_ins *  ins, t_procstate * state, t_bool update_known_values)
 {
   t_bool execute, flag1,flag2;
@@ -1638,103 +1646,103 @@ ArmInsEmulator(t_arm_ins *  ins, t_procstate * state, t_bool update_known_values
   {
     case ARM_CONDITION_EQ :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_Z_CONDITION,&execute)))
-	if (!execute) 
-	  goto nothing_to_be_done; 
+	if (!execute)
+	  goto nothing_to_be_done;
       break;
     case ARM_CONDITION_NE :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_Z_CONDITION,&execute)))
-	if (execute) 
-	  goto nothing_to_be_done; 
+	if (execute)
+	  goto nothing_to_be_done;
       break;
     case ARM_CONDITION_CS :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_C_CONDITION,&execute)))
-	if (!execute) 
-	  goto nothing_to_be_done; 
+	if (!execute)
+	  goto nothing_to_be_done;
       break;
     case ARM_CONDITION_CC :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_C_CONDITION,&execute)))
-	if (execute) 
-	  goto nothing_to_be_done; 
+	if (execute)
+	  goto nothing_to_be_done;
       break;
     case ARM_CONDITION_MI :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_N_CONDITION,&execute)))
-	if (!execute) 
-	  goto nothing_to_be_done; 
+	if (!execute)
+	  goto nothing_to_be_done;
       break;
     case ARM_CONDITION_PL :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_N_CONDITION,&execute)))
-	if (execute) 
-	  goto nothing_to_be_done; 
+	if (execute)
+	  goto nothing_to_be_done;
       break;
-    case ARM_CONDITION_VS : 
+    case ARM_CONDITION_VS :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_V_CONDITION,&execute)))
-	if (!execute) 
-	  goto nothing_to_be_done; 
+	if (!execute)
+	  goto nothing_to_be_done;
       break;
     case ARM_CONDITION_VC :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_V_CONDITION,&execute)))
-	if (execute) 
-	  goto nothing_to_be_done; 
+	if (execute)
+	  goto nothing_to_be_done;
       break;
 
     case ARM_CONDITION_HI :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_C_CONDITION,&execute)))
-	if (!execute) 
-	  goto nothing_to_be_done; 
+	if (!execute)
+	  goto nothing_to_be_done;
       if (!(uncertain = (uncertain || ProcStateGetCond(state,ARM_REG_Z_CONDITION,&execute))))
-	if (execute) 
-	  goto nothing_to_be_done; 
+	if (execute)
+	  goto nothing_to_be_done;
       break;
 
     case ARM_CONDITION_LS :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_C_CONDITION,&execute)))
-	if (execute) 
+	if (execute)
 	  if (!(uncertain = (uncertain || ProcStateGetCond(state,ARM_REG_Z_CONDITION,&execute))))
-	    if (!execute) 
-	      goto nothing_to_be_done; 
+	    if (!execute)
+	      goto nothing_to_be_done;
       break;
     case ARM_CONDITION_GE :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_N_CONDITION,&flag1)))
 	if (!(uncertain = (uncertain || ProcStateGetCond(state,ARM_REG_V_CONDITION,&flag2))))
 	  if (flag1 != flag2)
-	    goto nothing_to_be_done; 
+	    goto nothing_to_be_done;
       break;
-    case ARM_CONDITION_LT : 
+    case ARM_CONDITION_LT :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_N_CONDITION,&flag1)))
 	if (!(uncertain = (uncertain || ProcStateGetCond(state,ARM_REG_V_CONDITION,&flag2))))
 	  if (flag1 == flag2)
-	    goto nothing_to_be_done; 
+	    goto nothing_to_be_done;
       break;
-    case ARM_CONDITION_GT : 
+    case ARM_CONDITION_GT :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_Z_CONDITION,&execute)))
-	if (execute) 
+	if (execute)
 	  goto nothing_to_be_done;
       if (!(uncertain = (uncertain || ProcStateGetCond(state,ARM_REG_N_CONDITION,&flag1))))
 	if (!(uncertain = (uncertain || ProcStateGetCond(state,ARM_REG_V_CONDITION,&flag2))))
 	  if (flag1 != flag2)
-	    goto nothing_to_be_done; 
+	    goto nothing_to_be_done;
       break;
 
-    case ARM_CONDITION_LE : 
+    case ARM_CONDITION_LE :
       if (!(uncertain = ProcStateGetCond(state,ARM_REG_Z_CONDITION,&execute)))
-	if (!execute) 
+	if (!execute)
 	  if (!(uncertain = (uncertain || ProcStateGetCond(state,ARM_REG_N_CONDITION,&flag1))))
 	    if (!(uncertain = (uncertain || ProcStateGetCond(state,ARM_REG_V_CONDITION,&flag2))))
 	      if (flag1 == flag2)
-		goto nothing_to_be_done; 
+		goto nothing_to_be_done;
       break;
     case ARM_CONDITION_AL:
       if (ARM_INS_OPCODE(ins)==ARM_T2CBZ || ARM_INS_OPCODE(ins)==ARM_T2CBNZ)
         {
 
-          /* this is not very elegant, but we don't see another option 
+          /* this is not very elegant, but we don't see another option
              in ARM code, instructions are modeled as conditionally executed
              when they depend on condition flags, but CBZ and CBNZ thumb instructions
              are modeled as (un)executed if the condition checked in the instruction
              is (not) met */
           t_reg reg = ARM_INS_REGB(ins);
           t_register_content content;
-          
+
           if (CP_BOT==ProcStateGetReg(state,reg,&content))
             {
               ARM_INS_SET_ATTRIB(ins,   ARM_INS_ATTRIB(ins) | IF_EXECED);
@@ -1757,8 +1765,8 @@ ArmInsEmulator(t_arm_ins *  ins, t_procstate * state, t_bool update_known_values
       else
         ARM_INS_SET_ATTRIB(ins,   ARM_INS_ATTRIB(ins) & ~IF_ALWAYS_EXECED);
       break;
-    case ARM_CONDITION_NV : 
-      goto nothing_to_be_done; 
+    case ARM_CONDITION_NV :
+      goto nothing_to_be_done;
   }
 
   /* set instruction flags */

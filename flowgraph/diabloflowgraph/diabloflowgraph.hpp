@@ -4,15 +4,27 @@
 
 extern "C" {
 #include <diabloflowgraph.h>
+#include <diablosupport.h>
+#include "diabloflowgraph_new_target_selector_cmdline.h"
 }
 
 /* C++ standard headers */
+#include <algorithm>
+#include <array>
+#include <fstream>
+#include <functional>
+#include <iomanip>
+#include <iostream>
+#include <map>
 #include <set>
+#include <string>
 #include <vector>
 
 #include "diabloflowgraph_STL.hpp"
-#include "diabloflowgraph_complexity.hpp"
+#include "diabloflowgraph_object_tracking.hpp"
 #include "diabloflowgraph_transformation.hpp"
+#include "diabloflowgraph_complexity.hpp"
+#include "diabloflowgraph_fake_edge_cycles.hpp"
 
 /* If the transformation classes have not been included, don't include the headers that build on them */
 #ifdef DIABLOFLOWGRAPH_TRANSFORMATION_CLASS
