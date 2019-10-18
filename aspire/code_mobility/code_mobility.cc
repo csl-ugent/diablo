@@ -289,9 +289,6 @@ void CodeMobilityTransformer::PrepareCfg (t_cfg* cfg)
 
 void CodeMobilityTransformer::FinalizeTransform ()
 {
-  if (strcmp(code_mobility_options.output_dir, ".") != 0)
-    DirMake(code_mobility_options.output_dir, FALSE);
-
   /* Datastructures for metrics */
   struct Metric
   {
@@ -366,42 +363,11 @@ void CodeMobilityTransformer::FinalizeTransform ()
     ObjectDeflowgraph(new_obj);
     ObjectRebuildSectionsFromSubsections (new_obj);
     ObjectAssemble(new_obj);
-    t_const_string path = StringConcat3(code_mobility_options.output_dir, "/", OBJECT_NAME(new_obj));
-    FILE* fp = fopen(path, "wb");
-    Free(path);
 
-    /* Write out the code section and possible RODATA sections */
-    t_section* text_subsec = OBJECT_CODE(new_obj)[0];
-    fwrite(SECTION_DATA(text_subsec), 1, SECTION_CSIZE(text_subsec), fp);
-    uint32_t block_size = SECTION_CSIZE(text_subsec);
-    if ((OBJECT_NRODATAS(new_obj) > 0) && (SECTION_SUBSEC_FIRST(OBJECT_RODATA(new_obj)[0]) != NULL))
-    {
-      /* We also create file containing its metadata (names and offsets of subsections) */
-      path = StringConcat4(code_mobility_options.output_dir, "/", OBJECT_NAME(new_obj), ".metadata");
-      FILE* fp_md = fopen(path, "wb");
-      Free(path);
-
-      for (t_uint32 iii = 0; iii < OBJECT_NRODATAS(new_obj); iii++)
-      {
-        t_section* sec = OBJECT_RODATA(new_obj)[iii];
-        fwrite(SECTION_DATA(sec), 1, SECTION_CSIZE(sec), fp);
-        block_size += SECTION_CSIZE(sec);
-
-        t_section* subsec;
-        SECTION_FOREACH_SUBSECTION(sec, subsec)
-        {
-          /* Decode the name of the subobject and the section, and print out the information */
-          t_string subobj = SECTION_NAME(subsec);
-          char* colon_pos = strchr(subobj, ':');
-          colon_pos[0] = '\0';
-          t_string name = colon_pos + 1;
-          fprintf(fp_md, "Subobject: %s Subsection: %s Offset: 0x%x\n", subobj, name, AddressExtractUint32(AddressSub(SECTION_CADDRESS(subsec), SECTION_CADDRESS(text_subsec))));
-        }
-      }
-      fclose(fp_md);
-    }
-
-    fclose(fp);
+    /* Determine block size */
+    uint32_t block_size = SECTION_CSIZE(OBJECT_CODE(new_obj)[0]);
+    for (t_uint32 iii = 0; iii < OBJECT_NRODATAS(new_obj); iii++)
+      block_size += SECTION_CSIZE(OBJECT_RODATA(new_obj)[iii]);
 
     /* Update the metric info */
     metric.nr_of_mobile_blocks++;
@@ -426,6 +392,50 @@ void CodeMobilityTransformer::FinalizeTransform ()
     RNGDestroy(rng_cm_master);
     RNGDestroy(rng_apply_chance);
     RNGDestroy(rng_opaquepredicate);
+  }
+}
+
+void CodeMobilityTransformer::Output ()
+{
+  if (strcmp(code_mobility_options.output_dir, ".") != 0)
+    DirMake(code_mobility_options.output_dir, FALSE);
+
+  for(t_object* new_obj : new_objs)
+  {
+    t_const_string path = StringConcat3(code_mobility_options.output_dir, "/", OBJECT_NAME(new_obj));
+    FILE* fp = fopen(path, "wb");
+    Free(path);
+
+    /* Write out the code section and possible RODATA sections */
+    t_section* text_subsec = OBJECT_CODE(new_obj)[0];
+    fwrite(SECTION_DATA(text_subsec), 1, SECTION_CSIZE(text_subsec), fp);
+    if ((OBJECT_NRODATAS(new_obj) > 0) && (SECTION_SUBSEC_FIRST(OBJECT_RODATA(new_obj)[0]) != NULL))
+    {
+      /* We also create file containing its metadata (names and offsets of subsections) */
+      path = StringConcat4(code_mobility_options.output_dir, "/", OBJECT_NAME(new_obj), ".metadata");
+      FILE* fp_md = fopen(path, "wb");
+      Free(path);
+
+      for (t_uint32 iii = 0; iii < OBJECT_NRODATAS(new_obj); iii++)
+      {
+        t_section* sec = OBJECT_RODATA(new_obj)[iii];
+        fwrite(SECTION_DATA(sec), 1, SECTION_CSIZE(sec), fp);
+
+        t_section* subsec;
+        SECTION_FOREACH_SUBSECTION(sec, subsec)
+        {
+          /* Decode the name of the subobject and the section, and print out the information */
+          t_string subobj = SECTION_NAME(subsec);
+          char* colon_pos = strchr(subobj, ':');
+          colon_pos[0] = '\0';
+          t_string name = colon_pos + 1;
+          fprintf(fp_md, "Subobject: %s Subsection: %s Offset: 0x%x\n", subobj, name, AddressExtractUint32(AddressSub(SECTION_CADDRESS(subsec), SECTION_CADDRESS(text_subsec))));
+        }
+      }
+      fclose(fp_md);
+    }
+
+    fclose(fp);
   }
 }
 

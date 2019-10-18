@@ -44,18 +44,7 @@ static void AddAttestation(t_cfg* cfg)
     /* Unpack information about attestator */
     t_const_string name = pair.first.c_str();
     Attestator* attestator = &(pair.second);
-
-    t_const_string tmpstr = StringConcat2("base_address_", name);
-    const t_symbol* base_address_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), tmpstr);
-    Free(tmpstr);
-
-    tmpstr = StringConcat2("data_structure_blob_", name);
-    const t_symbol* blob_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), tmpstr);
-    Free(tmpstr);
-
-    ASSERT(base_address_sym && blob_sym, ("Some symbols required for attestation (attestator: %s) were found not to be present in the binary. Are you sure the necessary files were linked in?", name));
-
-    t_section* data_sec = T_SECTION(SYMBOL_BASE(blob_sym));
+    const t_symbol* base_address_sym = attestator->base_address_sym;
 
     /* Add relocation so the base_address variable will contain the address of the .text section */
     RelocTableAddRelocToRelocatable (OBJECT_RELOC_TABLE(obj),
@@ -87,33 +76,9 @@ static void AddAttestation(t_cfg* cfg)
       attestation_annots.push_back(info);
     }
 
-    /* If there are no areas, set the data_structure_blob variable to NULL and return */
+    /* If there are no areas, return */
     if (attestation_annots.empty())
-    {
-      SectionSetData32(data_sec, SYMBOL_OFFSET_FROM_START(blob_sym), 0);
-      continue;/* My work here is done */
-    }
-
-    /* Add new subsection for ADS */
-    t_section* ads = SectionCreateForObject (SECTION_OBJECT(data_sec), DATA_SECTION, SECTION_PARENT_SECTION(data_sec),
-        AddressNewForObject(obj, sizeof(t_uint32) + 3 * sizeof(t_uint64)), ".data_structure_blob");
-
-    /* Add relocation so the data_structure_blob variable will contain the address of the ADS */
-    RelocTableAddRelocToRelocatable (OBJECT_RELOC_TABLE(obj),
-        AddressNullForObject(obj),
-        SYMBOL_BASE(blob_sym),
-        SYMBOL_OFFSET_FROM_START(blob_sym),
-        T_RELOCATABLE(ads),
-        AddressNullForObject(obj),
-        FALSE,
-        NULL,
-        NULL,
-        NULL,
-        "R00A00+\\l*w\\s0000$");
-
-    /* Add dynamic relative relocation on data_structure_blob variable if necessary */
-    if ((OBJECT_TYPE(obj) == OBJTYP_SHARED_LIBRARY_PIC) || (OBJECT_TYPE(obj) == OBJTYP_EXECUTABLE_PIC))
-      DiabloBrokerCall ("AddDynamicRelativeRelocation", obj, SYMBOL_BASE(blob_sym), SYMBOL_OFFSET_FROM_START(blob_sym));
+      continue;
 
     /* Use a dynamically-sized vector to hold all areas */
     attestator->areas.resize(attestation_annots.size());
@@ -172,7 +137,8 @@ static void AddAttestation(t_cfg* cfg)
      * contains the labels of all the regions that are to be attestated at startup.
      */
     t_uint16 id = 0;
-    tmpstr = StringConcat2("startup_labels_", name);
+    t_const_string tmpstr = StringConcat2("startup_labels_", name);
+    t_section* ads = T_SECTION(SYMBOL_BASE(attestator->blob_sym));/* The ADS subsection */
     FILE* fp = fopen(tmpstr, "w");
     Free(tmpstr);
     for (size_t iii = 0; iii < areas.size(); iii++)
@@ -211,7 +177,7 @@ static void AddAttestation(t_cfg* cfg)
 
     /* If we're dealing with a code guard attestator, we should reserve space for the checksums */
     if (!attestator->area_names.empty())
-      attestator->ReserveChecksumSpace(obj, name);
+      attestator->ReserveChecksumSpace();
 
     /* Dump the ADS in binary format */
     tmpstr = StringConcat2("ads_", name);
@@ -279,6 +245,7 @@ void AttestationInit(t_object* obj, t_const_string AID_string, t_const_string ou
   DiabloBrokerCallInstall("DetermineAddressProducersOptimization", "t_bool* optimize", (void*)setFalse, TRUE);
 
   /* Create and associate the regions with their attestators, and fill in the argument for the calls to the attestator */
+  Attestator::ResolveSymbols(obj);
   Attestator::AssociateRegionsWithAttestators(OBJECT_CFG(obj));
   AdaptAttestatorCalls(OBJECT_CFG(obj));
 }
@@ -312,6 +279,31 @@ Attestator* Attestator::Create(string& label, vector<string>& regions, t_uint32*
     *area_id = it - area_names.begin();
 
   return ret;
+}
+
+void Attestator::ResolveSymbols(t_object* obj)
+{
+  for(auto& pair : attestators)
+  {
+    /* Unpack information about attestator */
+    t_const_string name = pair.first.c_str();
+    Attestator* attestator = &(pair.second);
+
+    /* Get the symbols for the variables */
+    t_const_string tmpstr = StringConcat2("base_address_", name);
+    attestator->base_address_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), tmpstr);
+    Free(tmpstr);
+
+    tmpstr = StringConcat2("data_structure_blob_", name);
+    attestator->blob_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), tmpstr);
+    Free(tmpstr);
+
+    tmpstr = StringConcat2("checksum_", name);
+    attestator->checksum_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), tmpstr);
+    Free(tmpstr);
+
+    ASSERT(attestator->base_address_sym && attestator->blob_sym && attestator->checksum_sym, ("Some symbols required for attestation (attestator: %s) were found not to be present in the binary. Are you sure the necessary files were linked in?", name));
+  }
 }
 
 void Attestator::AssociateRegionsWithAttestators(t_cfg* cfg)
@@ -381,10 +373,9 @@ void Attestator::CalculateChecksums(t_object* obj)
       /* As we're already past the point where the sections are rebuilt from their subsections, we have
        * to modify the parent section itself to fill in the checksums. This requires some juggling with addresses.
        */
-      t_symbol* checksum_sym = attestator->checksum_sym;
-      t_section* checksum_subsec = T_SECTION(SYMBOL_BASE(checksum_sym));
+      t_section* checksum_subsec = T_SECTION(SYMBOL_BASE(attestator->checksum_sym));
       t_section* data_sec = SECTION_PARENT_SECTION(checksum_subsec);
-      t_address offset = AddressAdd(AddressSub(SECTION_CADDRESS(checksum_subsec), SECTION_CADDRESS(data_sec)), SYMBOL_OFFSET_FROM_START(checksum_sym));
+      t_address offset = AddressAdd(AddressSub(SECTION_CADDRESS(checksum_subsec), SECTION_CADDRESS(data_sec)), SYMBOL_OFFSET_FROM_START(attestator->checksum_sym));
 
       for (const auto& area : attestator->areas)
       {
@@ -402,15 +393,8 @@ void Attestator::CalculateChecksums(t_object* obj)
   }
 }
 
-void Attestator::ReserveChecksumSpace(t_object* obj, t_const_string name)
+void Attestator::ReserveChecksumSpace()
 {
-  /* Get the symbol for the checksum structure */
-  t_const_string tmpstr = StringConcat2("checksum_", name);
-  checksum_sym = SymbolTableGetSymbolByName (OBJECT_SUB_SYMBOL_TABLE(obj), tmpstr);
-  Free(tmpstr);
-
-  ASSERT(checksum_sym, ("Some symbols required for code guards (attestator: %s) were found not to be present in the binary. Are you sure the necessary files were linked in?", name));
-
   /* Resize the checksum section */
   checksum_size = SectionGetData32 (T_SECTION(SYMBOL_BASE(checksum_sym)), SYMBOL_OFFSET_FROM_START(checksum_sym));
   t_section* checksum_subsec = T_SECTION(SYMBOL_BASE(checksum_sym));
