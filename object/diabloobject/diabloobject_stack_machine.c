@@ -794,6 +794,16 @@ StackExec (t_const_string program, const t_reloc * rel, const t_symbol * sym, ch
           DEBUG_STACK(("@G - @G = @G", oper1, oper2, AddressSub (oper1, oper2)));
         }
         break;
+      case '_': /* reverse SUB pop the two top elements off the stack, sub them and push the result */
+        {
+          t_address oper1, oper2;
+
+          oper1 = Pop (st);
+          oper2 = Pop (st);
+          Push (st, AddressSub (oper1, oper2));
+          DEBUG_STACK(("@G - @G = @G", oper1, oper2, AddressSub (oper1, oper2)));
+        }
+        break;
       case '&': /* pop the two top elements off the stack, and them (bitwise) and push the result */
         {
           t_address oper1, oper2;

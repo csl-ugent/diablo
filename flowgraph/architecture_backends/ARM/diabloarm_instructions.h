@@ -215,6 +215,7 @@ void ArmInsMakeCondBranchLinkAndExchange(t_arm_ins * ins, t_uint32 cond, t_reg r
 void ArmInsMakeClz(t_arm_ins * ins, t_reg regA, t_reg regC, t_uint32 cond);
 void ArmInsMakeAdd(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeMul(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
+void ArmInsMakeDiv(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond); //custom
 void ArmInsMakeCmp(t_arm_ins * ins, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeTst(t_arm_ins * ins, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeSub(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
