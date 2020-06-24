@@ -636,8 +636,10 @@ main (int argc, char **argv)
         {
           if (aspire_options.code_mobility)
             cm_transformer->FinalizeTransform();
+#if SELF_DEBUGGING
           if (aspire_options.self_debugging)
             sd_transformer->FinalizeTransform();
+#endif
         }
 
         t_const_string consumed_annotations_file = StringConcat2 (global_options.output_name, ".diablo.consumedannotations.json");
