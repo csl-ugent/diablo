@@ -18,6 +18,8 @@ extern "C" {
 
 #include "diablo_options.h"
 #include "obfuscation_opt.h"
+
+#include "obfuscation/generic/opaque_predicate_opt.h"
 }
 
 #include <diabloflowgraph_dwarf.h>
@@ -37,6 +39,8 @@ extern "C" {
 
 #include <diabloannotations.h>
 #include "obfuscation_json.h"
+
+#include <frontends/common.h>
 
 using namespace std;
 
@@ -176,6 +180,41 @@ always_true (t_bbl * bbl1, t_bbl * bbl2)
   return TRUE;
 }
 
+char** stringVectorToCharPtrArray(const vector<string> &v)
+{
+    if (v.size() > 0)
+    {
+        char** cc = new char *[v.size()+1];
+        int idx = 0;
+
+        for (string s : v)
+        {
+            cc[idx] = new char[s.size()+1];
+            strcpy(cc[idx], s.c_str());
+
+            idx++;
+        }
+
+        cc[v.size()] = NULL;
+
+        return cc;
+    }
+
+    return NULL;
+}
+
+void deleteCharPtrArray(char** arr, int size)
+{
+  for (int i = 0; i < size; i++)
+    delete[] arr[i];
+
+  delete[] arr;
+}
+
+void OutputFilenameBroker(t_string *result)
+{
+  *result = StringDup(global_options.output_name);
+}
 
 LogFile* L_OBF_OP=NULL;
 int
@@ -184,6 +223,8 @@ main (int argc, char **argv)
   t_object *obj;
 
   void *obf_arch;
+  PrintFullCommandline(argc, argv);
+  InitPluginSearchDirectory(FileDirectory(argv[0]));
   InitArchitecture(&obf_arch);
 
   ObfuscationArchitectureInitializer* obfuscationArchitecture = GetObfuscationArchitectureInitializer();
@@ -204,6 +245,7 @@ main (int argc, char **argv)
   PrintVersionInformationIfRequested();
 
   /* III. The REAL program {{{ */
+  RNGInitialise();
   if (global_options.random_overrides_file)
     RNGReadOverrides(global_options.random_overrides_file);
 
@@ -232,8 +274,12 @@ main (int argc, char **argv)
 
     obj = LinkEmulate (global_options.objectfilename,diabloobject_options.read_debug_info);
 
-    if(diabloobject_options.read_debug_info)
+    DiabloBrokerCallInstall("EnhancedLivenessDirectory", "t_string *", (void *)EnhancedLivenessDirectoryBroker, FALSE);
+
+    if(diabloobject_options.read_debug_info) {
+      DiabloBrokerCall("ParseVersioningInformation", obj);
       DwarfFlowgraphInit();
+    }
 
     /* Read in the annotations from the JSON file if one is provided */
     Annotations annotations;
@@ -247,28 +293,47 @@ main (int argc, char **argv)
     if (global_options.self_profiling)
       SelfProfilingInit(obj, global_options.self_profiling);
 
+    DiabloBrokerCallInstall("OutputFileName", "t_string *", (void *)OutputFilenameBroker, FALSE);
+
 	//RelocTableRemoveConstantRelocs(OBJECT_RELOC_TABLE(obj));
 
     if (global_options.disassemble)
     {
+      vector<string> force_reachable_vector;
+
       /* B. Transform and optimize  {{{ */
       /* 1. Disassemble */
+      NewDiabloPhase("Disassemble");
 
       ObjectDisassemble (obj);
 
       /* 2. {{{ Create the flowgraph */
       if (global_options.flowgraph)
       {
+        t_const_string initial_dot_path = "./diablo-obfuscator-dots-before";
+        t_const_string final_dot_path = "./diablo-obfuscator-dots-after";
+
+        vector<string> reachable_vector;
+
+        if (global_options.dots_before_path_set)
+          initial_dot_path = global_options.dots_before_path;
+        if (global_options.dots_after_path_set)
+          final_dot_path = global_options.dots_after_path;
+
+        NewDiabloPhase("Flowgraph");
+        ComplexityInitTempInfo(OBJECT_CFG(obj));
+
         t_cfg *cfg;
         if (global_options.self_profiling)
           {
-            t_const_string force_reachable[2];
-            force_reachable[0] = FINAL_PREFIX_FOR_LINKED_IN_SP_OBJECT "Init";
-            force_reachable[1] = NULL;
+            force_reachable_vector.push_back(FINAL_PREFIX_FOR_LINKED_IN_SP_OBJECT "Init");
+            t_string *force_reachable = stringVectorToCharPtrArray(force_reachable_vector);
             ObjectFlowgraph (obj, NULL, force_reachable, FALSE);
+            deleteCharPtrArray(force_reachable, force_reachable_vector.size());
           }
         else
           ObjectFlowgraph (obj, NULL, NULL, FALSE);
+
         cfg = OBJECT_CFG(obj);
 
         if(diabloobject_options.read_debug_info)
@@ -278,9 +343,19 @@ main (int argc, char **argv)
 
         DiabloBrokerCall("StucknessAnalysis", obj);
 
+        RecordFunctionsAsOriginal(cfg);
+
         CfgRemoveDeadCodeAndDataBlocks (cfg);
         CfgPatchToSingleEntryFunctions (cfg);
         CfgRemoveDeadCodeAndDataBlocks (cfg);
+
+        /* optimize for single-threaded apps */
+        if (global_options.single_threaded)
+        {
+          STATUS(START, ("Optimizing for single-threaded application"));
+          DiabloBrokerCall("OptimizeSingleThreaded", cfg);
+          STATUS(STOP, ("Optimizing for single-threaded application"));
+        }
 
         RegionsInit(annotations, cfg);
 
@@ -297,6 +372,14 @@ main (int argc, char **argv)
               }
           }
 
+        if (diabloflowgraph_options.blocksequencefile)
+          {
+            CfgReadBlockSequenceCounts (cfg, diabloflowgraph_options.blocksequencefile);
+          }
+
+        InitialiseObjectFileTracking(cfg);
+        ComplexityFiniTempInfo(OBJECT_CFG(obj));
+
         // MakeConstProducers (cfg);
 
         VERBOSE(0,("INITIAL PROGRAM COMPLEXITY REPORT"));
@@ -304,13 +387,23 @@ main (int argc, char **argv)
         CfgComputeStaticComplexity(cfg);
         CfgComputeDynamicComplexity(cfg);
 
-        //CfgDrawFunctionGraphsWithHotness (OBJECT_CFG(obj), "./dots-before");
-        DiabloBrokerCall("BblConstructCompareMatrices", cfg);
+        /* generate dot file if requested */
+        if (global_options.generate_dots)
+        {
+          CfgDrawFunctionGraphs(cfg, initial_dot_path);
 
+          t_string callgraph_dot_file = StringConcat2(initial_dot_path, "/callgraph.dot");
+          CfgDrawFunctionGraphsWithHotness (OBJECT_CFG(obj), initial_dot_path);
+          CgBuild (cfg);
+          CgExport (CFG_CG(cfg), callgraph_dot_file);
+          Free(callgraph_dot_file);
+        }
+
+        NewDiabloPhase("Obfuscation");
         if (global_options.annotation_file == NULL)
           ObjectObfuscate(global_options.objectfilename, obj);
         else
-          CfgObfuscateRegions(cfg);
+          CfgObfuscateRegions(cfg, global_options.generate_dots);
 
         if (!diabloanopt_options.rely_on_calling_conventions
             && global_options.factoring && (global_options.epilogue_factoring || global_options.bbl_factoring))
@@ -347,12 +440,18 @@ main (int argc, char **argv)
           {
             if (diabloflowgraph_options.blockprofilefile)
               CfgComputeHotBblThreshold (cfg, 0.90);
-            CfgDrawFunctionGraphsWithHotness (OBJECT_CFG(obj), "./dots-final");
+            CfgDrawFunctionGraphsWithHotness (OBJECT_CFG(obj), final_dot_path);
             CgBuild (cfg);
-            CgExport (CFG_CG(cfg), "./dots-final/callgraph.dot");
+
+            t_string callgraph_dot_file = StringConcat2(final_dot_path, "/callgraph.dot");
+            CgExport (CFG_CG(cfg), callgraph_dot_file);
+            Free(callgraph_dot_file);
           }
         /* }}} */
 
+        DiabloBrokerCall("printStats", cfg);
+
+        NewDiabloPhase("Deflowgraph");
         ObjectDeflowgraph (obj);
 
         if (global_options.print_listing)
@@ -365,33 +464,6 @@ main (int argc, char **argv)
         RegionsFini(cfg);
       }
       /*  }}} */
-
-#if 0
-	{
-	  FILE *f = fopen ("mapping.xml", "w");
-	  FileIo(f,"<mapping>");
-	  if (f)
-	  {
-	    t_ins *ins;
-	    SECTION_FOREACH_INS (OBJECT_CODE (obj)[0], ins)
-	    {
-        t_address_item * item = INS_ADDRESSLIST(ins)->first;
-		FileIo (f, "<ins address=\"@G\" ", INS_CADDRESS(ins));
-
-          FileIo(f, "orig_function_first=\"@G\" guessed_train_exec_count=\"%lli\" >", INS_ORIGINAL_ADDRESS(ins), INS_EXECCOUNT(ins));
-
-        while(item) {
-		      FileIo (f, "@G ", item->address);
-		      item = item->next;
-		    }
-
-	      FileIo (f, "</ins>\n");
-	    }
-	    FileIo(f,"</mapping>");
-	    fclose (f);
-	  }
-	}
-#endif
 
       ObjectAssemble (obj);
       /* End Transform and optimize }}} */
@@ -418,6 +490,8 @@ main (int argc, char **argv)
 
   }
   /* END REAL program }}} */
+
+  RNGFinalise();
 
   /* IV. Free all structures {{{ */
   /* remove directory that held the restored dump */

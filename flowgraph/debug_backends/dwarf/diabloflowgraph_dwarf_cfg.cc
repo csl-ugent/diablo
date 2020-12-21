@@ -1,13 +1,12 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
-#include "diabloflowgraph_dwarf.h"
+#include "diabloflowgraph_dwarf.hpp"
 
 #include <map>
-#include <string>
-#include <iostream>
 
 using namespace std;
 
+/* DYNAMIC MEMBERS */
 INS_DYNAMIC_MEMBER_GLOBAL_ARRAY(lineinfo);
 
 static map<string, char*> file_name_cache;
@@ -186,7 +185,7 @@ void DwarfTableForLineInfoAddEntry(AddressRangeTableEntry * a_entry, DwarfAbbrev
 	  auto et = static_cast<DwarfAbbrevTableEntry *>(e);
 	  
 	  /* not a subprogram tag --> continue */
-	  if (et->declaration->tag != 0x2e) continue;
+	  if (et->declaration->tag != DwarfTagCode::DW_TAG_subprogram) continue;
 	  
 	  /* found subprogram */
 	  DwarfTableForLineInfoAddEntry(a_entry,et);
@@ -199,7 +198,6 @@ void DwarfTableForLineInfoAddEntry(AddressRangeTableEntry * a_entry, DwarfAbbrev
 void DwarfBuildTableForLineInfo(DwarfSections *dwarf_sections, DwarfInfo dwarf_info)
 {
   AddressRangeTable *arange_table = static_cast<AddressRangeTable *>(dwarf_info.arange_table);
-  AddressRangeTableEntry *entry = NULL;
 
   for (auto entry_it : *arange_table)
     DwarfTableForLineInfoAddEntry(entry_it, static_cast<DwarfAbbrevTableEntry *>(entry_it->cu_header->children[0]));
@@ -268,6 +266,17 @@ CfgAssociateLineInfoWithIns(t_cfg *cfg, DwarfSections *dwarf_sections, DwarfInfo
         INS_SET_SRC_LINE(ins, INS_LINEINFO(ins)->line);
       }
     }
+
+  AddressRangeTable *arange_table = static_cast<AddressRangeTable *>(dwarf_info.arange_table);
+
+  for (auto entry : *arange_table) {
+    DwarfCompilationUnitHeader *cu_header = entry->cu_header;
+
+    for (auto entry_it : cu_header->children)
+      FindFunctionDeclarations(static_cast<DwarfAbbrevTableEntry *>(entry_it));
+  }
+
+  DwarfParseInformation(cfg);
 }
 
 void

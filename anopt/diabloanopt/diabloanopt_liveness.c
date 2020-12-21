@@ -16,6 +16,15 @@
 // #include "../../dwarf/dwarf_function.h"
 #endif
 
+/* floating-point specifics are annotated with 'FLOAT' comments */
+// #define DEBUG_THIS
+
+#ifdef DEBUG_THIS
+#define _DEBUG(x) DEBUG(x)
+#else
+#define _DEBUG(x)
+#endif
+
 /*! FunctionComputeChangedRegisters: This function computes the registers that
  * a procedure changes, ignoring loads that restore a register. 
  * {{{ */
@@ -310,6 +319,9 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
   /* local variables */
   const t_architecture_description * desc = CFG_DESCRIPTION(cfg);
 
+  //FLOAT
+  t_regset all_float_arg_regs = RegsetIntersect(desc->flt_registers, desc->argument_regs);
+
   /* First we initialize all functions:
    *
    * - The call hell function gets initialized as:
@@ -330,10 +342,27 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
     if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)))
     {
       FUNCTION_SET_REGS_THROUGH(i_fun, desc->callee_saved);
-      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)) == BBL_CH_DYNCALL || FUNCTION_BBL_FIRST(i_fun) == CFG_CALL_HELL_NODE(cfg))
-	FUNCTION_SET_REGS_USED(i_fun, RegsetUnion(desc->callee_may_use,desc->dyncall_may_use));
-      else
-	FUNCTION_SET_REGS_USED(i_fun, desc->callee_may_use);
+
+      t_regset x = desc->callee_may_use;
+      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)) == BBL_CH_DYNCALL || FUNCTION_BBL_FIRST(i_fun) == CFG_CALL_HELL_NODE(cfg)) {
+        RegsetSetUnion(x, desc->dyncall_may_use);
+
+        //FLOAT vvv
+	/* we use DWARF to know which FP registers are used (parameters) */
+        RegsetSetDiff(x, all_float_arg_regs);
+        RegsetSetUnion(x, FUNCTION_FLOAT_ARG_REGS(i_fun));
+        //FLOAT ^^^
+
+        FUNCTION_SET_REGS_USED(i_fun, x);
+      }
+      else {
+        //FLOAT vvv
+        RegsetSetDiff(x, all_float_arg_regs);
+        RegsetSetUnion(x, FUNCTION_FLOAT_ARG_REGS(i_fun));
+        //FLOAT ^^^
+
+        FUNCTION_SET_REGS_USED(i_fun, x);
+      }
     }
     else if( FUNCTION_IS_HELL(i_fun) )
     {
@@ -345,6 +374,15 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
       FUNCTION_SET_REGS_THROUGH(i_fun, NullRegs);
       FUNCTION_SET_REGS_USED(i_fun, NullRegs);
     }
+
+    //FLOAT vvv
+    /* calculate whether or not this function defines any FP register */
+    t_bbl *bbl;
+    t_regset all_def = RegsetNew();
+    FUNCTION_FOREACH_BBL(i_fun, bbl)
+      RegsetSetUnion(all_def, BblRegsMaybeDef(bbl));
+    FUNCTION_SET_DEFS_FLOAT_REG(i_fun, !RegsetIsEmpty(RegsetIntersect(all_def, desc->flt_registers)));
+    //FLOAT ^^^
   }
   
   /* Next we compute the used and defined registers of each basic block.
@@ -368,6 +406,7 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
     /* We set the exit blocks to 'all registers live' */
     if (!BBL_IS_HELL(i_bbl) && BblIsExitBlock(i_bbl))
     {
+      _DEBUG(("set11 @B callsite to @X", i_bbl, CPREGSET(BBL_CFG(i_bbl), desc->all_registers)));
       BBL_SET_REGS_LIVE_OUT(i_bbl, desc->all_registers);
 
       /* Use debugging information extension {{{ */
@@ -375,13 +414,24 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
       /* Subtract the return registers that are not used by
        * this function from the set of live registers.
        */
-      if(diabloanopt_options.rely_on_calling_conventions)
-        BBL_SET_REGS_LIVE_OUT(i_bbl, RegsetDiff(BBL_REGS_LIVE_OUT(i_bbl), RegsetDiff(desc->return_regs,FUNCTION_RET_REGS(BBL_FUNCTION(i_bbl)))));
+      if(diabloanopt_options.rely_on_calling_conventions) {
+        t_regset x = RegsetDiff(BBL_REGS_LIVE_OUT(i_bbl), RegsetDiff(desc->return_regs,FUNCTION_RET_REGS(BBL_FUNCTION(i_bbl))));
+
+        //FLOAT vvv
+	/* we use DWARF to know which FP registers are defined in this function (return values) */
+        RegsetSetDiff(x, all_float_arg_regs);
+        RegsetSetUnion(x, FUNCTION_FLOAT_RET_REGS(BBL_FUNCTION(i_bbl)));
+        //FLOAT ^^^
+
+        _DEBUG(("set12 @B callsite to @X", i_bbl, CPREGSET(BBL_CFG(i_bbl), x)));
+        BBL_SET_REGS_LIVE_OUT(i_bbl, x);
+      }
 #endif
       /* }}} */
     }
     else
     {
+      _DEBUG(("set13 @B callsite to @X", i_bbl, CPREGSET(BBL_CFG(i_bbl), desc->always_live)));
       BBL_SET_REGS_LIVE_OUT(i_bbl, desc->always_live);
     }
   }
@@ -396,9 +446,18 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
   {
     CFG_FOREACH_FUN(cfg,i_fun)
     {
+      /* change the THROUGH regset */
       {
-	FUNCTION_SET_REGS_THROUGH(i_fun, RegsetDiff(FUNCTION_REGS_THROUGH(i_fun),
-	      RegsetDiff(FUNCTION_DESCRIPTOR(i_fun)->argument_regs,FUNCTION_ARG_REGS(i_fun))));
+        /* remove the used INT argument registers */
+        t_regset x = RegsetDiff(desc->argument_regs, FUNCTION_ARG_REGS(i_fun));
+
+        //FLOAT vvv
+	/* remove the used FLT argument registers */
+        RegsetSetDiff(x, FUNCTION_FLOAT_ARG_REGS(i_fun));
+        //FLOAT ^^^
+
+	/* the unused arguments are going through */
+	FUNCTION_SET_REGS_THROUGH(i_fun, RegsetDiff(FUNCTION_REGS_THROUGH(i_fun), x));
       }
     }
   }
@@ -410,8 +469,16 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
     if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)))
     {
       FUNCTION_SET_REGS_THROUGH (i_fun, desc->callee_saved);
-      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)) == BBL_CH_DYNCALL)
-        FUNCTION_SET_REGS_USED(i_fun, RegsetUnion(desc->callee_may_use,desc->dyncall_may_use));
+      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)) == BBL_CH_DYNCALL) {
+        t_regset x = RegsetUnion(desc->callee_may_use,desc->dyncall_may_use);
+
+        //FLOAT vvv
+        RegsetSetDiff(x, all_float_arg_regs);
+        RegsetSetUnion(x, FUNCTION_FLOAT_ARG_REGS(i_fun));
+        //FLOAT ^^^
+
+        FUNCTION_SET_REGS_USED(i_fun, x);
+      }
     }
   }
   FUNCTION_SET_REGS_THROUGH (CFG_HELL_FUNCTION(cfg), desc->all_registers);
@@ -431,10 +498,16 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
     {
 #ifdef AGGRESSIVE_LIVENESS
       t_bbl *tail = CFG_EDGE_TAIL (i_edge);
-      if (diabloanopt_options.rely_on_calling_conventions && CFG_DESCRIPTION(cfg)->FunIsGlobal(BBL_FUNCTION(tail)))
-	FUNCTION_SET_REGS_USED(BBL_FUNCTION(tail),
-	    RegsetIntersect (FUNCTION_REGS_USED(BBL_FUNCTION(tail)),
-	      desc->callee_may_use));
+      if (diabloanopt_options.rely_on_calling_conventions && CFG_DESCRIPTION(cfg)->FunIsGlobal(BBL_FUNCTION(tail))) {
+        t_regset x = RegsetIntersect (FUNCTION_REGS_USED(BBL_FUNCTION(tail)), desc->callee_may_use);
+
+        //FLOAT vvv
+        RegsetSetDiff(x, all_float_arg_regs);
+        RegsetSetUnion(x, FUNCTION_FLOAT_ARG_REGS(BBL_FUNCTION(tail)));
+        //FLOAT ^^^
+
+	FUNCTION_SET_REGS_USED(BBL_FUNCTION(tail), x);
+      }
 #endif
     }
 
@@ -458,8 +531,17 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
   {
     CFG_FOREACH_FUN(cfg,i_fun)
     {
-	FUNCTION_SET_REGS_USED(i_fun, RegsetDiff(FUNCTION_REGS_USED(i_fun),
-	      RegsetDiff(FUNCTION_DESCRIPTOR(i_fun)->argument_regs,FUNCTION_ARG_REGS(i_fun))));
+      /* remove unused argument registers */
+      t_regset x = FUNCTION_REGS_USED(i_fun);
+      RegsetSetDiff(x, RegsetDiff(FUNCTION_DESCRIPTOR(i_fun)->argument_regs, FUNCTION_ARG_REGS(i_fun)));
+
+      //FLOAT vvv
+      /* remove unused argument registers */
+      RegsetSetDiff(x, all_float_arg_regs);
+      RegsetSetUnion(x, FUNCTION_FLOAT_ARG_REGS(i_fun));
+      //FLOAT ^^^
+
+	FUNCTION_SET_REGS_USED(i_fun, x);
     }
   }
 #endif
@@ -470,8 +552,16 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
     if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)))
     {
       FUNCTION_SET_REGS_THROUGH (i_fun, desc->callee_saved);
-      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)) == BBL_CH_DYNCALL)
-        FUNCTION_SET_REGS_USED(i_fun, RegsetUnion(desc->callee_may_use,desc->dyncall_may_use));
+      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(i_fun)) == BBL_CH_DYNCALL) {
+        t_regset x = RegsetUnion(desc->callee_may_use, desc->dyncall_may_use);
+
+        //FLOAT vvv
+        RegsetSetDiff(x, all_float_arg_regs);
+        RegsetSetUnion(x, FUNCTION_FLOAT_ARG_REGS(i_fun));
+        //FLOAT ^^^
+
+        FUNCTION_SET_REGS_USED(i_fun, x);
+      }
     }
   }
   FUNCTION_SET_REGS_THROUGH (CFG_HELL_FUNCTION(cfg), desc->all_registers);
@@ -512,9 +602,10 @@ CfgComputeLivenessSensitive(t_cfg * cfg, t_bool with_kill_useless)
   SensitiveLivenessFixpoint(cfg, with_kill_useless);
 
   /* and than we add a forward analysis */
-
+//   CfgDrawFunctionGraphs(cfg, "before-fw");
   if(diabloanopt_options.forward_liveness)
     CfgComputeMeaningfulRegs(cfg);
+//   CfgDrawFunctionGraphs(cfg, "after-fw");
 
 #ifdef DIABLOANOPT_DEBUG /*{{{*/
   {
@@ -666,6 +757,7 @@ BblPropLivenessToPredSwiReturnEdge(t_regset in, const t_architecture_description
     if (BBL_IS_HELL(callsite)) *do_continue = TRUE;
     BblMark(callsite);
     change = TRUE;
+    _DEBUG(("set16 @B callsite to @X", callsite, CPREGSET(BBL_CFG(callsite), *out)));
     BBL_SET_REGS_LIVE_OUT(callsite, *out);
   }
   return change;
@@ -718,6 +810,7 @@ BblPropLivenessToPredNoReturnForEdge(t_regset in, const t_architecture_descripti
           {
             BblMark(callsite);
             change = TRUE;
+            _DEBUG(("set1 @B callsite to @X", callsite, CPREGSET(BBL_CFG(callsite), callsite_out)));
             BBL_SET_REGS_LIVE_OUT(callsite, callsite_out);
           }
         }
@@ -762,6 +855,12 @@ BblPropLivenessToPredIncludingReturnForEdge(t_regset in, const t_architecture_de
             RegsetSetUnion(tmp,description->callee_may_return);
           }
 
+      //FLOAT vvv
+      RegsetSetDiff(tmp, RegsetIntersect(description->flt_registers, description->callee_may_change));
+	    RegsetSetDiff(tmp, RegsetIntersect(description->flt_registers, description->callee_may_return));
+	    RegsetSetUnion(tmp, FUNCTION_FLOAT_RET_REGS(BBL_FUNCTION(CFG_EDGE_HEAD(i_edge))));
+      //FLOAT ^^^
+
           RegsetSetDup(*out,*old_out);
           RegsetSetUnion(*out,tmp);
         }
@@ -773,7 +872,6 @@ BblPropLivenessToPredIncludingReturnForEdge(t_regset in, const t_architecture_de
 
           if (!BBL_IS_HELL(callsite) && BBL_FUNCTION(callsite) && !FUNCTION_IS_HELL(BBL_FUNCTION(callsite)))
           {
-
             t_regset callsite_out = RegsetNew();
             t_regset callsite_oldout = RegsetNew();
 
@@ -786,10 +884,19 @@ BblPropLivenessToPredIncludingReturnForEdge(t_regset in, const t_architecture_de
             RegsetSetIntersect(tmp,FUNCTION_REGS_THROUGH(callee));
             RegsetSetUnion(callsite_out,tmp);
 
+      //FLOAT vvv
+	    if (FUNCTION_CALL_HELL_TYPE(BBL_FUNCTION(CFG_EDGE_HEAD(i_edge)))
+	    	&& !FUNCTION_DEFS_FLOAT_REG(BBL_FUNCTION(callsite))
+	    	&& RegsetIsEmpty(FUNCTION_FLOAT_ARG_REGS(BBL_FUNCTION(callsite)))) {
+		RegsetSetDiff(callsite_out, RegsetIntersect(description->argument_regs, description->flt_registers));
+	    }
+      //FLOAT ^^^
+
             if(!RegsetEquals(callsite_out,callsite_oldout))
             {
               BblMark(callsite);
               change = TRUE;
+              _DEBUG(("set2 @B callsite to @X", callsite, CPREGSET(BBL_CFG(callsite), callsite_out)));
               BBL_SET_REGS_LIVE_OUT(callsite, callsite_out);
             }
           }
@@ -814,6 +921,10 @@ BblPropLivenessToPred(t_bbl * bbl, t_regset in, const t_architecture_description
   t_function *headfun;
   t_bool change = FALSE;
   t_bool do_continue;
+
+  t_bool debug = (BBL_OLD_ADDRESS(bbl) == 0x66864);
+
+  _DEBUG(("to-pred @iB", bbl));
 
   BBL_FOREACH_PRED_EDGE(bbl,i_edge)
     {
@@ -849,6 +960,16 @@ BblPropLivenessToPred(t_bbl * bbl, t_regset in, const t_architecture_description
                   /* not a tail call to hell -> same as in default case */
                   RegsetSetDup(out,old_out);
                   RegsetSetUnion(out,in);
+
+      //FLOAT vvv
+		  /* this is an IP jump to HELL */
+		  if (BBL_IS_HELL(bbl)
+			&& !FUNCTION_DEFS_FLOAT_REG(BBL_FUNCTION(head))
+			&& RegsetIsEmpty(FUNCTION_FLOAT_RET_REGS(BBL_FUNCTION(head)))) {
+		    ASSERT(!BBL_IS_HELL(head), ("unexpected @E"));
+		    RegsetSetDiff(out, RegsetIntersect(description->return_regs, description->flt_registers));
+		  }
+      //FLOAT ^^^
                 }
                 else
                 {
@@ -964,6 +1085,17 @@ BblPropLivenessToPred(t_bbl * bbl, t_regset in, const t_architecture_description
 
 	      if(FunctionBehaves(callee) && description->FunIsGlobal(callee) && diabloanopt_options.rely_on_calling_conventions)
 		RegsetSetDiff(out,description->dead_over_call);
+	
+		//FLOAT vvv
+		{
+			t_bbl *callsite = CFG_EDGE_HEAD(i_edge);
+	    if (FUNCTION_CALL_HELL_TYPE(callee)
+	    	&& !FUNCTION_DEFS_FLOAT_REG(BBL_FUNCTION(callsite))
+	    	&& RegsetIsEmpty(FUNCTION_FLOAT_ARG_REGS(BBL_FUNCTION(callsite)))) {
+		RegsetSetDiff(out, RegsetIntersect(description->argument_regs, description->flt_registers));
+	    }
+		}
+		//FLOAT ^^^
 
 	      RegsetSetUnion(out,old_out);
 	      break;
@@ -994,6 +1126,7 @@ BblPropLivenessToPred(t_bbl * bbl, t_regset in, const t_architecture_description
 	      if ((headfun = BBL_FUNCTION(head))) 
 		FunctionMark(headfun);
 	      change = TRUE;
+        _DEBUG(("set3 @B callsite to @X", head, CPREGSET(BBL_CFG(head), out)));
 	      BBL_SET_REGS_LIVE_OUT(head, out);
 	    }
       
@@ -1009,6 +1142,7 @@ BblPropLivenessToPred(t_bbl * bbl, t_regset in, const t_architecture_description
 	      if (BBL_IS_HELL(head)) continue;
 	      BblMark(head);
 	      change = TRUE;
+        _DEBUG(("set4 @B callsite to @X", head, CPREGSET(BBL_CFG(head), out)));
 	      BBL_SET_REGS_LIVE_OUT(head, out);
 	      continue;
 	    }
@@ -1025,6 +1159,7 @@ BblPropLivenessToPred(t_bbl * bbl, t_regset in, const t_architecture_description
 		FunctionMark(headfun);
 	    }
 	  change = TRUE;
+    _DEBUG(("set5 @B callsite to @X", head, CPREGSET(BBL_CFG(head), out)));
 	  BBL_SET_REGS_LIVE_OUT(head, out);
 	}
     }
@@ -1292,13 +1427,14 @@ CfgComputeMeaningfulRegs(t_cfg * cfg)
 	  FunctionMark(fun);
 	}
       
+      /* process call-from-hell function entry points */
       BBL_FOREACH_SUCC_EDGE(CFG_HELL_NODE(cfg),edge)
 	{
 	  if (CFG_EDGE_CAT(edge)==ET_CALL)
 	    {
 	      BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), description->callee_may_use);
 #ifdef DWARF_ARG_INFO
-	      BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), RegsetDiff(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),RegsetDiff(description->argument_regs, FUNCTION_ARG_REGS(BBL_FUNCTION(CFG_EDGE_TAIL(edge))))));
+	      BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), RegsetDiff(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),RegsetDiff(description->argument_regs, RegsetUnion(FUNCTION_ARG_REGS(BBL_FUNCTION(CFG_EDGE_TAIL(edge))), FUNCTION_FLOAT_ARG_REGS(BBL_FUNCTION(CFG_EDGE_TAIL(edge)))))));
 #endif
 	      BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), RegsetUnion(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),description->callee_saved));
 	      BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge),  RegsetUnion(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),description->always_live));
@@ -1320,7 +1456,7 @@ CfgComputeMeaningfulRegs(t_cfg * cfg)
 	  {
 	    BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), description->callee_may_use);
 #ifdef DWARF_ARG_INFO
-	    BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), RegsetDiff(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),RegsetDiff(description->argument_regs, FUNCTION_ARG_REGS(BBL_FUNCTION(CFG_EDGE_TAIL(edge))))));
+	    BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), RegsetDiff(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),RegsetDiff(description->argument_regs, RegsetUnion(FUNCTION_ARG_REGS(BBL_FUNCTION(CFG_EDGE_TAIL(edge))), FUNCTION_FLOAT_ARG_REGS(BBL_FUNCTION(CFG_EDGE_TAIL(edge)))))));
 #endif
 	    BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge),  RegsetUnion(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),description->callee_saved));
 	    BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge),  RegsetUnion(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),description->always_live));
@@ -1338,6 +1474,18 @@ CfgComputeMeaningfulRegs(t_cfg * cfg)
           BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), RegsetUnion(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),description->callee_saved));
           BBL_SET_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge), RegsetUnion(BBL_REGS_DEFINED_IN(CFG_EDGE_TAIL(edge)),description->always_live));
         }
+
+        //FLOAT vvv
+        CFG_FOREACH_FUN(cfg, fun) {
+          if (FUNCTION_IS_HELL(fun))
+            continue;
+
+          t_regset x = BBL_REGS_DEFINED_IN(FUNCTION_BBL_FIRST(fun));
+          RegsetSetDiff(x, RegsetIntersect(description->argument_regs, description->flt_registers));
+          RegsetSetUnion(x, FUNCTION_FLOAT_ARG_REGS(fun));
+          BBL_SET_REGS_DEFINED_IN(FUNCTION_BBL_FIRST(fun), x);
+        }
+        //FLOAT ^^^
       
       do
 	{
@@ -1400,6 +1548,8 @@ CfgComputeMeaningfulRegs(t_cfg * cfg)
 				    RegsetSetDup(old2,BBL_REGS_DEFINED_IN(return_node));
 				    RegsetSetDup(new2,old2);
 				    RegsetSetUnion(new2,prop);
+
+				    RegsetSetIntersect(new2, BblRegsLiveBefore(return_node));
 
 				    if (!RegsetEquals(new2,old2))				  
 				      {
@@ -1483,8 +1633,19 @@ CfgComputeMeaningfulRegs(t_cfg * cfg)
 				  {
 				    /* Make the intersection smaller by using debuginfo */
 				    RegsetSetIntersect(max,description->callee_may_return);
-				    RegsetSetDiff(max,RegsetDiff(description->return_regs,FUNCTION_RET_REGS(callee)));
+
+            t_regset x = RegsetDiff(description->return_regs, FUNCTION_RET_REGS(callee));
+            
+            //FLOAT
+            RegsetSetDiff(x, FUNCTION_FLOAT_RET_REGS(callee));
+
+				    RegsetSetDiff(max,x);
 				  }
+				
+        //FLOAT vvv
+				t_regset x = RegsetIntersect(description->return_regs, description->flt_registers);
+				RegsetSetDiff(max, RegsetDiff(x, FUNCTION_FLOAT_RET_REGS(callee)));
+        //FLOAT ^^^
 
 				RegsetSetUnion(max,def_caller_out);
 				RegsetSetUnion(max,description->always_live);
@@ -1531,8 +1692,10 @@ CfgComputeMeaningfulRegs(t_cfg * cfg)
 	  RegsetSetDup(defined_out,BBL_REGS_DEFINED_IN(bbl));
 	  RegsetSetUnion(defined_out,BBL_REGS_DEF(bbl));
  	  RegsetSetIntersect(defined_out,live_out);
+
 	  if (!RegsetIsEmpty(RegsetDiff(live_out,defined_out)))
 	    {
+        _DEBUG(("set6 @B callsite to @X", bbl, CPREGSET(BBL_CFG(bbl), defined_out)));
 	      BBL_SET_REGS_LIVE_OUT(bbl, defined_out);
 	    }
 	}

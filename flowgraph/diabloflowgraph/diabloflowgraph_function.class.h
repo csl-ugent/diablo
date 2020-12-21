@@ -68,6 +68,9 @@ MEMBER(t_regset,regs_used,REGS_USED)
 MEMBER(t_regset,arg_regs,ARG_REGS)
 MEMBER(t_regset,ret_regs,RET_REGS)
 MEMBER(t_regset,regs_overwritten,REGS_OVERWRITTEN)
+MEMBER(t_regset,float_arg_regs,FLOAT_ARG_REGS)
+MEMBER(t_regset,float_ret_regs,FLOAT_RET_REGS)
+MEMBER(t_bool,defs_float_reg,DEFS_FLOAT_REG)
 /*! The number of basic blocks in the function */
 MEMBER(t_uint32,nr_blocks,NR_BLOCKS)
 
@@ -212,6 +215,9 @@ CONSTRUCTOR({  /* insert the function in the dll */
   FunctionInsertInCfg (cfg, ret);
   FUNCTION_SET_RET_REGS(ret, CFG_DESCRIPTION(cfg)->return_regs);
   FUNCTION_SET_ARG_REGS(ret, CFG_DESCRIPTION(cfg)->argument_regs);
+  FUNCTION_SET_FLOAT_RET_REGS(ret, RegsetNew());
+  FUNCTION_SET_FLOAT_ARG_REGS(ret, RegsetNew());
+  FUNCTION_SET_DEFS_FLOAT_REG(ret, FALSE);
   FUNCTION_SET_BEHAVES(ret, TRUE);
   FUNCTION_SET_ID(ret, function_global_id++);
 })

@@ -53,18 +53,15 @@ DwarfDecodedULEB128 DwarfDecodeULEB128(DwarfEncodedULEB128 encoded)
 {
   ASSERT(encoded.size() <= 10, ("Can only decode ULEB128 into a 64-bits unsigned integer at the most!"));
 
-  DwarfDecodedULEB128 ret = 0;
-  t_uint32 byte_nr = 0;
-  /* only decode up to the number of supported bytes */
-  for (t_uint8 encoded_byte : encoded)
-  {
-    /* add byte to output */
-    ret |= (encoded_byte & 0x7f) << (byte_nr * 7);
+  DwarfDecodedULEB128 result = 0;
+  int shift = 0;
 
-    byte_nr++;
+  for (t_uint8 byte : encoded) {
+    result |= (static_cast<t_int64>(byte) & 0x7f) << shift;
+    shift += 7;
   }
 
-  return ret;
+  return result;
 }
 
 /* decode an SLEB128-encoded integer */
@@ -73,26 +70,24 @@ DwarfDecodeSLEB128(DwarfEncodedSLEB128 encoded)
 {
   ASSERT(encoded.size() <= 10, ("Can only decode SLEB128 into a 64-bits integer at the most!"));
 
-  DwarfDecodedSLEB128 ret = 0;
-  t_uint32 byte_nr = 0;
-  /* only decode up to the number of supported bytes */
-  for (t_uint8 encoded_byte : encoded)
-  {
-    /* add byte to output */
-    ret |= (encoded_byte & 0x7f) << (byte_nr * 7);
+  DwarfDecodedSLEB128 result = 0;
+  int shift = 0;
+  int size = sizeof(DwarfDecodedSLEB128) * 8;
 
-    byte_nr++;
+  t_uint8 byte;
+  for (size_t i = 0; i < encoded.size(); i++) {
+    byte = encoded[i];
+
+    result |= (static_cast<t_int64>(byte) & 0x7f) << shift;
+    shift += 7;
   }
 
-  /* sign-extension */
-  byte_nr--;/* Get back to the last element */
-  if (encoded[byte_nr] & 0x40)
-  {
-    /* sign-bit of last encoded byte is set */
-    ret |= (UINT64_MAX) << ((byte_nr + 1) * 7);
+  if ((shift < size)
+      && (byte & 0x40)) {
+    result |= -(1ULL << shift);
   }
 
-  return ret;
+  return result;
 }
 
 /* read in an initial length value.

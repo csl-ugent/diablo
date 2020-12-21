@@ -4,7 +4,6 @@
 
 extern "C" {
 #include <diabloflowgraph.h>
-#include <diabloflowgraph_dwarf.h>
 #include <diabloelf.h>
 #include <diablo_options.h>
 
@@ -14,6 +13,7 @@ extern "C" {
 #include <sys/stat.h>
 }
 
+#include <diabloflowgraph_dwarf.h>
 #include <diabloanoptarm.hpp>
 #include <frontends/common.h>
 

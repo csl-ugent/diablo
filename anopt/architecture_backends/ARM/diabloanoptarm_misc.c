@@ -420,7 +420,7 @@ void OptimizeSingleThreaded(t_cfg * cfg)
 				ARM_INS_SET_CSIZE(new_ins, AddressNew32(4));
 				ARM_INS_SET_OLD_SIZE(new_ins, AddressNew32(0));
 
-				ArmInsMakeMov(new_ins, ARM_INS_REGC(i_ins), ARM_REG_NONE, 1, ARM_INS_CONDITION(i_ins));
+				ArmInsMakeMov(new_ins, ARM_INS_REGC(i_ins), ARM_REG_NONE, 0, ARM_INS_CONDITION(i_ins));
 				ArmInsInsertAfter(new_ins,i_ins);
 
 				ARM_INS_SET_REGC(i_ins, ARM_REG_NONE);

@@ -1698,7 +1698,12 @@ ObjectUID BblObjectIndex(t_bbl *bbl) {
   return PartitionInfo::all_instances[set_id]->object_file;
 }
 
-void BblSourceLocation(t_bbl *bbl, FunctionUID& function, SourceFileUID& file, SourceArchiveUID& archive) {
+bool BblSourceLocation(t_bbl *bbl, FunctionUID& function, SourceFileUID& file, SourceArchiveUID& archive, bool do_precheck) {
+  if (do_precheck) {
+    if (BBL_OBJECT_SET(bbl) == ObjectSetUID_INVALID)
+      return FALSE;
+  }
+
   ObjectUID object_uid = BblObjectIndex(bbl);
 
   /* associated functions */
@@ -1708,14 +1713,33 @@ void BblSourceLocation(t_bbl *bbl, FunctionUID& function, SourceFileUID& file, S
   function = *(functions.begin());
   file = GetFileUID(object_uid);
   archive = GetArchiveUID(object_uid);
+
+  return TRUE;
 }
 
 SourceArchiveUID GetArchiveUID(ObjectUID idx) {
+  if (idx == ObjectUID_INVALID)
+    return SourceArchiveUID_INVALID;
+
   return objects_and_ranges[idx].archive_id;
 }
 
 std::string GetArchiveName(SourceArchiveUID idx) {
   return all_archives[idx];
+}
+
+std::string GetSourceFileName(SourceFileUID uid) {
+  return all_filenames[uid];
+}
+
+std::string GetSourceFileNameBase(SourceFileUID uid) {
+  string x = GetSourceFileName(uid);
+  auto pos = x.rfind('/');
+
+  if (pos == string::npos)
+    return x;
+
+  return x.substr(pos + 1);
 }
 
 void DisableOriginTracking() {

@@ -1206,7 +1206,7 @@ VerSymEntry {
 VerSymEntryAfterLinkerEmulation {
   trigger { LINKED_SYMBOL_EXISTS("$after_linker_emulation") && LINKED_SYMBOL_EXISTS("ANYDYNSYMSYM:*") && LINKED_SYMBOL_EXISTS(CONCAT("VERSYM:",SUBSTRING(MATCHED_NAME(),13,0))) }
   action  { ADD_SUBSECTION("Linker",".gnu.version",CONCAT(".gnu.version.",SUBSTRING(MATCHED_NAME(),7,0)), RODATA, 2, 2) }
-  section { CONST16(0x0) }/* DIRTY HACK! This entry is supposed to tell the dynamic linker which version of the shared library is to be used. As it is too hard to determine whether the entry we need already exists (and if so which index it has) we just use the value 0 which means it's a local symbol. This does not make a difference to our ends as the symbols we add are unversioned anyway */
+  section { CONST16(READ_LINKED_VALUE16(MATCHED_SYMBOL_VALUE())) }/* DIRTY HACK! This entry is supposed to tell the dynamic linker which version of the shared library is to be used. As it is too hard to determine whether the entry we need already exists (and if so which index it has) we just use the value 0 which means it's a local symbol. This does not make a difference to our ends as the symbols we add are unversioned anyway */
   address { MATCHED_SYMBOL_VALUE() }
 }
 
@@ -1420,10 +1420,22 @@ DynSymOrig {
 
 DynSymDefined {
   trigger { !LINKED_SYMBOL_EXISTS("$after_linker_emulation") && LINKED_SYMBOL_EXISTS("ANYDYNSYMSYM:*") && !UNDEF_OR_NONEXIST_SYMBOL(SUBSTRING(MATCHED_NAME(),13,0)) && !SUBSECTION_EXISTS("Linker",CONCAT("DYNSYM:",SUBSTRING(MATCHED_NAME(),13,0))) &&
-            ((READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+12) & 0x0000000f) != 3) }
+            ((READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+12) & 0x0000000f) != 3) && ((READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+12) & 0x0000000f) != 6) }
   action  { ADD_SUBSECTION("Linker", ".dynsym", CONCAT("DYNSYM:",SUBSTRING(MATCHED_NAME(),13,0)), RODATA, 4, 16) }
   section { RELOCATED32(0x0, CONCAT("DYNSYMSYMSTR:",SUBSTRING(MATCHED_NAME(), 13, 0)), 0, "$dynstr_start",0, "S00S01-\l*w\s0000$"), /* The offset in the string table */
             RELOCATED32(0x0, CONCAT("ORIG:",SUBSTRING(MATCHED_NAME(), 13, 0)), 0, 0, 0, "S00A00+S00M|\l*w\s0000$"),  /* jump slot address entry */
+            CONST32(READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+8)) /* The symbol size */,
+      CONST32(READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+12) & 0xffff) /* The symbol type & bind */
+          }
+  address { MATCHED_SYMBOL_VALUE()  }
+}
+
+DynSymDefinedTLS {
+  trigger { !LINKED_SYMBOL_EXISTS("$after_linker_emulation") && LINKED_SYMBOL_EXISTS("ANYDYNSYMSYM:*") && !UNDEF_OR_NONEXIST_SYMBOL(SUBSTRING(MATCHED_NAME(),13,0)) && !SUBSECTION_EXISTS("Linker",CONCAT("DYNSYM:",SUBSTRING(MATCHED_NAME(),13,0))) &&
+            ((READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+12) & 0x0000000f) != 3) && ((READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+12) & 0x0000000f) == 6) }
+  action  { ADD_SUBSECTION("Linker", ".dynsym", CONCAT("DYNSYM:",SUBSTRING(MATCHED_NAME(),13,0)), RODATA, 4, 16) }
+  section { RELOCATED32(0x0, CONCAT("DYNSYMSYMSTR:",SUBSTRING(MATCHED_NAME(), 13, 0)), 0, "$dynstr_start",0, "S00S01-\l*w\s0000$"), /* The offset in the string table */
+            RELOCATED32(0x0, CONCAT("ORIG:",SUBSTRING(MATCHED_NAME(), 13, 0)), 0, "$tls_start", 0, "S00S01-S00M|\l*w\s0000$"),  /* jump slot address entry */
             CONST32(READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+8)) /* The symbol size */,
       CONST32(READ_LINKED_VALUE32(MATCHED_SYMBOL_VALUE()+12) & 0xffff) /* The symbol type & bind */
           }
@@ -1713,6 +1725,33 @@ TlsTpOffRel {
     RELOCATED32(0x0, CONCAT("GOT:",SUBSTRING(MATCHED_NAME(),10,0)), 0, 0, 0, "S00\l*w\s0000$"),
 		RELOCATED32(0x13, CONCAT("ANYDYNSYMSYM:",SUBSTRING(MATCHED_NAME(),10,0)), 0, "$dynsym_start", 0, "S00S01 - i00000004 > \ i00000008 < l i000000ff & | w \ s0000$")}
 	address { SYMBOL(CONCAT("TLS_TPOFF:", SUBSTRING(MATCHED_NAME(), 10, 0))) }
+}
+
+/* tls_dtpmod */
+TlsDtpModRel {
+	trigger { LINKED_SYMBOL_EXISTS("ANYDYNSYMSYM:*") && LINKED_SYMBOL_EXISTS(CONCAT("TLS_DTPMOD:", SUBSTRING(MATCHED_NAME(), 13, 0))) }
+	action { ADD_SUBSECTION("Linker", ".rel.dyn", CONCAT("DYNREL:",MATCHED_NAME()), RODATA, 4, 8) }
+	section {
+    RELOCATED32(0x0, CONCAT("GOT:",SUBSTRING(MATCHED_NAME(),11,0)), 0, 0, 0, "S00\l*w\s0000$"),
+		RELOCATED32(0x11, CONCAT("ANYDYNSYMSYM:",SUBSTRING(MATCHED_NAME(),11,0)), 0, "$dynsym_start", 0, "S00S01 - i00000004 > \ i00000008 < l i000000ff & | w \ s0000$")}
+	address { SYMBOL(CONCAT("TLS_DTPMOD:", SUBSTRING(MATCHED_NAME(), 11, 0))) }
+}
+
+/* tls_dtpoff */
+TlsDtpOffRel {
+	trigger { LINKED_SYMBOL_EXISTS("ANYDYNSYMSYM:*") && LINKED_SYMBOL_EXISTS(CONCAT("TLS_DTPOFF:", SUBSTRING(MATCHED_NAME(), 13, 0))) }
+	action { ADD_SUBSECTION("Linker", ".rel.dyn", CONCAT("DYNREL:",MATCHED_NAME()), RODATA, 4, 8) }
+	section {
+    /* "ELF for the ARM Architecture" 4.6.1.9
+     * R_ARM_TLS_GD32 (parsed in diabloelf_arm.c) causes two adjacent entries to be added (...)
+     * The first of these is dynamically relocated by R_ARM_TLS_DTPMOD32,
+     * the second by R_ARM_TLS_DTPOFF32.
+     *
+     * Since we're handling DTPOFF here, an addend of 4 to the target symbol is required.
+     */
+    RELOCATED32(0x0, CONCAT("GOT:",SUBSTRING(MATCHED_NAME(),11,0)), 4, 0, 0, "S00A00+\l*w\s0000$"),
+		RELOCATED32(0x12, CONCAT("ANYDYNSYMSYM:",SUBSTRING(MATCHED_NAME(),11,0)), 0, "$dynsym_start", 0, "S00S01 - i00000004 > \ i00000008 < l i000000ff & | w \ s0000$")}
+	address { SYMBOL(CONCAT("TLS_DTPOFF:", SUBSTRING(MATCHED_NAME(), 11, 0))) }
 }
 
 /* bind any potentially unresolved references to (WEAK/ANY/)DYNSYMSYM

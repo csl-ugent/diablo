@@ -188,7 +188,6 @@ void ArmAssembleOne(t_arm_ins * i_ins, char * data)
       	break;
 
       case IT_MUL:
-      case IT_DIV:
       	ArmAssembleMUL(ains, (t_uint32 *) data); 
       	break;
 

@@ -1,10 +1,9 @@
 /* This research is supported by the European Union Seventh Framework Programme (FP7/2007-2013), project ASPIRE (Advanced  Software Protection: Integration, Research, and Exploitation), under grant agreement no. 609734; on-line at https://aspire-fp7.eu/. */
 
 #include "diabloobject_dwarf.h"
+#include "diabloobject_dwarf_tags.h"
 
 #include <iostream>
-#include <map>
-#include <vector>
 
 using namespace std;
 
@@ -46,7 +45,7 @@ ReadAbbreviationDeclarationList(t_section *sec, t_address offset)
     new_declaration->code = code;
 
     /* tag */
-    new_declaration->tag = DwarfDecodeULEB128(DwarfReadULEB128FromSection(sec, offset, n_bytes));
+    new_declaration->tag = static_cast<DwarfTagCode>(DwarfDecodeULEB128(DwarfReadULEB128FromSection(sec, offset, n_bytes)));
     offset = AddressAddUint32(offset, n_bytes);
 
     /* children */
@@ -80,10 +79,70 @@ ReadAbbreviationDeclarationList(t_section *sec, t_address offset)
 
       new_attribute->name = static_cast<DwarfAttributeCode>(name);
       new_attribute->form = static_cast<DwarfFormCode>(form);
+      new_attribute->use_fixed_offset = false;
     }
   }
 
   return new_table;
+}
+
+t_address
+ParseAttributes(DwarfAbbrevTableEntry *entry, t_address offset, vector<DwarfAbstractAttribute *>& to_process, DwarfCompilationUnitHeader *cu_header, DwarfSections *dwarf_sections) {
+  vector<DwarfAbstractAttribute *> attributes;
+
+  /* Decode all attributes for this declaration and add them to a temporary list.
+   * The reason we need to do this, is because some basic attributes are needed by
+   * the more complex attributes which need additional parsing. */
+  attributes.clear();
+  for (DwarfAttributeSpec *attribute : entry->declaration->attributes)
+  {
+    t_uint32 sz = 0;
+
+    if (attribute->use_fixed_offset)
+      offset = attribute->fixed_offset;
+
+    // DEBUG(("parsing attribute %d 0x%x with form %d 0x%x at offset @G", attribute->name, attribute->name, attribute->form, attribute->form, offset));
+
+    attributes.push_back(DwarfDecodeAttribute(attribute, cu_header, dwarf_sections, offset, sz));
+
+    if (attribute->form == DwarfFormCode::DW_FORM_ref4)
+      to_process.push_back(attributes.back());
+
+    /* some attributes need to be parsed up front, to enable parsing more
+     * complex attributes later on */
+    if (!AttributeNeedsParsing(attributes.back()))
+      entry->attributes.push_back(DwarfParseAttribute(cu_header, dwarf_sections, attributes.back()));
+
+    offset = AddressAddUint32(offset, sz);
+  }
+
+  /* parse the decoded attributes (i.e. attributes of type rangelistptr, stmtlist, ...);
+    * only attributes which load data from other sections need additional parsing. */
+  for (DwarfAbstractAttribute *decoded : attributes)
+    if (AttributeNeedsParsing(decoded))
+      entry->attributes.push_back(DwarfParseAttribute(cu_header, dwarf_sections, decoded));
+
+  return offset;
+}
+
+void PostProcessParsedAttributes(vector<DwarfAbstractAttribute *>& to_process, map<t_address, DwarfAbbrevTableEntry *>& table_entries) {
+  for (auto i : to_process) {
+    ASSERT(i->form == DwarfAttributeForm::Reference, ("expected reference attribute"));
+
+    switch (i->attr->form) {
+    case DwarfFormCode::DW_FORM_ref1:
+    case DwarfFormCode::DW_FORM_ref2:
+    case DwarfFormCode::DW_FORM_ref4:
+    case DwarfFormCode::DW_FORM_ref8: {
+      DwarfReferenceAttribute *attr = static_cast<DwarfReferenceAttribute *>(i);
+      ASSERT(table_entries.find(attr->value) != table_entries.end(), ("no entry at @G", attr->value));
+      attr->data = table_entries[attr->value];
+    } break;
+
+    default:
+      FATAL(("unexpected form code"));
+    }
+  }
 }
 
 /* parses the abbreviation table associated with 'cu_header' */
@@ -97,15 +156,22 @@ ParseAbbreviationTable(DwarfCompilationUnitHeader *cu_header, DwarfSections *dwa
   vector<DwarfDebugInformationEntry *> nested_entries;
   nested_entries.push_back(cu_header);
 
+  t_address cu_header_offset = offset;
+
+  /* future and back references are theoretically possible,
+   * so we can't resolve the references in-place */
+  vector<DwarfAbstractAttribute *> to_process;
+  map<t_address, DwarfAbbrevTableEntry *> table_entries;
+
   do
   {
     t_uint32 n_bytes = 0;
     DwarfAbbrevDeclaration *declaration;
     DwarfAbbrevTableEntry *entry;
-    vector<DwarfAbstractAttribute *> attributes;
 
     /* read in the declaration id for this declaration */
     declaration_id = DwarfDecodeULEB128(DwarfReadULEB128FromSection(dwarf_sections->info_section, offset, n_bytes));
+    t_address entry_offset = offset;
     offset = AddressAddUint32(offset, n_bytes);
 
     /* possible early exit */
@@ -138,33 +204,14 @@ ParseAbbreviationTable(DwarfCompilationUnitHeader *cu_header, DwarfSections *dwa
 
     /* create a new entry of the abbrev table */
     entry = new DwarfAbbrevTableEntry();
+    table_entries[entry_offset] = entry;
+
     nested_entries.back()->children.push_back(entry);
 
     entry->declaration = declaration;
+    entry->offset = entry_offset;
 
-    /* Decode all attributes for this declaration and add them to a temporary list.
-     * The reason we need to do this, is because some basic attributes are needed by
-     * the more complex attributes which need additional parsing. */
-    attributes.clear();
-    for (DwarfAttributeSpec *attribute : declaration->attributes)
-    {
-      t_uint32 sz = 0;
-
-      attributes.push_back(DwarfDecodeAttribute(attribute, cu_header, dwarf_sections, offset, sz));
-
-      /* some attributes need to be parsed up front, to enable parsing more
-       * complex attributes later on */
-      if (!AttributeNeedsParsing(attributes.back()))
-        entry->attributes.push_back(DwarfParseAttribute(cu_header, dwarf_sections, attributes.back()));
-
-      offset = AddressAddUint32(offset, sz);
-    }
-
-    /* parse the decoded attributes (i.e. attributes of type rangelistptr, stmtlist, ...);
-     * only attributes which load data from other sections need additional parsing. */
-    for (DwarfAbstractAttribute *decoded : attributes)
-      if (AttributeNeedsParsing(decoded))
-        entry->attributes.push_back(DwarfParseAttribute(cu_header, dwarf_sections, decoded));
+    offset = ParseAttributes(entry, offset, to_process, cu_header, dwarf_sections);
 
     /* children only exist for the upper-most DIE if the has_children property is TRUE. */
     if (declaration_id == 0
@@ -178,6 +225,8 @@ ParseAbbreviationTable(DwarfCompilationUnitHeader *cu_header, DwarfSections *dwa
       current_level++;
     }
   } while (iterate);
+
+  PostProcessParsedAttributes(to_process, table_entries);
 }
 
 /* Given an entry in the abbreviation table (i.e., a declaration), iterate over its list of

@@ -8,5 +8,6 @@ extern "C" {
 
 #include <diabloflowgraph.hpp>
 #include "diabloarm_transformation.hpp"
+#include "diabloarm_dwarf.hpp"
 
 #endif

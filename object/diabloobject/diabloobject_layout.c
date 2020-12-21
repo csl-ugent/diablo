@@ -32,6 +32,19 @@ _sec_compare_caddresses (const t_section * const* s1, const t_section * const* s
 }
 
 static int
+_sec_compare_old_addresses (const t_section * const* s1, const t_section * const* s2)
+{
+  ASSERT(!AddressIsNull(SECTION_OLD_ADDRESS(*s1)), ("old address is null! @T", *s1));
+  ASSERT(!AddressIsNull(SECTION_OLD_ADDRESS(*s2)), ("old address is null! @T", *s2));
+
+  if (AddressIsLt (SECTION_OLD_ADDRESS(*s1), SECTION_OLD_ADDRESS(*s2)))
+    return -1;
+  if (AddressIsGt (SECTION_OLD_ADDRESS(*s1), SECTION_OLD_ADDRESS(*s2)))
+    return 1;
+  return 0;
+}
+
+static int
 _sec_compare_align (const t_section * const* s1, t_section * const* s2)
 {
   if (AddressIsLt (SECTION_ALIGNMENT(*s1), SECTION_ALIGNMENT(*s2)))
@@ -245,23 +258,27 @@ SectionPutAtAddress (t_section * sec, t_uint64 start, const t_layout_rule * r,
           SECTION_TYPE(sec) == TLSDATA_SECTION ||
           SECTION_TYPE(sec) == TLSBSS_SECTION)
       {
-        if (!diabloobject_options.data_order_seed)
-        {
-          diablo_stable_sort(subs, nsubs, sizeof (t_section *),
-                 (int (*)(const void *, const void *)) _sec_compare_align);
-        }
-        else
-        {
-          /* randomise order using a standard shuffle */
-          t_section *tmpsec;
-
-          srand(diabloobject_options.data_order_seed);
-          for (i = nsubs - 1; i >= 0; --i)
+        /* don't change the order of the TLS sections */
+        if (SECTION_TYPE(sec) != TLSDATA_SECTION &&
+            SECTION_TYPE(sec) != TLSBSS_SECTION) {
+          if (!diabloobject_options.data_order_seed)
           {
-            j = random() % (i + 1);
-            tmpsec = subs[j];
-            subs[j] = subs[i];
-            subs[i] = tmpsec;
+            diablo_stable_sort(subs, nsubs, sizeof (t_section *),
+                  (int (*)(const void *, const void *)) _sec_compare_align);
+          }
+          else
+          {
+            /* randomise order using a standard shuffle */
+            t_section *tmpsec;
+
+            srand(diabloobject_options.data_order_seed);
+            for (i = nsubs - 1; i >= 0; --i)
+            {
+              j = random() % (i + 1);
+              tmpsec = subs[j];
+              subs[j] = subs[i];
+              subs[i] = tmpsec;
+            }
           }
         }
         tmpaddr = secaddr;
@@ -651,6 +668,7 @@ ObjectPlaceSections (t_object * obj, t_bool min, t_bool reorder_subsecs_for_mini
   /* {{{ third step: reorder the sections in the OBJECT_CODE(obj)[], OBJECT_DATA(obj)[], ... arrays
    * this is necessary as the section order may have changed during the placing of the
    * sections, and there is code in diablo that expects the order to be correct */
+  /* NOTE: we need to keep the TLS sections (.tdata, .tbss) in-order according to the old addresses */
   diablo_stable_sort (OBJECT_CODE(obj), OBJECT_NCODES(obj), sizeof (t_section *),
          (int (*)(const void *, const void *)) _sec_compare_caddresses);
   diablo_stable_sort (OBJECT_RODATA(obj), OBJECT_NRODATAS(obj), sizeof (t_section *),
@@ -658,11 +676,11 @@ ObjectPlaceSections (t_object * obj, t_bool min, t_bool reorder_subsecs_for_mini
   diablo_stable_sort (OBJECT_DATA(obj), OBJECT_NDATAS(obj), sizeof (t_section *),
          (int (*)(const void *, const void *)) _sec_compare_caddresses);
   diablo_stable_sort (OBJECT_TLSDATA(obj), OBJECT_NTLSDATAS(obj), sizeof (t_section *),
-         (int (*)(const void *, const void *)) _sec_compare_caddresses);
+         (int (*)(const void *, const void *)) _sec_compare_old_addresses);
   diablo_stable_sort (OBJECT_BSS(obj), OBJECT_NBSSS(obj), sizeof (t_section *),
          (int (*)(const void *, const void *)) _sec_compare_caddresses);
   diablo_stable_sort (OBJECT_TLSBSS(obj), OBJECT_NTLSBSSS(obj), sizeof (t_section *),
-         (int (*)(const void *, const void *)) _sec_compare_caddresses);
+         (int (*)(const void *, const void *)) _sec_compare_old_addresses);
   diablo_stable_sort (OBJECT_NOTE(obj), OBJECT_NNOTES(obj), sizeof (t_section *),
          (int (*)(const void *, const void *)) _sec_compare_caddresses);
   /*  diablo_stable_sort (OBJECT_DEBUG(obj), OBJECT_NDEBUGS(obj), sizeof (t_section *),
@@ -736,6 +754,10 @@ ObjectOrderCodeSectionsContiguously (t_object * obj)
    * after TLSDATA (if any), hence they're at the same address as the start of
    * DATA
    */
+  /* sort the TLS sections (.tdata, .tbss) according to the original addresses */
+  diablo_stable_sort(OBJECT_TLSBSS(obj), OBJECT_NTLSBSSS(obj), sizeof(t_section *), (int (*)(const void *, const void *)) _sec_compare_old_addresses);
+  diablo_stable_sort(OBJECT_TLSDATA(obj), OBJECT_NTLSDATAS(obj), sizeof(t_section *), (int (*)(const void *, const void *)) _sec_compare_old_addresses);
+
   tlsbssaddr = SECTION_CADDRESS(OBJECT_DATA(obj)[0]);
   for (i = 0; i < OBJECT_NTLSBSSS(obj); i++)
   {

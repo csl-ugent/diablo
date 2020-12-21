@@ -13,7 +13,7 @@ extern "C" {
 using namespace std;
 
 #define RANDOM_VERBOSITY 10
-#define RANDOM_VERBOSITY_V (RANDOM_VERBOSITY + 1)
+#define RANDOM_VERBOSITY_V (RANDOM_VERBOSITY + 0)
 
 enum class RNGOverrideType {
 	GenerateNext,
@@ -130,7 +130,10 @@ t_randomnumbergenerator *RNGCreate(t_randomnumbergenerator *parent, t_uint32 see
 	t_randomnumbergenerator *ret = new t_randomnumbergenerator();
 
 	/* try to find the region-specific override first */
-	t_overrides::iterator it = overrides.find(concatNameRegion(name, region_name));
+	string full_name = concatNameRegion(name, region_name);
+	VERBOSE(RANDOM_VERBOSITY_V, ("  looking for override \"%s\"", full_name.c_str()));
+
+	t_overrides::iterator it = overrides.find(full_name);
 
 	/* override the seed value if an override is specified */
 	if (it != overrides.end()) {
@@ -271,15 +274,22 @@ t_uint32 RNGGenerate(t_randomnumbergenerator *rng) {
 t_uint32 RNGGenerateWithRange(t_randomnumbergenerator *rng, t_uint32 min, t_uint32 max)
 {
   t_dist range = t_dist((max > min) ? min : max, (max > min) ? max : min);
-  return range(rng->generator);
+
+	t_uint32 ret = range(rng->generator);
+	VERBOSE(RANDOM_VERBOSITY, ("RNGGenerateWithRange %p (%s) generated %d", rng, rng->name.c_str(), ret));
+  return ret;
 }
 
 t_bool RNGGenerateBool(t_randomnumbergenerator *rng) {
-	return ((RNGGenerate(rng) % 2) == 1) ? TRUE : FALSE;
+	t_bool ret = ((RNGGenerate(rng) % 2) == 1) ? TRUE : FALSE;
+	VERBOSE(RANDOM_VERBOSITY, ("RNGGenerateBool %p (%s) generated %d", rng, rng->name.c_str(), ret));
+	return ret;
 }
 
 t_uint32 RNGGeneratePercent(t_randomnumbergenerator *rng) {
-	return RNGGenerateWithRange(rng, 1, 100);
+	t_uint32 ret = RNGGenerateWithRange(rng, 1, 100);
+	VERBOSE(RANDOM_VERBOSITY, ("RNGGeneratePercent %p (%s) generated %d", rng, rng->name.c_str(), ret));
+	return ret;
 }
 
 void RNGReset(t_randomnumbergenerator *rng) {

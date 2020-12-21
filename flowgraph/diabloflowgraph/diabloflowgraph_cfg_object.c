@@ -544,6 +544,8 @@ ObjectFlowgraph (t_object * obj,
     }
   } /* }}} */
 
+  DiabloBrokerCall("MetaAPI_KeepLive", cfg);
+
   STATUS(START, ("Processing dynamic symbols"));
   ObjectConnectDynamicSymbols(cfg);
   STATUS(STOP, ("Processing dynamic symbols"));
@@ -740,10 +742,14 @@ void ObjectDeflowgraph (t_object * obj)
   DiabloBrokerCall ("AfterDeflowgraph");
   DiabloBrokerCall ("PrintInstructions", cfg);
   
-  if (diabloflowgraph_options.origin_tracking) {
+  if (diabloflowgraph_options.origin_tracking
+      && diabloflowgraph_options.origin_tracking_final) {
     TrackOriginInformation(cfg, ORIGIN_FINAL_DIRECTORY);
     FinalizeObjectTracking(cfg);
   }
+
+  if (diabloflowgraph_options.final_dots)
+    CfgDrawFunctionGraphs(cfg, "final");
 
   if (cfg)
     CfgFreeData (cfg);
@@ -1109,7 +1115,6 @@ SectionToDisassembled (t_section * sec)
         /* move relocation to next block with instructions in the chain */
         t_bbl *next = bbl;
         t_bbl *prev = bbl;
-
         while (!BBL_INS_FIRST(next))
         {
           next = BBL_NEXT_IN_CHAIN(next);
@@ -1129,6 +1134,10 @@ SectionToDisassembled (t_section * sec)
                  ("Trying to move relocation or symbol pointing to successor of empty bbl @eB, but bbl has no successor", bbl));
           ASSERT(BBL_SUCC_FIRST(prev) == BBL_SUCC_LAST(prev),
                  ("bbl @eibB should have exactly one successor", bbl));
+          if (!(CFG_EDGE_CAT(BBL_SUCC_FIRST(prev)) &
+                 (ET_FALLTHROUGH | ET_IPFALLTHRU))) {
+            CfgDrawFunctionGraphs(BBL_CFG(prev), "error");
+          }
           ASSERT(CFG_EDGE_CAT(BBL_SUCC_FIRST(prev)) &
                  (ET_FALLTHROUGH | ET_IPFALLTHRU),
                  ("should be fallthrough edge: @ieB", prev));

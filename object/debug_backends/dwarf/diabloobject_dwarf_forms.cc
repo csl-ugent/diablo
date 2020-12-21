@@ -75,13 +75,11 @@ DwarfParseVariableConstantForm(DwarfFormStruct& s, DwarfCompilationUnitHeader *c
   {
   case DwarfFormCode::DW_FORM_sdata:
     ret->value = static_cast<t_uint64>(DwarfDecodeSLEB128(DwarfReadSLEB128FromSection(dwarf_sections->info_section, info_section_offset, sz)));
-    ASSERT(sz <= sizeof(t_uint64), ("decoded SLEB128 does not fit in 64-bit"));
     ret->is_signed = true;
     break;
 
   case DwarfFormCode::DW_FORM_udata:
     ret->value = static_cast<t_uint64>(DwarfDecodeULEB128(DwarfReadULEB128FromSection(dwarf_sections->info_section, info_section_offset, sz)));
-    ASSERT(sz <= sizeof(t_uint64), ("decoded ULEB128 does not fit in 64-bit"));
     ret->is_signed = false;
     break;
 
@@ -204,34 +202,40 @@ DwarfParseReference(DwarfFormStruct& s, DwarfCompilationUnitHeader *cu, DwarfSec
   {
   case DwarfFormCode::DW_FORM_ref1:
     sz = 1;
-    ret->value = static_cast<t_address>(SectionGetData8(dwarf_sections->info_section, info_section_offset));
+    ret->value = AddressAdd(cu->offset,
+                  static_cast<t_address>(SectionGetData8(dwarf_sections->info_section, info_section_offset)));
     break;
 
   case DwarfFormCode::DW_FORM_ref2:
     sz = 2;
-    ret->value = static_cast<t_address>(SectionGetData16(dwarf_sections->info_section, info_section_offset));
+    ret->value = AddressAdd(cu->offset,
+                  static_cast<t_address>(SectionGetData16(dwarf_sections->info_section, info_section_offset)));
     break;
 
   case DwarfFormCode::DW_FORM_ref4:
     sz = 4;
-    ret->value = static_cast<t_address>(SectionGetData32(dwarf_sections->info_section, info_section_offset));
+    ret->value = AddressAdd(cu->offset,
+                  static_cast<t_address>(SectionGetData32(dwarf_sections->info_section, info_section_offset)));
     break;
 
   case DwarfFormCode::DW_FORM_ref8:
     ASSERT(sizeof(t_address) == 8, ("64-bit DWARF data found, but Diablo is compiled for 32-bit!"));
 
     sz = 8;
-    ret->value = static_cast<t_address>(SectionGetData64(dwarf_sections->info_section, info_section_offset));
+    ret->value = AddressAdd(cu->offset,
+                  static_cast<t_address>(SectionGetData64(dwarf_sections->info_section, info_section_offset)));
     break;
 
   case DwarfFormCode::DW_FORM_ref_udata:
-    ret->value = static_cast<t_address>(DwarfDecodeULEB128(DwarfReadULEB128FromSection(dwarf_sections->info_section, info_section_offset, sz)));
+    ret->value = AddressAdd(cu->offset,
+                  static_cast<t_address>(DwarfDecodeULEB128(DwarfReadULEB128FromSection(dwarf_sections->info_section, info_section_offset, sz))));
     ASSERT(sz <= sizeof(t_address), ("length of decoded ULEB128 integer is bigger than supported length"));
     break;
 
   case DwarfFormCode::DW_FORM_ref_addr:
     sz = cu->address_size;
-    ret->value = DwarfReadAddress(cu->address_size, dwarf_sections->info_section, info_section_offset);
+    ret->value = AddressAdd(SECTION_OLD_ADDRESS(dwarf_sections->info_section),
+                  DwarfReadAddress(cu->address_size, dwarf_sections->info_section, info_section_offset));
     break;
 
   case DwarfFormCode::DW_FORM_ref_sig8:

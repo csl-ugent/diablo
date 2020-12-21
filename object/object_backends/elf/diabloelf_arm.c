@@ -7,7 +7,8 @@
 #include <diabloelf.h>
 
 /* TODO: verify pt_interp_align, ptnote_align, ptphdr_align, pttls_align */
-static const Elf32_HeaderInfo elf_arm_gnu_info =
+/* the correct values will be filled in by the ElfReadCommon code */
+static Elf32_HeaderInfo elf_arm_gnu_info =
 {
   0x1000,         /*  Elf32_Word pagesize; */
   SHT_PROGBITS,   /*  Elf32_Word pltshtype; */
@@ -21,7 +22,7 @@ static const Elf32_HeaderInfo elf_arm_gnu_info =
 };
 
 /* TODO: verify ptload_align, ptdynamic_align, pt_interp_align, ptnote_align, ptphdr_align, pttls_align */
-static const Elf32_HeaderInfo elf_arm_ads_info =
+static Elf32_HeaderInfo elf_arm_ads_info =
 {
   0x0,            /*  Elf32_Word pagesize; */
   SHT_PROGBITS,   /*  Elf32_Word pltshtype; */
@@ -43,7 +44,7 @@ static t_tristate sysv_abi = PERHAPS;
 /* abi version in the binary's header */
 static int abi_version = 0;
 
-static enum {EXPLICIT_SOFTFP,IMPLICIT_SOFTFP,HARDFP} fpu_conv;
+static enum {EXPLICIT_SOFTFP,IMPLICIT_SOFTFP,HARDFP} fpu_conv = EXPLICIT_SOFTFP;
 
 t_bool
 IsElfArmSameEndianOnMsb (FILE * fp)
@@ -165,10 +166,10 @@ ElfArmLinkBaseAddress(const t_object *obj, const t_layout_script *script)
 }
 
 /* Either the GOT or some other data section follows after the RELRO segment,
-   if one exists. 
+   if one exists.
    If so, the one following the RELRO need to be aligned on a page boundary to
    avoid that it partially ends up in the page being protected against
-   writes as part of the RELRO segment 
+   writes as part of the RELRO segment
  */
 
 t_uint64
@@ -189,11 +190,11 @@ ElfArmAlignGotAfterRelRO(t_object *obj, long long currpos)
 
   if (!have_got)
     return currpos;
-    
+
   if (OBJECT_GOT_IN_RELRO(obj))
     return currpos;
 
-  return  (currpos + 0x1000 - 1) & ~(0x1000 - 1); 
+  return  (currpos + 0x1000 - 1) & ~(0x1000 - 1);
 }
 
 t_uint64
@@ -213,19 +214,19 @@ ElfArmAlignDataAfterRelRO(t_object *obj, long long currpos)
     }
 
   if (!have_got)
-    return (currpos + 0x1000 - 1) & ~(0x1000 - 1); 
-    
+    return (currpos + 0x1000 - 1) & ~(0x1000 - 1);
+
   if (!OBJECT_GOT_IN_RELRO(obj))
     return currpos;
 
-  return (currpos + 0x1000 - 1) & ~(0x1000 - 1); 
+  return (currpos + 0x1000 - 1) & ~(0x1000 - 1);
 }
 
 
 /* the start of the RELRO segment needs to be allocated such that
    then end of the RELRO segment comes as close as possible to a page
    boundary, and at that page boundary the first section after the RELRO
-   segment will start 
+   segment will start
  */
 
 t_uint64
@@ -246,28 +247,28 @@ ElfArmAlignStartOfRelRO(t_object *obj, long long currpos)
   OBJECT_FOREACH_SECTION(obj,sec,i)
     {
       t_string secname = SECTION_NAME(sec);
-      if (StringPatternMatch(".eh_frame",secname) || 
-          StringPatternMatch(".gcc_except_table",secname) || 
-          StringPatternMatch(".tdata",secname) || 
-          StringPatternMatch(".tdata.*",secname) || 
-          StringPatternMatch(".gnu.linkonce.td.*",secname) || 
+      if (StringPatternMatch(".eh_frame",secname) ||
+          StringPatternMatch(".gcc_except_table",secname) ||
+          StringPatternMatch(".tdata",secname) ||
+          StringPatternMatch(".tdata.*",secname) ||
+          StringPatternMatch(".gnu.linkonce.td.*",secname) ||
           // in glibc, tbss have effective size 0
-          //          StringPatternMatch(".tbss",secname) || 
-          //          StringPatternMatch(".tbss.*",secname) || 
-          StringPatternMatch(".gnu.linkonce.tb.*",secname) || 
-          StringPatternMatch(".tcommon",secname) || 
-          StringPatternMatch(".preinit_array",secname) || 
-          StringPatternMatch(".init_array.*",secname) || 
-          StringPatternMatch(".init_array",secname) || 
-          StringPatternMatch(".fini_array.*",secname) || 
-          StringPatternMatch(".fini_array",secname) || 
-          StringPatternMatch(".ctors",secname) || 
-          StringPatternMatch(".ctors.*",secname) || 
-          StringPatternMatch(".dtors",secname) || 
-          StringPatternMatch(".dtors.*",secname) || 
-          StringPatternMatch(".jcr",secname) || 
+          //          StringPatternMatch(".tbss",secname) ||
+          //          StringPatternMatch(".tbss.*",secname) ||
+          StringPatternMatch(".gnu.linkonce.tb.*",secname) ||
+          StringPatternMatch(".tcommon",secname) ||
+          StringPatternMatch(".preinit_array",secname) ||
+          StringPatternMatch(".init_array.*",secname) ||
+          StringPatternMatch(".init_array",secname) ||
+          StringPatternMatch(".fini_array.*",secname) ||
+          StringPatternMatch(".fini_array",secname) ||
+          StringPatternMatch(".ctors",secname) ||
+          StringPatternMatch(".ctors.*",secname) ||
+          StringPatternMatch(".dtors",secname) ||
+          StringPatternMatch(".dtors.*",secname) ||
+          StringPatternMatch(".jcr",secname) ||
           StringPatternMatch(".dynamic",secname) ||
-          StringPatternMatch(".data.rel.ro",secname) || 
+          StringPatternMatch(".data.rel.ro",secname) ||
           (StringPatternMatch(".got",secname) && OBJECT_GOT_IN_RELRO(obj))
           )
         {
@@ -296,7 +297,7 @@ ElfArmAlignStartOfRelRO(t_object *obj, long long currpos)
   t_uint64 new_current_pos_after_relro = currpos + total_size_relro;
 
   /* aligned position of end of RELRO that needs to be achieved */
-  t_uint64 new_aligned_pos_after_relro = (new_current_pos_after_relro + 0x1000 - 1) & ~(0x1000 - 1); 
+  t_uint64 new_aligned_pos_after_relro = (new_current_pos_after_relro + 0x1000 - 1) & ~(0x1000 - 1);
 
   /* necessary shift */
   t_uint64 shift =  new_aligned_pos_after_relro - new_current_pos_after_relro;
@@ -444,16 +445,20 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
       VERBOSE(1,("DETECTED HARDFLOAT BINARY"));
       fpu_conv = HARDFP;
     }
-  else if ((hdr32.e_flags & EF_ARM_ABI_FLOAT_SOFT))
-    {
-      VERBOSE(1,("DETECTED SOFTFP BINARY"));
-      fpu_conv = EXPLICIT_SOFTFP;
-    }
-  else
-    {
-      VERBOSE(1,("DETECT IMPLICIT SOFTFP BINARY"));
-      fpu_conv = IMPLICIT_SOFTFP;
-    }
+  else if (fpu_conv != HARDFP) {
+    /* e.g., crt1.o is SOFTFP.
+     * We want to keep the HARDFP setting if it has been set already. */
+    if ((hdr32.e_flags & EF_ARM_ABI_FLOAT_SOFT))
+      {
+        VERBOSE(1,("DETECTED SOFTFP BINARY"));
+        fpu_conv = EXPLICIT_SOFTFP;
+      }
+    else
+      {
+        VERBOSE(1,("DETECT IMPLICIT SOFTFP BINARY"));
+        fpu_conv = IMPLICIT_SOFTFP;
+      }
+  }
 
   if ((hdr32.e_flags & 0xFF000000)==0x01000000) abi=1;
   else if ((hdr32.e_flags & 0xFF000000)==0x02000000) abi=2;
@@ -465,7 +470,7 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
 
   /* Reading elf headers does not depend on the type of objectfile */
   ElfReadCommon32 (fp, &hdr32, obj, &shdrs, &symbol_table, &dynamic_symbol_table, &numsyms, &strtab,
-       &sechdrstrtab, &sec_table, &table, &dynamic_table, FALSE, read_debug, &elf_arm_ads_info);
+       &sechdrstrtab, &sec_table, &table, &dynamic_table, FALSE, read_debug, &elf_arm_gnu_info);
 
   /* In case the entry address is Thumb code, it will have the lowest bit set.
    * Clear it here so that the generic Diablo code won't be confused. We'll
@@ -569,7 +574,7 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
               tmp_align = AddressNew32 (shdrs[tel].sh_addralign);
               sec_table[tel] = ObjectAddSectionFromFile (obj, ATTRIB_SECTION, TRUE, fp,
                                           OBJECT_STREAMPOS (obj) +
-                                          shdrs[tel].sh_offset, 
+                                          shdrs[tel].sh_offset,
                                           tmp_addr, tmp_sz,
                                           tmp_align,
                                           secname,
@@ -727,19 +732,92 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
 
                 break;
               }
+            case R_ARM_TLS_DTPMOD32:
+            {
+              t_string tls_dtpmod;
+              t_string dyngotreloc_dtpmod;
+              t_string symbol_name;
+
+              if (ELF32_R_SYM(rel[tel2].r_info) == 0) {
+                /* S=0: resolves to the module number of the current module (ie. the module containing this relocation). */
+                tls_dtpmod = "TLS_DTPMODNULL:";
+                dyngotreloc_dtpmod = "DYNGOTRELOC:DTPMODNULL:";
+
+                symbol_name = StringIo("%x", rel[tel2].r_offset);
+
+                VERBOSE(3,("TLS_DTPMOD! null symbol at 0x%x!",rel[tel2].r_offset));
+              }
+              else {
+                /* S!=0: resolves to the module number of the module defining the specified TLS symbol, S. */
+                tls_dtpmod = "TLS_DTPMOD:";
+                dyngotreloc_dtpmod = "DYNGOTRELOC:DTPMOD:";
+
+                t_symbol *sym = dynamic_table[ELF32_R_SYM (rel[tel2].r_info)];
+                symbol_name = SYMBOL_NAME(sym);
+
+                VERBOSE(3,("TLS_DTPMOD! @S\n", sym));
+              }
+
+              t_string symname = StringConcat2(tls_dtpmod, symbol_name);
+              SymbolTableAddSymbol (OBJECT_SYMBOL_TABLE(obj), symname, "R00$", 10, PERHAPS, FALSE, T_RELOCATABLE(sec_table[tel]), AddressNew32(tel2 * sizeof (Elf32_Rel)), AddressNew32(0), NULL, AddressNew32(0), 0);
+              Free(symname);
+              /* add extra symbol indicating that this symbol's got entry is filled in by
+                * the dynamic linker
+                */
+              symname = StringConcat2(dyngotreloc_dtpmod, symbol_name);
+              SymbolTableAddSymbol (OBJECT_SYMBOL_TABLE(obj), symname, "R00$", 10, PERHAPS, FALSE, T_RELOCATABLE(sec_table[tel]), AddressNew32(tel2 * sizeof (Elf32_Rel)), AddressNew32(0), NULL, AddressNew32(0), 0);
+              Free(symname);
+              break;
+            }
+            case R_AMR_TLS_DTPOFF32:
+            {
+              t_symbol *sym = dynamic_table[ELF32_R_SYM (rel[tel2].r_info)];
+              t_string symname;
+
+              VERBOSE(3,("TLS_DTPOFF32! @S\n", sym));
+              symname = StringConcat2("TLS_DTPOFF:", SYMBOL_NAME(sym));
+              SymbolTableAddSymbol (OBJECT_SYMBOL_TABLE(obj), symname, "R00$", 10, PERHAPS, FALSE, T_RELOCATABLE(sec_table[tel]), AddressNew32(tel2 * sizeof (Elf32_Rel)), AddressNew32(0), NULL, AddressNew32(0), 0);
+              Free(symname);
+              /* add extra symbol indicating that this symbol's got entry is filled in by
+                * the dynamic linker
+                */
+              symname = StringConcat2("DYNGOTRELOC:DTPOFF:", SYMBOL_NAME(sym));
+              SymbolTableAddSymbol (OBJECT_SYMBOL_TABLE(obj), symname, "R00$", 10, PERHAPS, FALSE, T_RELOCATABLE(sec_table[tel]), AddressNew32(tel2 * sizeof (Elf32_Rel)), AddressNew32(0), NULL, AddressNew32(0), 0);
+              Free(symname);
+              break;
+            }
             case R_ARM_TLS_TPOFF32:
             {
-                t_symbol *sym = dynamic_table[ELF32_R_SYM (rel[tel2].r_info)];
-                t_string symname;
+                t_string tls_tpoff;
+                t_string dyngotreloc_tpoff;
+                t_string symbol_name;
 
-                VERBOSE(3,("TLS_TPOFF! @S\n", sym));
-                symname = StringConcat2("TLS_TPOFF:", SYMBOL_NAME(sym));
+                if (ELF32_R_SYM (rel[tel2].r_info) == 0) {
+                  /* S==0 */
+                  tls_tpoff = "TLS_TPOFFNULL:";
+                  dyngotreloc_tpoff = "DYNGOTRELOC:";
+
+                  symbol_name = StringIo("%x", rel[tel2].r_offset);
+
+                  VERBOSE(3,("TLS_TPOFF32! null symbol at 0x%x", rel[tel2].r_offset));
+                }
+                else {
+                  tls_tpoff = "TLS_TPOFF:";
+                  dyngotreloc_tpoff = "DYNGOTRELOC:";
+
+                  t_symbol *sym = dynamic_table[ELF32_R_SYM (rel[tel2].r_info)];
+                  symbol_name = SYMBOL_NAME(sym);
+
+                  VERBOSE(3,("TLS_TPOFF! @S\n", sym));
+                }
+
+                t_string symname = StringConcat2(tls_tpoff, symbol_name);
                 SymbolTableAddSymbol (OBJECT_SYMBOL_TABLE(obj), symname, "R00$", 10, PERHAPS, FALSE, T_RELOCATABLE(sec_table[tel]), AddressNew32(tel2 * sizeof (Elf32_Rel)), AddressNew32(0), NULL, AddressNew32(0), 0);
                 Free(symname);
                 /* add extra symbol indicating that this symbol's got entry is filled in by
                  * the dynamic linker
                  */
-                symname = StringConcat2("DYNGOTRELOC:", SYMBOL_NAME(sym));
+                symname = StringConcat2(dyngotreloc_tpoff, symbol_name);
                 SymbolTableAddSymbol (OBJECT_SYMBOL_TABLE(obj), symname, "R00$", 10, PERHAPS, FALSE, T_RELOCATABLE(sec_table[tel]), AddressNew32(tel2 * sizeof (Elf32_Rel)), AddressNew32(0), NULL, AddressNew32(0), 0);
                 Free(symname);
                 break;
@@ -1018,7 +1096,7 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
                 generic = AddressNew32 (rel[tel2].r_offset);
                 data = SectionGetData32 (corrsec, generic);
                 addend = AddressNew32 (data);
-                
+
                 ASSERT(!SYMBOL_NAME(sym) || strcmp(SYMBOL_NAME(sym),".text") ||(data == 0), ("Absolute relocation into the text section."));
 
                 /* Absolute addresses have to be adjusted by the load
@@ -1516,6 +1594,7 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
                   RelocTableAddRelocToSymbol (OBJECT_RELOC_TABLE (obj), addend, T_RELOCATABLE (corrsec), generic, sym, TRUE, NULL, NULL, NULL, "S00P-s0008-\\ == i80000000& ? ~s0001+ s0fff& l iff7ff000& | : s0fff & l ifffff000 & | i00800000 | ! S00M| w \\ =s001f> - s1000+ iffffe000& $");
               }
               break;
+            case R_ARM_TLS_GD32:
             case R_ARM_TLS_LDM32:
             case R_ARM_TLS_IE32:
               {
@@ -1566,11 +1645,12 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
                  * The "+ 4" at the end of the "address" line is because of
                  * the "NOTE" in the explanation above
                  */
+                /* NOTE: removed the +8. At least for the .tbss section this is invalid. */
                 t_const_string tentative_ie32 =
-                  "GotSection {\
+                  "/* ie32 */ GotSection {\
                     trigger { ! SUBSECTION_EXISTS(\"Linker\",CONCAT(\"GOTELEM:GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0)))} \
                     action  { ADD_SUBSECTION(\"Linker\", \".got\", CONCAT(\"GOTELEM:GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0)), DATA, 4, 4) }\
-                    section { RELOCATED32(0x0,STRINGTOKENR(MATCHED_NAME(),\":\",0),0,\"$tls_start\",0,\"u01?s0000:S00A00+S01-s0008+!\\l*w\\s0000$\") }\
+                    section { RELOCATED32(0x0,STRINGTOKENR(MATCHED_NAME(),\":\",0),0,0,0,\"S00A00+S00t00--!\\l*w\\s0000$\") }\
                     address { READ_LINKED_VALUE32(SUBSYMBOL(MATCHED_NAME())) + SUBSYMBOL(CONCAT(\"DIABLO_UNIQUE_GOT_LOAD:\",SUBSTRING(MATCHED_NAME(),22,0))) + 4 }\
                   }\
                   GotSymbol {\
@@ -1579,13 +1659,30 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
                     }\
                     symbol  {  START_OF_SUBSECTION(\"Linker\",CONCAT(\"GOTELEM:GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0))) }\
                   }";
-                t_const_string tentative_ldm32 =
-                  "GotSection {\
+                t_const_string tentative_ldm32_template =
+                  "/* ldm32 */ GotSection {\
                     trigger { ! SUBSECTION_EXISTS(\"Linker\",CONCAT(\"GOTELEM:GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0)))} \
                     action  { ADD_SUBSECTION(\"Linker\", \".got\", CONCAT(\"GOTELEM:GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0)), DATA, 4, 8) }\
                     section {\
-                              RELOCATED32(0x0,0,0,0,0,\"s0001\\l*w\\s0000$\"),\
+                              RELOCATED32(0x0,0,0,0,0,\"s%04d\\l*w\\s0000$\"),\
                               RELOCATED32(0x0,0,0,0,0,\"s0000\\l*w\\s0000$\")\
+                            }\
+                    address { READ_LINKED_VALUE32(SUBSYMBOL(MATCHED_NAME())) + SUBSYMBOL(CONCAT(\"DIABLO_UNIQUE_GOT_LOAD:\",SUBSTRING(MATCHED_NAME(),22,0))) + 4 }\
+                  }\
+                  GotSymbol {\
+                    action {\
+                      ADD_SYMBOL_NEW(CONCAT(\"GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0)),12,SYMBOL_TYPE_NOTYPE )\
+                    }\
+                    symbol  {  START_OF_SUBSECTION(\"Linker\",CONCAT(\"GOTELEM:GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0))) }\
+                  }";
+
+                t_const_string tentative_gd32_template =
+                  "/* gd32 */ GotSectionDynamic {\
+                    trigger { ! SUBSECTION_EXISTS(\"Linker\",CONCAT(\"GOTELEM:GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0))) } \
+                    action  { ADD_SUBSECTION(\"Linker\", \".got\", CONCAT(\"GOTELEM:GOT:\",STRINGTOKENR(MATCHED_NAME(),\":\",0)), DATA, 4, 8) }\
+                    section {\
+                              RELOCATED32(0x0,0,0,0,0,\"s%04d\\l*w\\s0000$\"),\
+                              RELOCATED32(0x0,%s,0,%s,0,\"%s\\l*w\\s0000$\")\
                             }\
                     address { READ_LINKED_VALUE32(SUBSYMBOL(MATCHED_NAME())) + SUBSYMBOL(CONCAT(\"DIABLO_UNIQUE_GOT_LOAD:\",SUBSTRING(MATCHED_NAME(),22,0))) + 4 }\
                   }\
@@ -1598,6 +1695,7 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
                 t_const_string tentative;
                 t_string unique_source_name;
 
+                t_symbol *original_symbol = sym;
                 if (SYMBOL_ORDER(sym) == -1)
                 {
                   char *colon_pos;
@@ -1616,13 +1714,53 @@ ElfReadArmSameEndian (FILE * fp, t_object * obj, t_bool read_debug)
                 /* see "NOTE" in the comment at the start for this relocation */
                 loadaddr = AddressSubUint32(AddressSub(generic,addend),4);
 
+                /* look for symbol with specific name */
+                t_string dyngotname = StringConcat2("DYNGOTRELOC:DTPMOD:", SYMBOL_NAME(original_symbol));
+                t_symbol *dyngotsym = SymbolTableLookup(OBJECT_SYMBOL_TABLE(OBJECT_PARENT(obj)), dyngotname);
+
                 switch (reloc_type)
                 {
                   case R_ARM_TLS_IE32:
                     tentative = tentative_ie32;
                     break;
                   case R_ARM_TLS_LDM32:
-                    tentative = tentative_ldm32;
+                  {
+                    int value = 1;
+
+                    if (!dyngotsym) {
+                      /* no dynamic GOT entry was found, assume the module to be set to 0 */
+                      value = 0;
+                    }
+
+                    tentative = StringIo(tentative_ldm32_template, value);
+                  }
+                    break;
+                  case R_ARM_TLS_GD32:
+                  {
+                    int addend = 0;
+                    t_string sym1 = "0";
+                    t_string sym2 = "0";
+                    t_string reloc_code = "s0000";
+
+                    if (!dyngotsym) {
+                      /* no dynamic GOT entry was found, assume the module to be set to 1 */
+
+                      /* this is a DTPMOD32, see Table 4-17 for the R_ARM_TLS_GD32 relocation */
+
+                      /* TODO in some cases the addend appears to be '1', in others '0'.
+                       * We need to find out why and adjust the logic here.
+                       * This logic would not have been necessary if the GOT were present in the original objects.
+                       * This is not the case (hence the tentative), so we should manually generate the GOT entry. */
+                      addend = 0;
+                      //addend = 1;
+                      WARNING(("assuming added 0x%x for @S", addend, sym));
+                      sym1 = StringIo("\"%s\"", SYMBOL_NAME(original_symbol));
+                      sym2 = "\"$tls_start\"";
+                      reloc_code = "S00S01-";
+                    }
+
+                    tentative = StringIo(tentative_gd32_template, addend, sym1, sym2, reloc_code);
+                  }
                     break;
                   default:
                     FATAL(("complete support for reloc %d",reloc_type));

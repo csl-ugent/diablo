@@ -120,7 +120,15 @@ ParseAddressRangeTableEntry(AddressRangeTableEntry *entry, DwarfSections *dwarf_
   /* read in the associated abbreviation table and parse it */
   entry->cu_header->abbrev_table = ReadAbbreviationDeclarationList(dwarf_sections->abbrev_section, static_cast<t_address>(entry->cu_header->debug_abbrev_offset));
   ParseAbbreviationTable(entry->cu_header, dwarf_sections, AddressAddUint32(offset, header_size));
-  //PrintAbbreviationTable(entry->cu_header);
+
+  ASSERT(entry->cu_header->children.size() == 1, ("unexpected %d", entry->cu_header->children.size()));
+
+  /* collect attribute values */
+  auto language_attr = GetDwarfAttribute<DwarfConstantAttribute *>(static_cast<DwarfAbbrevTableEntry *>(entry->cu_header->children[0]), DwarfAttributeCode::DW_AT_language);
+  ASSERT(language_attr, ("no language attribute for compilation unit at @G", entry->cu_header->debug_abbrev_offset));
+  entry->cu_header->language = static_cast<DwarfLanguageCode>(language_attr->value);
+  /* try to convert the read language attribute to a string to see whether or not we recognise it correctly */
+  DwarfLanguageCodeToString(entry->cu_header->language);
 }
 
 /* Read in an address range table from the .debug_aranges section */

@@ -166,6 +166,11 @@ t_ins * ArmAddJumpInstructionPlug(t_bbl * bbl)
   return T_INS(ArmAddJumpInstruction(bbl));
 }
 
+t_ins * ArmAddCallInstructionPlug(t_bbl * bbl)
+{
+  return T_INS(ArmAddCallInstruction(bbl));
+}
+
 void ArmComputeLiveRegsBeforeSwiPlug(t_regset * live_after_swi, t_ins * ins)
 {
   ArmComputeLiveRegsBeforeSwi(live_after_swi,T_ARM_INS(ins));
@@ -226,35 +231,35 @@ t_architecture_description arm_description =
   /* JENS - Added 16 bits on the right side of the last word to incorporate the 16 extra D-registers in NEON */
    {MAX_REG_ITERATOR, {0xffffffff,0xffffffff,0x000fffff}},
   /* int registers */   
-   {MAX_REG_ITERATOR, {0x0000ffff,0}},
+   {MAX_REG_ITERATOR, {0x0000ffff,0,0}},
   /* float registers */   
    {MAX_REG_ITERATOR, {0xff000000,0xffffffff, 0x000fffff}},
   /* predicate registers */
-   {MAX_REG_ITERATOR, {0x00fc0000,0}},
+   {MAX_REG_ITERATOR, {0x00fc0000,0,0}},
   /* callee saved registers */   
    {MAX_REG_ITERATOR, {0xf0002ff0,0xfffe0000,0x00000001}},
   /* callee may use registers */   
-   {MAX_REG_ITERATOR, {0x0f00f00f,0x0001fffe,0x00020000}}, /* callee may use */
+   {MAX_REG_ITERATOR, {0x0f00f00f,0x0001fffe,0x00000000}}, /* callee may use */
   /* callee may change        */   
-   {MAX_REG_ITERATOR, {0x0fffd00f,0x0001fffe,0x00020000}}, /* callee may change */
+   {MAX_REG_ITERATOR, {0x0fffd00f,0x0001fffe,0x000ffff2}}, /* callee may change */
    /* callee may return        */   
-   {MAX_REG_ITERATOR, {0x0f00000f,0x0000001e}},/* may contain return value */
+   {MAX_REG_ITERATOR, {0x0f00000f,0x0000001e,0}},/* may contain return value */
   /* always live              */   
-   {MAX_REG_ITERATOR, {0x0000a000,0,0x0000000e}},/* always live */
+   {MAX_REG_ITERATOR, {0x0000a000,0,0x00000000}},/* always live */
   /* registers prop over hell */   
-   {MAX_REG_ITERATOR, {0}},
+   {MAX_REG_ITERATOR, {0,0,0}},
   /* const registers          */   
-   {MAX_REG_ITERATOR, {0}},
+   {MAX_REG_ITERATOR, {0,0,0}},
   /* dead over call           */   
-   {MAX_REG_ITERATOR, {0x00fc0000,0}}, /* Dead over call */
+   {MAX_REG_ITERATOR, {0x00fc0000,0x00000000,0x00000002}}, /* Dead over call */
   /* link registers           */   
-   {MAX_REG_ITERATOR, {0x00004000,0}},
+   {MAX_REG_ITERATOR, {0x00004000,0,0}},
    /* argument_regs */
-   {MAX_REG_ITERATOR, {0x0000000f,0}},
+   {MAX_REG_ITERATOR, {0x0000000f,0x0001fffe,0}},
    /* return_regs */
-   {MAX_REG_ITERATOR, {0x0000000f,0}}, 
+   {MAX_REG_ITERATOR, {0x0000000f,0x0000001e,0}}, 
    /* dyncall use registers */
-   {MAX_REG_ITERATOR, {0}},
+   {MAX_REG_ITERATOR, {0,0,0}},
 #elif MAX_REG_ITERATOR > 32
 #error
    0x7fffffffLL,
@@ -342,7 +347,8 @@ t_architecture_description arm_description =
    ArmInsIsInvariantPlug,
    ArmInsIsConstantProducerPlug,
    ArmInsGetImmediatePlug,
-   ArmInsSetImmediatePlug
+   ArmInsSetImmediatePlug,
+   ArmAddCallInstructionPlug
 };
 /* \todo Clean this up and document */
 #if MAX_REG_ITERATOR > 64

@@ -35,6 +35,8 @@
 #define R_ARM_THM_SWI8   14
 #define R_ARM_XPC25      15
 #define R_ARM_THM_XPC22  16
+#define R_ARM_TLS_DTPMOD32 17
+#define R_AMR_TLS_DTPOFF32 18
 #define R_ARM_TLS_TPOFF32 19
 #define R_ARM_COPY	 20
 #define R_ARM_GLOB_DAT   21
@@ -62,11 +64,13 @@
 #define R_ARM_THM_MOVT_PREL 50
 #define R_ARM_GOT_PREL   96
 #define R_ARM_THM_JUMP11 102
+#define R_ARM_TLS_GD32 104
 #define R_ARM_TLS_LDM32  105
 #define R_ARM_TLS_LDO32  106
 #define R_ARM_TLS_IE32   107
 #define R_ARM_TLS_LE32   108
 #define R_ARM_ME_TOO	128
+#define R_ARM_IRELATIVE 160
 #endif
 
 #ifndef DIABLOELF_ARM_FUNCTIONS

@@ -50,7 +50,7 @@ DiabloI386Init (int argc, char **argv)
     ArchitectureHandlerAdd("i386",&i386_description,ADDRSIZE32);
     I386InitOpcodeTable();
     I386CreateOpcodeHashTable();
-    DiabloBrokerCallInstall ("AddInstrumentationToBbl", "t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_address offset", I386AddInstrumentationToBbl, TRUE);
+    DiabloBrokerCallInstall ("AddInstrumentationToBbl", "t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_section* sequencing_counter_sec, t_address offset", I386AddInstrumentationToBbl, TRUE);
     DiabloBrokerCallInstall("AddCallFromBblToBbl", "t_object* obj, t_bbl* from, t_bbl* to", I386AddCallFromBblToBbl, TRUE);
     DiabloI386CppInit (argc, argv);
   }

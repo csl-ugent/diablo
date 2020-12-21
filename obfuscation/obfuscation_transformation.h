@@ -15,6 +15,9 @@ extern "C" {
 #include <diabloflowgraph.h>
 }
 
+BBL_DYNAMIC_MEMBER_GLOBAL(can_transform, CAN_TRANSFORM, CanTransform, bool, false);
+extern bool initialisation_phase;
+
 extern LogFile * L_OBF_OP;
 extern LogFile * L_OBF_FLAT;
 extern LogFile * L_OBF_BF;
@@ -22,6 +25,9 @@ extern LogFile * L_OBF_BF;
 struct BBLObfuscationTransformation : public BBLTransformation {
   BBLObfuscationTransformation();
   virtual t_const_string name() const { return "bbl_obfuscation"; }
+
+  virtual std::string statusToString(int status_code) { return "IMPLEMENT_ME"; };
+  virtual int statusCode() { return -1; };
 };
 
 /* TODO: Actually, we have region-based transformations that can transform functions, because they are a region, and function-specific transformations, that,
@@ -64,7 +70,7 @@ bool DisallowedFunctionToTransform(const t_function* fun);
 /* Some generic functionality for registers */
 void AddRegisterToLiveOut(t_bbl* bbl, t_reg reg);
 
-void CfgObfuscateRegions(t_cfg* cfg);
+void CfgObfuscateRegions(t_cfg* cfg, bool generate_dots);
 void ObjectObfuscate(t_const_string filename, t_object* obj);
 
 #endif /* OBFUSCATION_TRANSFORMATION_H */

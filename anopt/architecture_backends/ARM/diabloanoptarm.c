@@ -118,6 +118,7 @@ DiabloAnoptArmInitCfg(void * vcfg, void * data)
 
     /*! Optimizes multiple loads and stores. */
     DiabloBrokerCallInstall("OptimizeStackLoadAndStores", "const t_cfg *" , ArmOptimizeStackLoadAndStores,TRUE, cfg);
+    DiabloBrokerCallInstall("OptimizeSingleThreaded", "t_cfg *", OptimizeSingleThreaded, TRUE, cfg);
     /*! Copy propagation for the Arm */
     DiabloBrokerCallInstall("OptCopyPropagation", "const t_cfg *" , ArmOptCopyPropagation,TRUE, cfg);
     DiabloBrokerCallInstall("ArmLoadStoreFwd", "const t_cfg *" , ArmLoadStoreFwd,TRUE, cfg);

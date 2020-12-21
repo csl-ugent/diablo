@@ -62,9 +62,12 @@
 #undef DIABLOELF_H
 #include <diabloelf.h>
 void ElfAddFinalizationRoutine(t_object *obj, t_symbol *fini_routine_sym);
-void ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym);
+void ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym, t_bool at_end);
 void ElfAddNeededLib (t_object * obj, t_string libname);
 void ElfSymbolMaybeAddVersionAlias(t_object *obj, t_symbol_table *symbol_table, t_symbol *sym);
+void ElfParseVersioningInformation(t_object *obj);
+void ElfGetSymbolDataBroker(t_string name, void *data, t_bool *result);
+void ElfGetExportedSymbolDataBroker(t_string name, void *data, t_bool *result);
 #endif
 
 #ifdef DIABLOELF_FUNCTIONS

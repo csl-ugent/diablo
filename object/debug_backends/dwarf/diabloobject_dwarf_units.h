@@ -14,6 +14,7 @@
 #include "diabloobject_dwarf_generic.h"
 
 #include <vector>
+#include <string>
 
 struct DwarfLineNumberProgramHeader;
 
@@ -45,6 +46,11 @@ struct DwarfCompilationUnitHeader
     for (auto line_info_matrix : line_info_matrices)
       delete line_info_matrix;
   }
+
+  std::string ToString();
+
+  /* attributes */
+  DwarfLanguageCode language;
 };
 
 struct DwarfTypeUnitHeader {

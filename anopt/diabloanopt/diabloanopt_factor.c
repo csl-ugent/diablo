@@ -86,6 +86,8 @@ void BblFactorFini(t_cfg * cfg)
 												  
 void BblFactoring(t_cfg *cfg, t_randomnumbergenerator *rng)
 {
+  static int nr_try = 0;
+
   int i,nins;
   bbl_hash_entry *table[TABLE_SIZE];
   bbl_hash_entry *he, *he2;
@@ -158,7 +160,8 @@ void BblFactoring(t_cfg *cfg, t_randomnumbergenerator *rng)
       	/*if (totalcount < diablosupport_options.debugcounter)*/
       	{
       	  int i;
-      	  VERBOSE(1,("BBL FACTOR: TRY @iB",holder.bbl[0]));
+      	  VERBOSE(1,("BBL FACTOR: TRY(%d) @iB",nr_try,holder.bbl[0]));
+
       	  for (i = 1; i < holder.nbbls; i++)
       	    VERBOSE(1,("slave @B",holder.bbl[i]));
 
@@ -167,10 +170,12 @@ void BblFactoring(t_cfg *cfg, t_randomnumbergenerator *rng)
 
       	  if (CFG_BBL_FACTOR(cfg)(&holder,holder.bbl[0]))
       	  {
-      	    VERBOSE(1,("SUCCES"));
+      	    VERBOSE(1,("SUCCES TRY(%d)", nr_try));
       	    factorcount += (holder.nbbls - 1) * nins - holder.nbbls;
       	    totalcount++;
       	  }
+
+          nr_try++;
       	}
       }
 

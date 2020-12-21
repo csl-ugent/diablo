@@ -21,6 +21,7 @@ t_uint32 addcount;
 t_uint32 count;
 #endif
 
+//#define FACTORING_DEBUGCOUNTER
 
 
 
@@ -92,6 +93,7 @@ t_bool ArmBblCanFactor(t_bbl *bbl)
 t_bool ArmBblFactor(t_equiv_bbl_holder *equivs, t_bbl *master)
 {
   static int nfactors = 0;
+  static int ntotalfactors = 0;
   t_cfg *cfg = BBL_CFG(master);
   t_bbl *new_bbl;
   t_arm_ins *ins;
@@ -105,6 +107,7 @@ t_bool ArmBblFactor(t_equiv_bbl_holder *equivs, t_bbl *master)
   int blocks_with_saves, factor_blocks, blocks_with_stack_saves;
   t_bool block_has_no_memops;
   t_bool block_does_not_define_stack_pointer;
+  t_bool block_does_not_use_stack_pointer;
 
   if (ArmIsControlflow(T_ARM_INS(BBL_INS_LAST(master)))) FATAL(("Expect non control flow instructions!"));
 
@@ -128,12 +131,15 @@ t_bool ArmBblFactor(t_equiv_bbl_holder *equivs, t_bbl *master)
    * + whether memory operations are present */
   block_has_no_memops = TRUE;
   block_does_not_define_stack_pointer = TRUE;
+  block_does_not_use_stack_pointer = TRUE;
   BBL_FOREACH_ARM_INS(master,ins)
   {
     RegsetSetUnion(block_defuse,ARM_INS_REGS_USE(ins));
     RegsetSetUnion(block_defuse,ARM_INS_REGS_DEF(ins));
          if (RegsetIn(ARM_INS_REGS_DEF(ins),ARM_REG_R13))
                 block_does_not_define_stack_pointer = FALSE;
+    if (RegsetIn(ARM_INS_REGS_USE(ins),ARM_REG_R13))
+      block_does_not_use_stack_pointer = FALSE;
     switch (ARM_INS_TYPE(ins))
     {
       case IT_LOAD:
@@ -184,7 +190,8 @@ t_bool ArmBblFactor(t_equiv_bbl_holder *equivs, t_bbl *master)
       /* if that doesn't work, save LR on the stack
        * but ONLY if the SP (r13) is not defined in the factorised block AND
        * if no memory operations happen inside the block (possibly aliasing memory!) */
-      else if (block_has_no_memops && block_does_not_define_stack_pointer)
+      /* JENS: the stack pointer should also NOT be used inside the block. */
+      else if (block_has_no_memops && block_does_not_define_stack_pointer && block_does_not_use_stack_pointer)
       {
         save_on_stack[i] = TRUE;
         blocks_with_stack_saves++;
@@ -268,7 +275,7 @@ t_bool ArmBblFactor(t_equiv_bbl_holder *equivs, t_bbl *master)
     LogFunctionTransformation("before", factor);
 
   /* selected bbls, also those that will not be transformed */
-  FactoringRecordTransformation(all_bbls, BBL_NINS(new_bbl), result, true);
+  FactoringRecordTransformation(all_bbls, BBL_NINS(new_bbl), result, true, true);
 
   for (i = 0; i < equivs->nbbls; i++)
   {
@@ -276,6 +283,12 @@ t_bool ArmBblFactor(t_equiv_bbl_holder *equivs, t_bbl *master)
     t_bbl *next;
 
     if (!can_factor[i]) continue;
+
+#ifdef FACTORING_DEBUGCOUNTER
+    if (ntotalfactors >= diablosupport_options.debugcounter)
+      continue;
+    VERBOSE(0, ("ARMFACTOR(%d)", ntotalfactors+1));
+#endif
 
     ASSERT(
         BBL_SUCC_FIRST(orig) && 
@@ -350,6 +363,8 @@ t_bool ArmBblFactor(t_equiv_bbl_holder *equivs, t_bbl *master)
     ARM_INS_SET_EXEC_COUNT(ins, BBL_EXEC_COUNT(orig));
     FactoringLogInstruction(T_INS(ins), "ADD");
     result.added_ins_info.AddInstruction(T_INS(ins));
+
+    ntotalfactors++;
   }
 
   ARM_INS_SET_EXEC_COUNT(T_ARM_INS(BBL_INS_LAST(new_bbl)), BBL_EXEC_COUNT(new_bbl));
@@ -363,7 +378,7 @@ t_bool ArmBblFactor(t_equiv_bbl_holder *equivs, t_bbl *master)
   LOG_MORE(L_FACTORING)
     LogFunctionTransformation("after", factor);
 
-  FactoringRecordTransformation(all_bbls, BBL_NINS(new_bbl)-1/* for the dispatch instruction */, result, false);
+  FactoringRecordTransformation(all_bbls, BBL_NINS(new_bbl)-1/* for the dispatch instruction */, result, false, true);
   STOP_LOGGING_TRANSFORMATION(L_FACTORING);
 
   return retval;

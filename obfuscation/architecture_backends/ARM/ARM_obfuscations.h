@@ -16,5 +16,6 @@ extern "C" {
 #include <diabloarm.hpp>
 
 #include <obfuscation/obfuscation_architecture_backend.h>
+#include <obfuscation/meta_api/meta_api.h>
 
 #endif /* ARM_OBFUSCATIONS */

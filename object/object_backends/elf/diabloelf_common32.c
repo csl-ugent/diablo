@@ -1239,7 +1239,12 @@ ElfWriteCommon32 (FILE * fp, Elf32_Ehdr * hdr, t_object * obj,
           ASSERT(hinfo->pttls_align!=(Elf32_Word)-1,("Have to write PT_TLS header but its alignment is not yet set for this target"));
           phdrs[nphdrs].p_align = hinfo->pttls_align;
           phdrs[nphdrs].p_flags = PF_R;
-          phdrs[nphdrs].p_filesz = secs[tel].hdr.sh_size;
+
+          if (secs[tel].hdr.sh_type != SHT_NOBITS)
+            phdrs[nphdrs].p_filesz = secs[tel].hdr.sh_size;
+          else
+            phdrs[nphdrs].p_filesz = 0;
+
           nphdrs++;
         }
         else
@@ -2041,52 +2046,56 @@ ElfProcessGnuVersionInformation32(t_object *obj, Elf32_Sym *dynamic_symbol_table
              * may have to update the strtab offsets when writing out the binary
              */
           }
-          else if (verdef)
+          else
           {
-            /* symbol definition -> look up entry in verdef */
-            Elf32_Verdef *entry;
-            Elf32_Verdaux *aux;
-            Elf32_Word auxidx;
-            VERBOSE(5,("Looking for verdef entry %d for symbol %s",versym[versymidx],symname));
-            VERDEF_FOREACH_ENTRY(verdef,entry)
-            {
-              if (entry->vd_ndx == versym[versymidx])
-                break;
-            }
-            ASSERT(entry && entry->vd_ndx==versym[versymidx],("Did not find entry %d in verdef for dynamic symbol %s",versym[versymidx],symname));
-            /* no VER_DEF_NUM documentation found, not sure what it means */
-            ASSERT(entry->vd_version == VER_DEF_CURRENT,("Unsupported verdef version %d for dynamic symbol %s",entry->vd_version,symname));
-            ASSERT((entry->vd_cnt!=0) && (entry->vd_aux!=0),("No aux entries for entry %d in verdef for dynamyc symbol %s",versym[versymidx],symname));
-            /* process all aux entries for this verdef entry. They contain
-             * the versioning information about this symbol
-             *
-             * "The first entry (pointed
-             *  to by the Elfxx_Verdef entry), contains the actual
-             *  defined name. The second and all later entries name
-             *  predecessor versions."
-             *
-             *  We are only interested in what we have to map the symbol
-             *  onto -> just process the first entry.
-             */
-            VERDEF_ENTRY_FOREACH_AUX(entry,aux,auxidx)
-            {
-              t_string versionname, aliasname, defaultvername;
-              t_symbol *aliassym, *orgsym;
-              /* check in which object file this symbol is defined;
-               * if there are multiple versioned symbols and this is
-               * the default one, it will be declared with @@, otherwise
-               * with @ -> check in that order
-               */
-              versionname = usestrtab+aux->vda_name;
-              aliasname = StringConcat3(symname,"@@",versionname);
-              defaultvername = StringConcat2(symname,"@@DIABLO_DEFAULT_VERSION");
-              VERBOSE(5,("Adding symbol %s as alias for %s",defaultvername,aliasname));
-              AddTranslatedSymbolName(defaultvername,aliasname);
-              Free(defaultvername);
-              Free(aliasname);
+            if (verdef) {
+              /* symbol definition -> look up entry in verdef */
+              Elf32_Verdef *entry;
+              Elf32_Verdaux *aux;
+              Elf32_Word auxidx;
+              VERBOSE(5,("Looking for verdef entry %d for symbol %s",versym[versymidx],symname));
+              VERDEF_FOREACH_ENTRY(verdef,entry)
+              {
+                if (entry->vd_ndx == versym[versymidx])
+                  break;
+              }
 
-              /* stop after first entry */
-              break;
+              if (entry && entry->vd_ndx==versym[versymidx]) {
+                /* no VER_DEF_NUM documentation found, not sure what it means */
+                ASSERT(entry->vd_version == VER_DEF_CURRENT,("Unsupported verdef version %d for dynamic symbol %s",entry->vd_version,symname));
+                ASSERT((entry->vd_cnt!=0) && (entry->vd_aux!=0),("No aux entries for entry %d in verdef for dynamyc symbol %s",versym[versymidx],symname));
+                /* process all aux entries for this verdef entry. They contain
+                * the versioning information about this symbol
+                *
+                * "The first entry (pointed
+                *  to by the Elfxx_Verdef entry), contains the actual
+                *  defined name. The second and all later entries name
+                *  predecessor versions."
+                *
+                *  We are only interested in what we have to map the symbol
+                *  onto -> just process the first entry.
+                */
+                VERDEF_ENTRY_FOREACH_AUX(entry,aux,auxidx)
+                {
+                  t_string versionname, aliasname, defaultvername;
+                  t_symbol *aliassym, *orgsym;
+                  /* check in which object file this symbol is defined;
+                  * if there are multiple versioned symbols and this is
+                  * the default one, it will be declared with @@, otherwise
+                  * with @ -> check in that order
+                  */
+                  versionname = usestrtab+aux->vda_name;
+                  aliasname = StringConcat3(symname,"@@",versionname);
+                  defaultvername = StringConcat2(symname,"@@DIABLO_DEFAULT_VERSION");
+                  VERBOSE(5,("Adding symbol %s as alias for %s",defaultvername,aliasname));
+                  AddTranslatedSymbolName(defaultvername,aliasname);
+                  Free(defaultvername);
+                  Free(aliasname);
+
+                  /* stop after first entry */
+                  break;
+                }
+              }
             }
           }
         }
@@ -2121,7 +2130,7 @@ ElfReadCommon32 (FILE * fp, void *hdr, t_object * obj, Elf32_Shdr ** shdr_ret,
                  Elf32_Sym ** symbol_table_ret, Elf32_Sym ** dynamic_symbol_table_ret, t_uint32 * numsyms_ret,
                  char **strtab_ret, char **sechdrstrtab_ret,
                  t_section *** sec_ret, t_symbol *** lookup, t_symbol *** dynamic_lookup,
-                 t_bool switch_endian, t_bool read_debug, Elf32_HeaderInfo const * const hinfo)
+                 t_bool switch_endian, t_bool read_debug, Elf32_HeaderInfo * hinfo)
 {
   t_bool dynlib;
 
@@ -2224,6 +2233,11 @@ ElfReadCommon32 (FILE * fp, void *hdr, t_object * obj, Elf32_Shdr ** shdr_ret,
           ASSERT(phdrs[segment_tel].p_memsz==phdrs[segment_tel].p_filesz,("OOPS: CANNOT HANDLE RELRO SEGMENT OF WHICH FILESIZE AND MEMSIZE DIFFER!")); 
           OBJECT_SET_RELRO_CSIZE(obj,phdrs[segment_tel].p_memsz);
 #endif
+        }
+      if (phdrs[segment_tel].p_type == PT_TLS)
+        {
+          /* copy over alignment */
+          hinfo->pttls_align = phdrs[segment_tel].p_align;
         }
       segment_tel++;
     }
@@ -2468,7 +2482,7 @@ ElfReadCommon32 (FILE * fp, void *hdr, t_object * obj, Elf32_Shdr ** shdr_ret,
                                             (*shdr_ret)
                                             [section_tel].sh_name,
                                             section_tel);
-
+                SECTION_SET_FLAGS((*sec_ret)[section_tel],SECTION_FLAGS((*sec_ret)[section_tel]) | SECTION_FLAG_KEEP);
               }
               else if (((*shdr_ret)[section_tel].sh_flags & SHF_WRITE))	/* Writable section */
               {
@@ -2964,6 +2978,10 @@ ElfReadCommon32 (FILE * fp, void *hdr, t_object * obj, Elf32_Shdr ** shdr_ret,
                 {
                   WARNING (("Ignoring Processor specific dynamic!"));
                 }
+                else if (dynamic_table[dynamic_tel].d_tag == DT_RUNPATH)
+                {
+                  WARNING (("Ignoring Runpath dynamic!"));
+                }
                 else
                 {
                   FATAL (("Unknown d_tag: %d %x",
@@ -3035,6 +3053,7 @@ ElfReadCommon32 (FILE * fp, void *hdr, t_object * obj, Elf32_Shdr ** shdr_ret,
                                             (*shdr_ret)[section_tel].
                                             sh_name,
                                             section_tel);
+                SECTION_SET_FLAGS((*sec_ret)[section_tel],SECTION_FLAGS((*sec_ret)[section_tel]) | SECTION_FLAG_KEEP);
               }
               else if (StringCmp((*sechdrstrtab_ret) + (*shdr_ret)[section_tel].sh_name,".plt") == 0)
               {

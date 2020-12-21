@@ -10,8 +10,7 @@
 #endif
 #include <diabloflowgraph.h>
 
-typedef t_uint64 t_profile_file_address;
-typedef t_int64 t_profile_file_count;
+// #define DEBUG_PROFILING
 
 #define BSEARCH 1
 
@@ -83,7 +82,7 @@ void SelfProfilingInit (t_object* obj, t_string profiling_object_path)
 
   /* Adapt the program so before start the initialization routine is executed */
   if (SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_SP_OBJECT "Init"))
-      DiabloBrokerCall ("AddInitializationRoutine", obj, init_sym);
+      DiabloBrokerCall ("AddInitializationRoutine", obj, init_sym, false);
 }
 
 /* Add self-profiling to an object. This assumes print-object containing the code to print out the profiling information
@@ -96,7 +95,7 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
   t_uint32 size;
   t_cfg* cfg = OBJECT_CFG(obj);
   t_string base_name = FileNameBase(output_name);
-  t_string filename = StringConcat2("profiling_data.", base_name);
+  t_string filename = NULL;
   t_bbl** list = Malloc(sizeof(t_bbl*));
   t_bool have_line_number_info = FALSE;
   list[0] = NULL;
@@ -106,7 +105,7 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
   FILE* fp_complexity_info;
   t_ins * prev_ins, * ins;
 
-  Free(base_name);
+  static int nr_blocks = 0;
 
   CFG_FOREACH_BBL(cfg,bbl)
     BBL_FOREACH_INS(bbl,ins)
@@ -155,12 +154,86 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
   memset(SECTION_DATA(profiling_sec), 0, size);
   SECTION_SET_CSIZE(profiling_sec, size);
 
+  t_section* sequencing_counter_sec = NULL;
+  if (diabloflowgraph_options.sp_sequence) {
+    sequencing_counter_sec = SectionCreateForObject(ObjectGetLinkerSubObject(obj), DATA_SECTION, SectionGetFromObjectByName(obj, ".data"), AddressNew32(0), "DIABLO_sequencing_counter");
+    SECTION_SET_DATA(sequencing_counter_sec, Realloc(SECTION_DATA(sequencing_counter_sec), 4));
+    memset(SECTION_DATA(sequencing_counter_sec), 0, 4);
+    SECTION_SET_CSIZE(sequencing_counter_sec, 4);
+  }
+
   t_section* name_sec = T_SECTION(SYMBOL_BASE(output_name_sym));
+
+  if (diabloflowgraph_options.sp_sequence)
+    filename = StringConcat2("sequencing_data.", base_name);
+  else
+    filename = StringConcat2("profiling_data.", base_name);
+  Free(base_name);
+
   size = strlen (filename) + 1;
   SECTION_SET_DATA(name_sec, Realloc(SECTION_DATA(name_sec), size));
   SECTION_SET_CSIZE(name_sec, size);
   memcpy (SECTION_DATA(name_sec), filename, strlen (filename) + 1);
   Free(filename);
+
+  if (diabloflowgraph_options.sp_sequence) {
+    /* for sequencing purposes */
+    t_section *init_array_section = NULL;
+    t_section *sec;
+    int tel;
+    OBJECT_FOREACH_SECTION(obj, sec, tel) {
+      if (!strncmp(SECTION_NAME(sec), ".init_array", strlen(".init_array"))) {
+        ASSERT(!init_array_section, ("duplicate section @T", init_array_section));
+        init_array_section = sec;
+      }
+    }
+    ASSERT(init_array_section, ("can't find section .init_array"));
+
+    t_section *init_array_vector = NULL;
+    SECTION_FOREACH_SUBSECTION(init_array_section, sec) {
+      ASSERT(!init_array_vector, ("duplicate vector @T", sec));
+      init_array_vector = sec;
+    }
+
+    t_reloc *reloc_init_done = NULL;
+    t_address max_offset = AddressNew32(0);
+    for (t_reloc_ref *rr = SECTION_REFERS_TO(init_array_vector); rr; rr = RELOC_REF_NEXT(rr)) {
+      t_reloc *rel = RELOC_REF_RELOC(rr);
+
+      t_relocatable *to = RELOC_TO_RELOCATABLE(rel)[0];
+      ASSERT(RELOCATABLE_RELOCATABLE_TYPE(to) == RT_BBL, ("expected relocation to BBL @R", rel));
+
+      t_bbl *bbl = T_BBL(to);
+      ASSERT(BBL_FUNCTION(bbl), ("expected to to be in function @eiB @R", bbl, rel));
+
+      if (!strcmp(FUNCTION_NAME(BBL_FUNCTION(bbl)), SP_IDENTIFIER_PREFIX "InitDone")) {
+        ASSERT(!reloc_init_done, ("duplicate relocation to %s @R", SP_IDENTIFIER_PREFIX "InitDone", rel));
+        reloc_init_done = rel;
+      }
+
+      if (AddressIsGt(RELOC_FROM_OFFSET(rel), max_offset))
+        max_offset = RELOC_FROM_OFFSET(rel);
+    }
+
+    /* we should have found the one */
+    ASSERT(reloc_init_done, ("can't find relocation to function '%s'", SP_IDENTIFIER_PREFIX "InitDone"));
+
+    for (t_reloc_ref *rr = SECTION_REFERS_TO(init_array_vector); rr; rr = RELOC_REF_NEXT(rr)) {
+      t_reloc *rel = RELOC_REF_RELOC(rr);
+
+      if (AddressIsLt(RELOC_FROM_OFFSET(rel), RELOC_FROM_OFFSET(reloc_init_done))) {
+        /* entry before the one, no need to do anything */
+      }
+      else if (rel == reloc_init_done) {
+        /* the one */
+        RELOC_SET_FROM_OFFSET(rel, max_offset);
+      }
+      else {
+        /* entry after the one, need to subtract 4 */
+        RELOC_SET_FROM_OFFSET(rel, AddressSubUint32(RELOC_FROM_OFFSET(rel), 4));
+      }
+    }
+  }
 
   /* Iterate over all BBLs again, add instrumentation with relocation to profiling section */
   nr_of_bbls = 0;
@@ -222,7 +295,16 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
      */
     t_address offset = nr_of_bbls*2*sizeof (t_uint64);/* Offset in the profiling section */
 
-    DiabloBrokerCall ("AddInstrumentationToBbl", obj, bbl, profiling_sec, offset);
+#ifdef DEBUG_PROFILING
+    if (nr_blocks >= diablosupport_options.debugcounter) {
+      VERBOSE(0, ("SP-SKIP @iB", bbl));
+    }
+    else
+#endif
+    {
+      DiabloBrokerCall ("AddInstrumentationToBbl", obj, bbl, profiling_sec, sequencing_counter_sec, offset);
+      nr_blocks++;
+    }
 
     /* Write the BBL's address in the old binary to appropriate place in the profiling section */
     SectionSetData64 (profiling_sec, offset, BBL_OLD_ADDRESS(bbl));
@@ -242,7 +324,7 @@ void CfgAddSelfProfiling (t_object* obj, t_string output_name)
   /* Cleanup and exit */
   Free(list);
 
-  STATUS(STOP, ("Adding self-profiling"));
+  STATUS(STOP, ("Adding self-profiling %d", nr_blocks));
 }
 
 void
@@ -774,7 +856,7 @@ static int __helper_compare_bbls(const void *a, const void *b)
 #endif
 
 void
-CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
+CfgReadBlockProfileFile (t_cfg * cfg, t_string name, t_bool execution_profile)
 {
   FILE *fp = fopen (name, "r");
 
@@ -820,7 +902,10 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
     bblarr[nbbls] = bbl;
     nbbls++;
 #endif
-    BBL_SET_EXEC_COUNT(bbl, 0LL);
+    if (execution_profile)
+      BBL_SET_EXEC_COUNT(bbl, 0LL);
+    else
+      BBL_SET_SEQUENCE_ID(bbl, 0LL);
   }
 
 #ifdef BSEARCH
@@ -860,8 +945,8 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
             if (node)
             {
               VERBOSE(0, ("Found @B", node->bbl));
-              BBL_SET_EXEC_COUNT(node->bbl, BBL_EXEC_COUNT(node->bbl)+1);
-
+              if (execution_profile)
+                BBL_SET_EXEC_COUNT(node->bbl, BBL_EXEC_COUNT(node->bbl)+1);
             }
             else
             {
@@ -912,7 +997,10 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
         else
         {
           bbl = node->bbl;
-          BBL_SET_EXEC_COUNT(bbl, count);
+          if (execution_profile)
+            BBL_SET_EXEC_COUNT(bbl, count);
+          else
+            BBL_SET_SEQUENCE_ID(bbl, count);
         }
         /* }}} */
 #else
@@ -922,9 +1010,12 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
 
           BBL_SET_OLD_ADDRESS(tempbbl, address);
           fbbl=(t_bbl**)bsearch(&tempbbl,bblarr, nbbls, sizeof(t_bbl *), __helper_compare_bbls);
-          if (fbbl)
-            BBL_SET_EXEC_COUNT(*fbbl, count);
-          else
+          if (fbbl) {
+            if (execution_profile)
+              BBL_SET_EXEC_COUNT(*fbbl, count);
+            else
+              BBL_SET_SEQUENCE_ID(*fbbl, count);
+          } else
             continue;
         }
 #else
@@ -953,7 +1044,11 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
         if (bbl)
         {
           last_found = bbl;
-          BBL_SET_EXEC_COUNT(bbl, count);
+
+          if (execution_profile)
+            BBL_SET_EXEC_COUNT(bbl, count);
+          else
+            BBL_SET_SEQUENCE_ID(bbl, count);
         }
         else
         {
@@ -969,6 +1064,8 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
 #endif
     }
 
+    t_uint64 nr_exec = 0;
+    t_uint64 nr_total = 0;
     CFG_FOREACH_BBL(cfg, bbl)
     {
       if (BBL_IS_HELL (bbl))
@@ -977,14 +1074,29 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
         continue;
       if (BBL_IS_LAST(bbl))
         continue;
-      if (BBL_EXEC_COUNT(bbl) >= 0LL)
-        continue;
-      BBL_SET_EXEC_COUNT(bbl, 0LL);
+      
+      if (execution_profile) {
+        nr_total++;
+
+        if (BBL_EXEC_COUNT(bbl) >= 0LL) {
+          if (BBL_EXEC_COUNT(bbl) > 0)
+            nr_exec++;
+          continue;
+        }
+        BBL_SET_EXEC_COUNT(bbl, 0LL);
+      }
+      else {
+        if (BBL_SEQUENCE_ID(bbl) >= 0LL)
+          continue;
+        BBL_SET_SEQUENCE_ID(bbl, 0LL);
+      }
     }
 
+    VERBOSE(0, ("PROFILE INFORMATION: %" PRIu64 "/%" PRIu64 "=%.2f", nr_exec, nr_total, 100.0*nr_exec/nr_total));
 
 #ifndef SMC
-    CfgEstimateEdgeCounts (cfg);
+    if (execution_profile)
+      CfgEstimateEdgeCounts (cfg);
 #endif
 
   }
@@ -993,6 +1105,7 @@ CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name)
     FATAL(("oeps, no execution count file with name %s", name));
   }
 
+  if (execution_profile)
   {
     t_function  * fun;
     CFG_FOREACH_FUN(cfg,fun)

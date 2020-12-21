@@ -65,7 +65,7 @@ public:
 		base_instruction = ins;
 
 		/* source information */
-		BblSourceLocation(Bbl(), origin_function, origin_object, origin_archive);
+		ASSERT(BblSourceLocation(Bbl(), origin_function, origin_object, origin_archive), ("this should not happen @eiB", Bbl()));
 	}
 	t_bool RescheduleBbl();
 

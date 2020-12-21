@@ -14,6 +14,10 @@
 #define EDGE_CALLFT_COLOR "green"
 #define EDGE_CALLFT_HEAD  "onormal"
 
+#define LINK_META_API_FUNCTIONS
+
+// #define FUNCTION_PRINT_USED_CHANGED_REGSETS
+
 /* This counter is increased every time a new function is created and serves to
  * give every function a unique ID, allowing t_function's to be ordered in a way that is
  * not address-dependent.
@@ -673,11 +677,11 @@ static t_string GetHellNodeLabel(t_bbl *bbl)
   FATAL(("Unknown hell node @B",bbl));
 }
 
-void FunctionDrawGraphAnnotated(
+void FunctionDrawGraphAnnotatedMarked(
     t_function *fun, 
     t_string filename, 
     void (*bbl_annotator)(t_bbl *, t_bbl_draw_data *), 
-    void (*edge_annotator)(t_cfg_edge *, t_edge_draw_data *))
+    void (*edge_annotator)(t_cfg_edge *, t_edge_draw_data *), t_bool marked)
 {
   t_ins * ins;
   t_bbl * bbl;
@@ -685,6 +689,9 @@ void FunctionDrawGraphAnnotated(
   t_bool show_callers = TRUE;
   t_bool draw_link;
   int callers = 0;
+  t_bool aop_link;
+  t_bbl *aop_link_head;
+  t_bbl *aop_link_tail;
 
   t_bbl_draw_data bbl_data;
   t_edge_draw_data edge_data;
@@ -711,6 +718,7 @@ void FunctionDrawGraphAnnotated(
   /* graph body */
 
   /* {{{ function nodes */
+  bool first = true;
   FUNCTION_FOREACH_BBL(fun,bbl)
   {
     ClearBblData(&bbl_data);
@@ -723,21 +731,76 @@ void FunctionDrawGraphAnnotated(
       bbl_data.label = StringDup("RETURN");
     else
     {
-      /* regular block */
-      t_string final, tmp1, tmp2;
-      final = StringIo("@xB",bbl);
-      BBL_FOREACH_INS(bbl,ins)
-      {
-	tmp1 = final;
-	tmp2 = StringIo("@gtI\\l",ins);
-	final = StringConcat2(tmp1,tmp2);
-	Free(tmp1);
-	Free(tmp2);
+      /* This code has been optimized to support BBLs with many instructions.
+       * Hence, we pre-allocate an array to store the individual instruction strings in,
+       * and concat them all afterwards.
+       * This is way faster than concatenating strings one after another. */
+
+      /* 1. pre-allocate an array of strings and lengths,
+       *    +1 for BBL prefix */
+      int increment = 1;
+
+#ifdef FUNCTION_PRINT_USED_CHANGED_REGSETS
+      if (first)
+        increment++;
+#endif
+
+      t_string *ins_str_array = Malloc((BBL_NINS(bbl)+increment) * sizeof(t_string));
+      size_t *ins_len_array = Malloc((BBL_NINS(bbl)+increment) * sizeof(size_t));
+
+      /* 2. Generate BBL information. */
+      size_t total_length = 0;
+
+      ins_str_array[0] = StringIo("@xB", bbl);
+      ins_len_array[0] = strlen(ins_str_array[0]);
+      total_length += ins_len_array[0];
+
+#ifdef FUNCTION_PRINT_USED_CHANGED_REGSETS
+      if (first) {
+        ins_str_array[1] = StringIo("USED: @X\\lCHANGED: @X\\l", CPREGSET(BBL_CFG(bbl), FUNCTION_REGS_USED(fun)), CPREGSET(BBL_CFG(bbl), FUNCTION_REGS_CHANGED(fun)));
+        ins_len_array[1] = strlen(ins_str_array[1]);
+        total_length += ins_len_array[1];
       }
+#endif
+
+      /* 3. Generate instruction strings. */
+      size_t ins_idx = increment;
+      BBL_FOREACH_INS(bbl, ins) {
+        ins_str_array[ins_idx] = StringIo("@gtI\\l", ins);
+        ins_len_array[ins_idx] = strlen(ins_str_array[ins_idx]);
+
+        total_length += ins_len_array[ins_idx];
+        ins_idx++;
+      }
+
+      /* 4. Construct a final, possibly very long, string by concatenating them all together.
+       *    Do this by using only one allocation. */
+      t_string final = Malloc((total_length+1) * sizeof(char));
+      final[total_length] = '\0';
+
+      size_t curr_pos = 0;
+      for (size_t i = 0; i < BBL_NINS(bbl)+increment; i++) {
+        strncpy(final+curr_pos, ins_str_array[i], ins_len_array[i]);
+        curr_pos += ins_len_array[i];
+        Free(ins_str_array[i]);
+      }
+      Free(ins_str_array);
+      Free(ins_len_array);
 
       bbl_data.label = final;
       bbl_data.style = StringDup("filled");
-      bbl_data.fillcolor = StringDup("white");
+
+      if (BblIsMarked(bbl) && marked)
+        bbl_data.fillcolor = StringDup("cyan");
+      else
+        bbl_data.fillcolor = StringDup("white");
+
+      if (BBL_ATTRIB(bbl) & BBL_AOP_SETTER)
+        bbl_data.fillcolor = StringDup("darkolivegreen3");
+      if (BBL_ATTRIB(bbl) & BBL_AOP_SELECT)
+        bbl_data.fillcolor = StringDup("blue");
+      if (BBL_ATTRIB(bbl) & BBL_AOP_CLOUD)
+        bbl_data.extra = StringDup("fontcolor=cyan3");
     }
 
     bbl_annotator(bbl, &bbl_data);
@@ -748,6 +811,8 @@ void FunctionDrawGraphAnnotated(
     if (bbl_data.style) fprintf(out,", style=%s", bbl_data.style);
     if (bbl_data.extra) fprintf(out,", %s", bbl_data.extra);
     fprintf(out,"]\n");
+
+    first = false;
   } /* }}} */
 
   ClearBblData(&bbl_data);
@@ -839,7 +904,9 @@ void FunctionDrawGraphAnnotated(
 	    }
 	    else
 	    {
-	      sprintf(nodename, "f%p", tail);
+              t_bbl *bbl = tail;
+              DiabloBrokerCall("AOPSpecialFunctionAddress", edge, &bbl);
+	      sprintf(nodename, "f%p", bbl);
 	      if (AddressIsEq(BBL_OLD_ADDRESS(tail),BBL_CADDRESS(tail)))
 		bbl_data.label = StringIo("%s (@G)",clean_name,BBL_OLD_ADDRESS(tail));
 	      else
@@ -854,7 +921,7 @@ void FunctionDrawGraphAnnotated(
 	    edge_data.color = StringDup("blue");
             edge_data.extra = StringDup("arrowhead=" EDGE_HEAD);
 	    bbl_data.fillcolor = StringDup("green");
-	    sprintf(nodename, "r%p", tail);
+            sprintf(nodename, "r%p", tail);
 	    bbl_data.label = StringIo("@xB in %s",tail,clean_name);
 	    break;
 	  case ET_COMPENSATING:
@@ -888,17 +955,37 @@ void FunctionDrawGraphAnnotated(
             edge_data.style = StringDup("dashed");
             edge_data.color = StringDup("green");
             edge_data.extra = StringDup("arrowhead=" EDGE_IP_HEAD);
-            bbl_data.fillcolor = StringDup("black");
             sprintf(nodename, "i%p", tail);
             bbl_data.label = StringIo("@xB in %s",tail,clean_name);
+#ifdef LINK_META_API_FUNCTIONS
+	    if (FUNCTION_NAME(BBL_FUNCTION(tail))
+	    	&& StringPatternMatch("MetaTF*", FUNCTION_NAME(BBL_FUNCTION(tail)))) {
+		bbl_data.fillcolor = StringDup("cyan");
+		bbl_data.style = StringDup("filled");
+	    }
+	    else
+#endif
+	    {
+	    	bbl_data.fillcolor = StringDup("black");
+	    }
             break;
 	  case ET_IPJUMP:
             edge_data.style = StringDup(EDGE_IP_STYLE);
             edge_data.color = StringDup("black");
             edge_data.extra = StringDup("arrowhead=" EDGE_IP_HEAD);
-            bbl_data.fillcolor = StringDup("black");
             sprintf(nodename, "i%p", tail);
             bbl_data.label = StringIo("@xB in %s",tail,clean_name);
+#ifdef LINK_META_API_FUNCTIONS
+	    if (FUNCTION_NAME(BBL_FUNCTION(tail))
+	    	&& StringPatternMatch("MetaTF*", FUNCTION_NAME(BBL_FUNCTION(tail)))) {
+		bbl_data.fillcolor = StringDup("cyan");
+		bbl_data.style = StringDup("filled");
+	    }
+	    else
+#endif
+	    {
+	    	bbl_data.fillcolor = StringDup("black");
+	    }
             break;
 	  case ET_IPSWITCH:
 	    edge_data.style = StringDup(EDGE_IP_STYLE);
@@ -959,7 +1046,7 @@ void FunctionDrawGraphAnnotated(
 	  if (draw_link)
 	  {
 	    /* draw an invisible link edge, to improve the layout of function call/return edge pairs */
-            fprintf(out,"\t\"%p\" -> \"%p\" [style=%s,color=%s,arrowhead=%s]\n",bbl,CFG_EDGE_TAIL(CFG_EDGE_CORR(edge)), EDGE_CALLFT_STYLE, EDGE_CALLFT_COLOR, EDGE_CALLFT_HEAD);
+      fprintf(out,"\t\"%p\" -> \"%p\" [style=%s,color=%s,arrowhead=%s]\n",bbl,CFG_EDGE_TAIL(CFG_EDGE_CORR(edge)), EDGE_CALLFT_STYLE, EDGE_CALLFT_COLOR, EDGE_CALLFT_HEAD);
 	  }
 	}
 
@@ -978,6 +1065,9 @@ void FunctionDrawGraphAnnotated(
       t_string destfun = BBL_FUNCTION(head)?(FUNCTION_NAME(BBL_FUNCTION(head)) ? FUNCTION_NAME(BBL_FUNCTION(head)) : "noname"):"nofun";
       char nodename[20];
       t_string clean_name = NULL;
+      aop_link = FALSE;
+      aop_link_head = NULL;
+      aop_link_tail = NULL;
       
       ClearEdgeData(&edge_data);
       ClearBblData(&bbl_data);
@@ -1012,17 +1102,54 @@ void FunctionDrawGraphAnnotated(
           edge_data.style = StringDup("dashed");
           edge_data.color = StringDup("green");
           edge_data.extra = StringDup("arrowhead=" EDGE_IP_HEAD);
-          bbl_data.fillcolor = StringDup("cyan");
-          bbl_data.label = StringIo("@xB in %s",head,clean_name);
-          sprintf(nodename,"I%p",head);
+
+          DiabloBrokerCall("EdgeIsAOP", edge, &aop_link);
+          if (aop_link) {
+            aop_link_head = FUNCTION_BBL_FIRST(BBL_FUNCTION(CFG_EDGE_HEAD(edge)));
+            aop_link_tail = CFG_EDGE_TAIL(edge);
+          }
+#ifdef LINK_META_API_FUNCTIONS
+          if (FUNCTION_NAME(BBL_FUNCTION(head))
+              && StringPatternMatch("MetaTF*", FUNCTION_NAME(BBL_FUNCTION(head)))) {
+            bbl_data.fillcolor = StringDup("cyan");
+            bbl_data.style = StringDup("filled");
+	    sprintf(nodename, "i%p", FUNCTION_BBL_FIRST(BBL_FUNCTION(head)));
+          }
+          else
+#endif
+	  {
+	    bbl_data.fillcolor = StringDup("cyan");
+            bbl_data.label = StringIo("@xB in %s",head,clean_name);
+            sprintf(nodename,"I%p",head);
+          }
           break;
 	case ET_IPJUMP:
           edge_data.style = StringDup(EDGE_IP_STYLE);
           edge_data.color = StringDup("black");
           edge_data.extra = StringDup("arrowhead=" EDGE_IP_HEAD);
-          bbl_data.fillcolor = StringDup("cyan");
+	  bbl_data.fillcolor = StringDup("cyan");
           bbl_data.label = StringIo("@xB in %s",head,clean_name);
           sprintf(nodename,"I%p",head);
+
+          DiabloBrokerCall("EdgeIsAOP", edge, &aop_link);
+          if (aop_link) {
+            aop_link_head = FUNCTION_BBL_FIRST(BBL_FUNCTION(CFG_EDGE_HEAD(edge)));
+            aop_link_tail = CFG_EDGE_TAIL(edge);
+          }
+#ifdef LINK_META_API_FUNCTIONS
+          if (FUNCTION_NAME(BBL_FUNCTION(head))
+              && StringPatternMatch("MetaTF*", FUNCTION_NAME(BBL_FUNCTION(head)))) {
+            bbl_data.fillcolor = StringDup("cyan");
+            bbl_data.style = StringDup("filled");
+	    sprintf(nodename, "i%p", FUNCTION_BBL_FIRST(BBL_FUNCTION(head)));
+          }
+          else
+#endif
+	  {
+	    bbl_data.fillcolor = StringDup("cyan");
+            bbl_data.label = StringIo("@xB in %s",head,clean_name);
+            sprintf(nodename,"I%p",head);
+          }
           break;
 	case ET_IPSWITCH:
 	  edge_data.style = StringDup(EDGE_IP_STYLE);
@@ -1049,8 +1176,12 @@ void FunctionDrawGraphAnnotated(
 	    sprintf(nodename,"%p", head);
 	  else if (BBL_IS_HELL(FUNCTION_BBL_FIRST(BBL_FUNCTION(head))))
 	    sprintf(nodename,"h%p", FUNCTION_BBL_FIRST(BBL_FUNCTION(head)));
-	  else
-	    sprintf(nodename,"f%p", FUNCTION_BBL_FIRST(BBL_FUNCTION(head)));
+	  else {
+      ASSERT(CFG_EDGE_CORR(edge), ("expected corresponding edge for @E", edge));
+            t_bbl *bbl = CFG_EDGE_TAIL(CFG_EDGE_CORR(edge));
+            DiabloBrokerCall("AOPSpecialFunctionAddress", edge, &bbl);
+            sprintf(nodename, "f%p", bbl);
+          }
 	  break;
 	default:
 	  FATAL(("unexpected edge type"));
@@ -1084,23 +1215,28 @@ void FunctionDrawGraphAnnotated(
 
       if (show_callers || CFG_EDGE_CAT(edge) != ET_CALL)
       {
-	  /* print edge */
-	  edge_annotator(edge, &edge_data);
-	  fprintf(out,"\t\"%s\" -> \"%p\" [style=%s,color=%s",nodename,bbl,edge_data.style,edge_data.color);
-	  if (edge_data.label) fprintf(out,",label=\"%s\"",edge_data.label);
-	  if (edge_data.extra) fprintf(out,", %s",edge_data.extra);
-	  fprintf(out,"]\n");
+        if (aop_link) {
+          fprintf(out,"\t\"i%p\" -> \"%p\" [style=%s,color=%s, %s]\n",aop_link_head,aop_link_tail, edge_data.style, edge_data.color, edge_data.extra);
+        }
+        else {
+          /* print edge */
+          edge_annotator(edge, &edge_data);
+          fprintf(out,"\t\"%s\" -> \"%p\" [style=%s,color=%s",nodename,bbl,edge_data.style,edge_data.color);
+          if (edge_data.label) fprintf(out,",label=\"%s\"",edge_data.label);
+          if (edge_data.extra) fprintf(out,", %s",edge_data.extra);
+          fprintf(out,"]\n");
 
-	  /* print extraprocedural block */
-	  if (bbl_data.label)
-	  {
-	    fprintf(out,"\t\"%s\" [", nodename);
-	    fprintf(out, "label=\"%s\"", bbl_data.label);
-	    if (bbl_data.fillcolor) fprintf(out,", fillcolor=%s", bbl_data.fillcolor);
-	    if (bbl_data.style) fprintf(out,", style=%s", bbl_data.style);
-	    if (bbl_data.extra) fprintf(out,", %s", bbl_data.extra);
-	    fprintf(out,"]\n");
-	  }
+          /* print extraprocedural block */
+          if (bbl_data.label)
+          {
+            fprintf(out,"\t\"%s\" [", nodename);
+            fprintf(out, "label=\"%s\"", bbl_data.label);
+            if (bbl_data.fillcolor) fprintf(out,", fillcolor=%s", bbl_data.fillcolor);
+            if (bbl_data.style) fprintf(out,", style=%s", bbl_data.style);
+            if (bbl_data.extra) fprintf(out,", %s", bbl_data.extra);
+            fprintf(out,"]\n");
+          }
+        }
       }
       
       Free (clean_name);
@@ -1197,6 +1333,10 @@ static void null_bbl_annotator(t_bbl *bbl, t_bbl_draw_data *data)
 
 static void null_edge_annotator(t_cfg_edge *edge, t_edge_draw_data *data)
 {
+}
+
+void FunctionDrawGraphMarked(t_function *fun, t_string filename, t_bool marked) {
+  FunctionDrawGraphAnnotatedMarked(fun, filename, null_bbl_annotator, null_edge_annotator, marked);
 }
 
 void FunctionDrawGraph(t_function *fun, t_string filename)

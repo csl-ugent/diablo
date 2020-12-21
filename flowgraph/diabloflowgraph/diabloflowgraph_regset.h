@@ -366,6 +366,9 @@ t_uint32 RegsetCountRegs (t_regset r);
 t_reg RegsetFindFirstBlob (t_regset r, t_uint32 * size);
 
 #endif
+
+t_string RegsetSerialize (t_regset r);
+t_regset RegsetDeserialize (t_string s);
 #endif
 /*}}}*/
 /*@}*/

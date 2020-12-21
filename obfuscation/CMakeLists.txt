@@ -19,6 +19,7 @@ endmacro()
 add_subdirectory(generic)
 add_subdirectory(architecture_backends)
 add_subdirectory(diversity_engine)
+add_subdirectory(meta_api)
 
 opt_gen_ext_base_make_library(Obfuscation ${CMAKE_CURRENT_SOURCE_DIR} obfuscation obfuscation_obfuscation_options obfuscation_obfuscation_option_list ObfuscationOpt obfuscation_opt "-d")
 
@@ -50,11 +51,12 @@ foreach(architecture ${ObfuscationArchitectures})
   string(TOUPPER ${architecture} architecture_allcaps) # Make variable for the configure step
   configure_file("${CMAKE_CURRENT_SOURCE_DIR}/backend_template.cc.in" ${backend_file})
 
-  add_executable (diablo-obfuscation-${architecture} diablo_obfuscation_main.cc ${backend_file})
+  add_executable (diablo-obfuscation-${architecture} diablo_obfuscation_main.cc ${backend_file} ${CMAKE_SOURCE_DIR}/frontends/common.cc)
   target_include_current_directories(diablo-obfuscation-${architecture})
   target_link_libraries(diablo-obfuscation-${architecture}
     ${common_link_libraries}
     PRIVATE DiabloObfuscation${architecture}
+    PRIVATE DiabloMetaAPI
   )
 
 
@@ -64,5 +66,6 @@ foreach(architecture ${ObfuscationArchitectures})
     ${common_link_libraries}
     PRIVATE DiabloDiversityEngine
     PRIVATE DiabloObfuscation${architecture}
+    PRIVATE DiabloMetaAPI
   )
 endforeach()

@@ -39,7 +39,6 @@ class CodeMobilityTransformer : public GMRTTransformer
     void FinalizeTransform ();
     void ReserveEntries(t_uint32 nr);
     void TransformObject ();
-    void Output ();
 
     /* Constructor and destructor */
     CodeMobilityTransformer (t_object* obj, t_const_string output_name);

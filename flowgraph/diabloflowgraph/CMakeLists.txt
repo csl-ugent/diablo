@@ -11,6 +11,7 @@ target_compile_definitions(Flowgraph
 target_include_current_directories(Flowgraph)
 target_link_libraries(Flowgraph
   PUBLIC Object
+  PUBLIC ObjectDebugDwarf
 )
 
 #install(FILES ${Flowgraph_H} DESTINATION include)

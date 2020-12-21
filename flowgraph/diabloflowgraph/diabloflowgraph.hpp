@@ -31,4 +31,6 @@ extern "C" {
 #include "diabloflowgraph_new_target_selector.hpp"
 #endif
 
+void ReadSequenceData(t_cfg * cfg, t_string name, t_address before_address, BblSet& before, t_address after_address, BblSet& after);
+
 #endif

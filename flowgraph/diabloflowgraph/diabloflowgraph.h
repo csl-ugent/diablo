@@ -118,6 +118,13 @@ void DiabloFlowgraphCppFini ();
 
 #include "diabloflowgraph_object_tracking.h"
 
+#define ASSERT_WITH_DOTS(z,x,y) do {\
+  if (!(x)) {\
+    CfgDrawFunctionGraphs z ;\
+    FATAL(y);\
+  }\
+} while(0)
+
 #endif
 /* vim: set shiftwidth=4 cinoptions={.5s,g0,p5,t0,(0,^-0.5s,n-2,+0.5s foldmethod=marker tw=78 cindent: */
 /* vim: set shiftwidth=2 expandtab cinoptions=p5,t0,(0, foldmethod=marker tw=80 cindent: */

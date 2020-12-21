@@ -745,19 +745,31 @@ static t_bool ArmCountEntriesInSwitchTable(t_bbl * branch_bbl, t_uint32 * nr_ent
 bool ArmFindDefinitionOfRegister(t_arm_ins * start, t_reg reg, t_uint32 * immvalue) {
   t_uint32 counter = 0;
   t_bbl *to_bbl = ARM_INS_BBL(start);
+
+  t_bbl *old_from = to_bbl;
   t_bbl *from_bbl = BBL_PREV(to_bbl);
 
   while (counter < 10) {
     counter++;
 
     t_arm_ins *ins_last = T_ARM_INS(BBL_INS_LAST(from_bbl));
-    if (!ArmInsIsUnconditionalBranch(ins_last)) {
+
+    t_address target;
+    if (ArmInsIsUnconditionalBranch(ins_last)) {
+      /* unconditional branches */
+      target = AddressAddUint32(ARM_INS_CADDRESS(ins_last),
+                                ARM_INS_IMMEDIATE(ins_last) + ((ARM_INS_FLAGS(ins_last) & FL_THUMB)?4:8));
+    }
+    else if (!ArmIsControlflow(ins_last)) {
+      /* fallthrough */
+      target = ARM_INS_CADDRESS(T_ARM_INS(BBL_INS_FIRST(old_from)));
+    }
+    else {
+      /* not supported */
+      old_from = from_bbl;
       from_bbl = BBL_PREV(from_bbl);
       continue;
     }
-
-    t_address target = AddressAddUint32(ARM_INS_CADDRESS(ins_last),
-                                        ARM_INS_IMMEDIATE(ins_last) + ((ARM_INS_FLAGS(ins_last) & FL_THUMB)?4:8));
 
     if (AddressIsEq(target,ARM_INS_CADDRESS(T_ARM_INS(BBL_INS_FIRST(to_bbl))))) {
       // found the BBL branching to the destination
@@ -775,12 +787,11 @@ bool ArmFindDefinitionOfRegister(t_arm_ins * start, t_reg reg, t_uint32 * immval
       }
 
       to_bbl = from_bbl;
+    }
+
+    old_from = from_bbl;
       from_bbl = BBL_PREV(from_bbl);
     }
-    else {
-      from_bbl = BBL_PREV(from_bbl);
-    }
-  }
 
   return FALSE;
 }
@@ -2851,7 +2862,6 @@ static t_uint32 ArmAddBasicBlockEdges(t_object *obj)
 	    }
 	    else
 	    {
-
 	      RELOC_SET_EDGE(rel, CfgEdgeCreateCall(cfg, CFG_HELL_NODE(cfg), block,NULL,NULL));
 	      nedges++;
 	    }
@@ -3046,6 +3056,8 @@ static t_uint32 ArmAddBasicBlockEdges(t_object *obj)
 			ARM_INS_REGB(backtrack) == ARM_REG_R13 &&
 			(ARM_INS_IMMEDIATE(backtrack) >> ARM_INS_REGB(block_end)) & 1)
 		      break;
+                    else if (RegsetIn(ARM_INS_REGS_DEF(backtrack),ARM_INS_REGB(block_end)))
+                      backtrack = NULL;
 		    else
 		      backtrack = ARM_INS_IPREV(backtrack);
 		  }
@@ -5602,7 +5614,11 @@ void ArmMakeAddressProducers(t_cfg *cfg)
                 */
                ASSERT((ARM_INS_OPCODE(actual_load) == ARM_ADD) && ((ARM_INS_REGB(actual_load) == ARM_REG_R15) || (ARM_INS_REGC(actual_load) == ARM_REG_R15)), ("Second part of GOT load is neither load nor an apprpriate ADD:\n  First LDR: @I\n  Second ins: @I\nregb: %d, regc: %d, oldrega: %d",ins,actual_load,ARM_INS_REGB(actual_load),ARM_INS_REGC(actual_load),ARM_INS_REGA(ins)));
 	       ComplexityRecordTransformedInstruction(T_INS(ins), T_INS(actual_load));
-               ArmInsMakeNoop(actual_load);
+
+	       if (ARM_INS_REGA(actual_load) == ARM_INS_REGC(actual_load))
+                 ArmInsMakeNoop(actual_load);
+	       else
+	         ArmInsMakeMov(actual_load, ARM_INS_REGA(actual_load), ARM_INS_REGC(actual_load), 0, ARM_INS_CONDITION(actual_load));
              }
 
              /* create the new relocation for the data ins */
@@ -7091,18 +7107,16 @@ void ArmAddCallFromBblToBbl (t_object* obj, t_bbl* from, t_bbl* to)
 /* Add instructions for instrumentation at the beginning of the BBL. These instructions
  * increment a certain memory location every time the BBL is executed. Used by CfgAddSelfProfiling
  */
-#define COUNTER_SATURATION 1
 #define PROFILE_USE_LIVENESS 0
-void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_address offset)
+#define PROFILING_BEFORE_INS 0
+#define PROFILING_DO_INSTRUMENT 1
+void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_section* sequencing_counter_sec, t_address offset)
 {
   t_arm_ins* tmp, *ins;
   t_arm_ins* first = T_ARM_INS(BBL_INS_FIRST(bbl));
   t_reloc* rel;
   t_cfg_edge* edge;
-  t_reg reg , helper;
-#if COUNTER_SATURATION
-  t_reg reg_saturation;
-#endif
+  t_reg reg, helper0, helper1, helper2;
   t_regset available;
   t_uint32 nr_of_dead_regs;
   t_bool isThumb = ArmBblIsThumb(bbl);
@@ -7112,6 +7126,15 @@ void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling
   static t_regset possible;
   static t_regset thumb_possible;
   static t_bool initialized = FALSE;
+  static t_bool emit_short_code = FALSE;
+  static t_bool emit_saturation = FALSE;
+  static t_bool do_sequencing = FALSE;
+
+  ins = NULL;
+#if PROFILING_BEFORE_INS
+  ASSERT(BBL_NINS(bbl) >= 2, ("expected block to have at least 2 instructions @eiB", bbl));
+  ins = ARM_INS_INEXT(T_ARM_INS(BBL_INS_FIRST(bbl)));
+#endif
 
   if(!initialized)
   {
@@ -7125,6 +7148,19 @@ void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling
         RegsetSetAddReg(thumb_possible, reg);
     }
 #endif
+
+    emit_short_code = diabloflowgraph_options.sp_markexecuted;
+    emit_saturation = diabloflowgraph_options.sp_saturation;
+    do_sequencing = diabloflowgraph_options.sp_sequence;
+    if (do_sequencing)
+      ASSERT(sequencing_counter_sec, ("sequencing support requested but counter section was not created"));
+
+    if (do_sequencing)
+      emit_short_code = FALSE;
+
+    if (emit_short_code)
+      emit_saturation = FALSE;
+
     initialized = TRUE;
   }
 
@@ -7237,13 +7273,19 @@ void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling
     reg = ARM_REG_R0;
     registers |= (1 << reg);
 
-    helper = ARM_REG_R1;
-    registers |= (1 << helper);
+    helper0 = ARM_REG_R1;
+    registers |= (1 << helper0);
 
-#if COUNTER_SATURATION
-    reg_saturation = ARM_REG_R2;
-    registers |= (1 << reg_saturation);
-#endif
+    if (emit_saturation
+        || do_sequencing) {
+      helper1 = ARM_REG_R2;
+      registers |= (1 << helper1);
+    }
+
+    if (do_sequencing) {
+      helper2 = ARM_REG_R3;
+      registers |= (1 << helper2);
+    }
   }
   else if(nr_of_dead_regs == 1)
   {
@@ -7251,97 +7293,203 @@ void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling
     REGSET_FOREACH_REG(available, reg)
       break;
 
-    helper = ARM_REG_R0;
-    while (helper == reg)
-      helper++;
+    helper0 = ARM_REG_R0;
+    while (helper0 == reg)
+      helper0++;
 
-    registers |= (1 << helper);
+    registers |= (1 << helper0);
 
-#if COUNTER_SATURATION
-    reg_saturation = ARM_REG_R0;
-    while (reg_saturation == reg
-           || reg_saturation == helper)
-      reg_saturation++;
+    if (emit_saturation
+        || do_sequencing) {
+      helper1 = ARM_REG_R0;
+      while (helper1 == reg
+            || helper1 == helper0)
+        helper1++;
 
-    registers |= (1 << reg_saturation);
-#endif
+      registers |= (1 << helper1);
+    }
+
+    if (do_sequencing) {
+      helper2 = ARM_REG_R0;
+      while (helper2 == reg
+            || helper2 == helper0
+            || helper2 == helper1)
+        helper2++;
+
+      registers |= (1 << helper2);
+    }
   }
-#if COUNTER_SATURATION
   else if(nr_of_dead_regs == 2)
   {
-    /* need to find 1 more register */
-    REGSET_FOREACH_REG(available, reg)
-      break;
-    REGSET_FOREACH_REG(available, helper)
-      if (reg != helper) break;
+    if (emit_saturation || do_sequencing) {
+      /* need to find 1 more register */
+      REGSET_FOREACH_REG(available, reg)
+        break;
+      REGSET_FOREACH_REG(available, helper0)
+        if (reg != helper0) break;
 
-    reg_saturation = ARM_REG_R0;
-    while (reg_saturation == reg
-           || reg_saturation == helper)
-      reg_saturation++;
+      helper1 = ARM_REG_R0;
+      while (helper1 == reg
+            || helper1 == helper0)
+        helper1++;
 
-    registers |= (1 << reg_saturation);
+      registers |= (1 << helper1);
+
+      if (do_sequencing) {
+        helper2 = ARM_REG_R0;
+        while (helper2 == reg
+              || helper2 == helper0
+              || helper2 == helper1)
+          helper2++;
+
+        registers |= (1 << helper2);
+      }
+    }
   }
-#endif
   else
   {
     REGSET_FOREACH_REG(available, reg)
       break;
-    REGSET_FOREACH_REG(available, helper)
-      if(reg != helper) break;
-#if COUNTER_SATURATION
-    REGSET_FOREACH_REG(available, reg_saturation)
-      if (reg_saturation != reg
-          && reg_saturation != helper) break;
-#endif
+    REGSET_FOREACH_REG(available, helper0)
+      if(reg != helper0) break;
+
+    if (emit_saturation || do_sequencing) {
+      REGSET_FOREACH_REG(available, helper1)
+        if (helper1 != reg
+            && helper1 != helper0) break;
+    }
+
+    if (do_sequencing) {
+      REGSET_FOREACH_REG(available, helper2)
+        if (helper2 != reg
+            && helper2 != helper0
+            && helper2 != helper1) break;
+    }
   }
 
   /* the following code prepends instructions to the given BBL, adding the profiling support code */
 
   /* restore used live registers, if any:
    *  POP {...} */
-  if (registers != 0)
-    ArmMakeInsForBbl(Pop, Prepend, tmp, bbl, isThumb, registers, ARM_CONDITION_AL, isThumb);
+#if PROFILING_DO_INSTRUMENT
+  if (registers != 0) {
+    if (ins)
+      ArmMakeInsForIns(Pop, Before, tmp, ins, isThumb, registers, ARM_CONDITION_AL, isThumb);
+    else
+      ArmMakeInsForBbl(Pop, Prepend, tmp, bbl, isThumb, registers, ARM_CONDITION_AL, isThumb);
+    ins = tmp;
+  }
 
-  /* store the new counter value:
-   *  STR reg, [helper, #0] */
-  ArmMakeInsForBbl(Str, Prepend, tmp, bbl, isThumb, reg, helper, ARM_REG_NONE,
-    0 /* immediate */, ARM_CONDITION_AL, TRUE /* pre */, FALSE /* up */, FALSE /* wb */);
+  if (do_sequencing) {
+    /* emit sequencing instrumentation code */
 
-  /* if desired, make sure the counter doesn't overflow */
-#if COUNTER_SATURATION
-  /* subtract one from the counter value, resetting it back to its maximum:
-   *  SUB reg, reg, reg_saturation */
-  ArmMakeInsForBbl(Sub, Prepend, tmp, bbl, isThumb, reg, reg, reg_saturation, 0, ARM_CONDITION_AL);
+    /* MSR cpsr, helper2 */
+    if (ins)
+      ArmMakeInsForIns(Msr, Before, tmp, ins, isThumb, helper2, ARM_CONDITION_AL, true);
+    else
+      ArmMakeInsForBbl(Msr, Prepend, tmp, bbl, isThumb, helper2, ARM_CONDITION_AL, true);
+    ins = tmp;
 
-  /* shift the number of leading zeros right by 5 bits.
-   * The logic here is that if 'reg' is 0, 'reg_saturation' contains '32' (0b100000).
-   *  MOV reg_saturation, reg_saturation LSR 5 */
-  ArmMakeInsForBbl(Mov, Prepend, tmp, bbl, isThumb, reg_saturation, reg_saturation, 0, ARM_CONDITION_AL);
-  ARM_INS_SET_SHIFTTYPE(tmp, ARM_SHIFT_TYPE_LSR_IMM);
-  ARM_INS_SET_SHIFTLENGTH(tmp, 5);
+    /* STREQ helper1, [reg, #0] */
+    ArmMakeInsForIns(Str, Before, tmp, ins, isThumb, helper1, reg, ARM_REG_NONE, 0, ARM_CONDITION_EQ, TRUE, FALSE, FALSE);
+    ins = tmp;
+    /* STREQ helper1, [helper0, #0] */
+    ArmMakeInsForIns(Str, Before, tmp, ins, isThumb, helper1, helper0, ARM_REG_NONE, 0, ARM_CONDITION_EQ, TRUE, FALSE, FALSE);
+    ins = tmp;
+    /* ADDEQ helper1, helper1, #1 */
+    ArmMakeInsForIns(Add, Before, tmp, ins, isThumb, helper1, helper1, ARM_REG_NONE, 1, ARM_CONDITION_EQ);
+    ins = tmp;
+    /* LDREQ helper1, [reg, #0] */
+    ArmMakeInsForIns(Ldr, Before, tmp, ins, isThumb, helper1, reg, ARM_REG_NONE, 0, ARM_CONDITION_EQ, TRUE, FALSE, FALSE);
+    ins = tmp;
+    /* address producer, producing the address at which the counter for this BBL is stored:
+    *  ADDRESS_PRODUCER(EQ) helper0, <address> */
+    ArmMakeInsForIns(Mov,  Before, tmp, ins, isThumb,  reg, ARM_REG_NONE, 0, ARM_CONDITION_EQ); /* Just get us an instruction with a correct regA */
+    ins = tmp;
+    rel = RelocTableAddRelocToRelocatable(OBJECT_RELOC_TABLE(obj),
+                                          AddressNullForObject(obj), /* addend */
+                                          T_RELOCATABLE(ins), /* from */
+                                          AddressNullForObject(obj), /* from-offset */
+                                          T_RELOCATABLE(sequencing_counter_sec), /* to */
+                                          AddressNew32(0), /* to-offset */
+                                          FALSE, /* hell */
+                                          NULL, /* edge */
+                                          NULL, /* corresp */
+                                          NULL, /* sec */
+                                          "R00A00+\\l*w\\s0000$");
+    ArmInsMakeAddressProducer(ins, 0/* immediate */, rel);
 
-  /* count the number of leading zeros in 'reg', and store the result in 'reg_saturation'.
-   * We can't use comparison instructions here because the statusflags may not be modified:
-   *  CLZ reg_saturation, reg */
-  ArmMakeInsForBbl(Clz, Prepend, tmp, bbl, isThumb, reg_saturation, reg, ARM_CONDITION_AL);
-#endif
+    /* CMP reg, #0 */
+    ArmMakeInsForIns(Cmp, Before, tmp, ins, isThumb, reg, ARM_REG_NONE, 0, ARM_CONDITION_AL);
+    ins = tmp;
 
-  /* increment the counter value:
-   *  ADD reg, reg, #1 */
-  ArmMakeInsForBbl(Add, Prepend, tmp, bbl, isThumb, reg, reg, ARM_REG_NONE, 1, ARM_CONDITION_AL);
+    /* MRS helper2, cpsr */
+    ArmMakeInsForIns(Mrs, Before, tmp, ins, isThumb, helper2, ARM_CONDITION_AL);
+    ins = tmp;
+  }
+  else {
+    /* emit self-profiling instrumentation code */
 
-  /* load the stored counter value (immediate will be filled in by the layout code, when address producers are generated):
-   *  LDR reg, [helper, #0] */
-  ArmMakeInsForBbl(Ldr, Prepend, tmp, bbl, isThumb, reg, helper, ARM_REG_NONE,
-    0 /* immediate */, ARM_CONDITION_AL, TRUE /* pre */, FALSE /* up */, FALSE /* wb */);
+    /* store the new counter value:
+    *  STR reg, [helper0, #0] */
+    if (ins)
+      ArmMakeInsForIns(Str, Before, tmp, ins, isThumb, reg, helper0, ARM_REG_NONE,
+        0 /* immediate */, ARM_CONDITION_AL, TRUE /* pre */, FALSE /* up */, FALSE /* wb */);
+    else {
+      ArmMakeInsForBbl(Str, Prepend, tmp, bbl, isThumb, reg, helper0, ARM_REG_NONE,
+        0 /* immediate */, ARM_CONDITION_AL, TRUE /* pre */, FALSE /* up */, FALSE /* wb */);
+    }
+    ins = tmp;
+
+    /* if desired, make sure the counter doesn't overflow */
+    if (emit_saturation) {
+      /* subtract one from the counter value, resetting it back to its maximum:
+      *  SUB reg, reg, helper1 */
+      ArmMakeInsForIns(Sub, Before, tmp, ins, isThumb, reg, reg, helper1, 0, ARM_CONDITION_AL);
+      ins = tmp;
+
+      /* shift the number of leading zeros right by 5 bits.
+      * The logic here is that if 'reg' is 0, 'helper1' contains '32' (0b100000).
+      *  MOV helper1, helper1 LSR 5 */
+      ArmMakeInsForIns(Mov, Before, tmp, ins, isThumb, helper1, helper1, 0, ARM_CONDITION_AL);
+      ARM_INS_SET_SHIFTTYPE(tmp, ARM_SHIFT_TYPE_LSR_IMM);
+      ARM_INS_SET_SHIFTLENGTH(tmp, 5);
+      ins = tmp;
+
+      /* count the number of leading zeros in 'reg', and store the result in 'helper1'.
+      * We can't use comparison instructions here because the statusflags may not be modified:
+      *  CLZ helper1, reg */
+      ArmMakeInsForIns(Clz, Before, tmp, ins, isThumb, helper1, reg, ARM_CONDITION_AL);
+      ins = tmp;
+    }
+
+    if (emit_short_code) {
+      /* produce '1' */
+      ArmMakeInsForIns(Mov, Before, tmp, ins, isThumb, reg, ARM_REG_NONE, 1, ARM_CONDITION_AL);
+    }
+    else {
+      /* increment the counter value:
+      *  ADD reg, reg, #1 */
+      ArmMakeInsForIns(Add, Before, tmp, ins, isThumb, reg, reg, ARM_REG_NONE, 1, ARM_CONDITION_AL);
+    }
+    ins = tmp;
+  }
+
+  if (!emit_short_code
+      || do_sequencing) {
+    /* load the stored counter value (immediate will be filled in by the layout code, when address producers are generated):
+    *  LDR reg, [helper0, #0] */
+    ArmMakeInsForIns(Ldr, Before, tmp, ins, isThumb, reg, helper0, ARM_REG_NONE,
+      0 /* immediate */, ARM_CONDITION_AL, TRUE /* pre */, FALSE /* up */, FALSE /* wb */);
+    ins = tmp;
+  }
 
   /* address producer, producing the address at which the counter for this BBL is stored:
-   *  ADDRESS_PRODUCER helper, <address> */
-  ArmMakeInsForBbl(Mov,  Prepend, ins, bbl, isThumb,  helper, ARM_REG_NONE, 0, ARM_CONDITION_AL); /* Just get us an instruction with a correct regA */
+   *  ADDRESS_PRODUCER helper0, <address> */
+  ArmMakeInsForIns(Mov, Before, tmp, ins, isThumb,  helper0, ARM_REG_NONE, 0, ARM_CONDITION_AL); /* Just get us an instruction with a correct regA */
   rel = RelocTableAddRelocToRelocatable(OBJECT_RELOC_TABLE(obj),
                                         AddressNullForObject(obj), /* addend */
-                                        T_RELOCATABLE(ins), /* from */
+                                        T_RELOCATABLE(tmp), /* from */
                                         AddressNullForObject(obj), /* from-offset */
                                         T_RELOCATABLE(profiling_sec), /* to */
                                         offset, /* to-offset */
@@ -7350,12 +7498,16 @@ void ArmAddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling
                                         NULL, /* corresp */
                                         NULL, /* sec */
                                         "R00A00+\\l*w\\s0000$");
-  ArmInsMakeAddressProducer(ins, 0/* immediate */, rel);
+  ArmInsMakeAddressProducer(tmp, 0/* immediate */, rel);
+  ins = tmp;
 
   /* back up the used live registers, if any:
    *  PUSH {...} */
   if (registers != 0)
-    ArmMakeInsForBbl(Push, Prepend, tmp, bbl, isThumb, registers, ARM_CONDITION_AL, isThumb);
+    ArmMakeInsForIns(Push, Before, tmp, ins, isThumb, registers, ARM_CONDITION_AL, isThumb);
+#else
+  ArmMakeInsForIns(Noop, Before, tmp, ins, isThumb);
+#endif
 }/* }}} */
 
 void ArmReviveFromThumbStubs(t_cfg *cfg)

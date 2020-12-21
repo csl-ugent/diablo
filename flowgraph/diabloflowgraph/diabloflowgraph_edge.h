@@ -41,6 +41,7 @@
 #define CfgEdgeIsForwardInterproc(edge) (CFG_EDGE_CAT(edge) & ET_FORWARD_INTERPROC)
 #define CfgEdgeIsBackwardInterproc(edge) (CFG_EDGE_CAT(edge) & ET_BACKWARD_INTERPROC)
 #define CfgEdgeIsFallThrough(edge) (CFG_EDGE_CAT(edge) & (ET_FALLTHROUGH|ET_IPFALLTHRU))
+#define CfgEdgeIsSwitch(edge) (CFG_EDGE_CAT(edge) & (ET_SWITCH|ET_IPSWITCH))
 #define CfgEdgeMark(x) EdgeMark(T_EDGE(x))
 #define CfgEdgeMarkInit() EdgeMarkInit()
 #define CfgEdgeIsMarked(x) EdgeIsMarked(T_EDGE(x))

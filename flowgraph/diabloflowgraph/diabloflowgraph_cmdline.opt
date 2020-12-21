@@ -16,6 +16,30 @@ bool_option origin_tracking
    default=off;
 }
 
+bool_option origin_tracking_final
+{
+   long="origin-tracking-final";
+   short="origin-tracking-final";
+   description="Enable origin tracking";
+   default=on;
+}
+
+bool_option final_dots
+{
+   long="final-dots";
+   short="final-dots";
+   description="Generate dot files after deflowgraphing";
+   default=on;
+}
+
+bool_option initial_dots
+{
+   long="initial-dots";
+   short="initial-dots";
+   description="Generate dot files before flowgraphing";
+   default=on;
+}
+
 group "Profile" bool_option profiled_layout
 {
    long="profiled-layout";
@@ -29,6 +53,13 @@ group "Profile" string_option blockprofilefile
    long="blockprofilefile";
    short="pb";
    description="Name of the file containing the basic block execution counts of the original binary";
+}
+
+group "Profile" string_option blocksequencefile
+{
+   long="blocksequencefile";
+   short="ps";
+   description="Name of the file containing the basic block sequence counts of the original binary";
 }
 
 group "Profile" string_option postblockprofilefile
@@ -50,6 +81,30 @@ group "Profile" bool_option rawprofiles
    long="rawprofiles";
    short="pr";
    description="Profiles are in raw format";
+   default=off;
+}
+
+group "Profile" bool_option sp_markexecuted
+{
+   long="spmarkexecuted";
+   short="spme";
+   description="Self-profiling only marks blocks as executed (this reduces the code size)";
+   default=off;
+}
+
+group "Profile" bool_option sp_saturation
+{
+   long="spsaturation";
+   short="spsat";
+   description="Control whether additional saturating instructions are inserted in the self-profiling instrumentation";
+   default=on;
+}
+
+group "Profile" bool_option sp_sequence
+{
+   long="spsequence";
+   short="spseq";
+   description="Enable or disable sequencing the program";
    default=off;
 }
 

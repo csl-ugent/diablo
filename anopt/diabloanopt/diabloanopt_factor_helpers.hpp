@@ -34,14 +34,14 @@ struct FactoringResult {
   }
 };
 
-void FactoringRecordTransformation(BblSet slices, size_t n_ins, FactoringResult insn_stats, bool only_source = false);
+void FactoringRecordTransformation(BblSet slices, size_t n_ins, FactoringResult insn_stats, bool only_source = false, bool regular_factoring = false);
 void FactoringPrintStatistics();
 void FactoringLogInstruction(t_ins *ins, std::string comment);
 
 void FactoringLogInit(std::string filename, std::string filename_ins, std::string filename_statistics, bool advanced_factoring = false);
 void FactoringLogFini();
 
-FactoringSetSourceInformation FactoringGetSourceInformation(BblSet bbls, int& nr_executed);
+FactoringSetSourceInformation FactoringGetSourceInformation(BblSet bbls, int& nr_executed, bool regular_factoring = false);
 
 void FactoringLogComment(std::string x);
 

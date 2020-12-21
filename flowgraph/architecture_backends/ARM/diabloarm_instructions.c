@@ -238,7 +238,7 @@ void ArmInsMakeUncondThumbBranch(t_arm_ins * ins)
    * BBL_NINS here. */
   ARM_INS_SET_IMMEDIATE(ins,  (t_int64)((t_int32)(G_T_UINT32(BBL_CADDRESS(ARM_INS_BBL(ins))) - (G_T_UINT32(BBL_CADDRESS(ARM_INS_BBL(ins))) + BBL_CSIZE(ARM_INS_BBL(ins)) - 4) - 4)));
   ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) | FL_IMMED | FL_THUMB);
-  ArmInsDefault(ins, ARM_CONDITION_AL);  
+  ArmInsDefault(ins, ARM_CONDITION_AL);
 
   ARM_INS_SET_REGS_USE(ins, NullRegs);
   ARM_INS_SET_REGS_DEF(ins, NullRegs);
@@ -569,25 +569,6 @@ void ArmInsMakeMul(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32
 {
   ARM_INS_SET_TYPE(ins,  IT_MUL);
   ARM_INS_SET_OPCODE(ins,  ARM_MUL);
-  ARM_INS_SET_REGA(ins,  regA);
-  ARM_INS_SET_REGB(ins,  regB);
-  ARM_INS_SET_REGC(ins,  regC);
-  ARM_INS_SET_IMMEDIATE(ins,  immed);
-  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins)& ~FL_DIRUP & ~FL_WRITEBACK & ~FL_PREINDEX);
-  if (!(ARM_INS_FLAGS(ins) & FL_THUMB))
-    ARM_INS_SET_CSIZE(ins,  AddressNew32(4));
-  else
-    ARM_INS_SET_CSIZE(ins,  AddressNew32(2));
-  if (regC == ARM_REG_NONE)
-    ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins)| FL_IMMED);
-
-  ArmInsDefault(ins, cond);
-}
-
-void ArmInsMakeDiv(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond)
-{ //custom
-  ARM_INS_SET_TYPE(ins,  IT_DIV);
-  ARM_INS_SET_OPCODE(ins,  ARM_UDIV);
   ARM_INS_SET_REGA(ins,  regA);
   ARM_INS_SET_REGB(ins,  regB);
   ARM_INS_SET_REGC(ins,  regC);
@@ -1016,19 +997,19 @@ void ArmInsMakeSwap(t_arm_ins * ins, t_reg regA, t_reg regB)
 
   ARM_INS_SET_CONDITION(ins, ARM_CONDITION_AL);
   ARM_INS_SET_ATTRIB(ins,   ARM_INS_ATTRIB(ins) & (~IF_CONDITIONAL));
-  
+
   ARM_INS_SET_REGA(ins, regA);
   ARM_INS_SET_REGB(ins, regB);
   ARM_INS_SET_REGC(ins, ARM_REG_NONE);
   ARM_INS_SET_REGS(ins, ARM_REG_NONE);
   ARM_INS_SET_IMMEDIATE(ins, 0);
-  
+
   ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & ~FL_IMMED);
   ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & ~(FL_DIRUP | FL_WRITEBACK | FL_PREINDEX));
-  
+
   ARM_INS_SET_REGS_DEF(ins, ArmDefinedRegisters(ins));
   ARM_INS_SET_REGS_USE(ins, ArmUsedRegisters(ins));
-  
+
   ARM_INS_SET_CSIZE(ins, AddressNew32(4));
 }
 
@@ -1446,8 +1427,15 @@ EXEC_CONDITION ArmInsCondition(t_arm_ins * ins)
 
 t_arm_ins * ArmAddJumpInstruction(t_bbl * bbl)
 {
-  t_arm_ins * ins = ArmInsNewForBbl(bbl);
-  ArmInsMakeUncondBranch(ins);
+  t_arm_ins * ins;
+  ArmMakeInsForBbl(UncondBranch, Append, ins, bbl, ArmBblIsThumb(bbl));
+  return ins;
+}
+
+t_arm_ins * ArmAddCallInstruction(t_bbl *bbl)
+{
+  t_arm_ins *ins = ArmInsNewForBbl(bbl);
+  ArmInsMakeUncondBranchAndLink(ins);
   return ins;
 }
 
@@ -2236,7 +2224,7 @@ void ArmInsReplaceImmediateWithRegister(t_arm_ins *ins, t_reg reg)
 
   ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & ~FL_IMMED);
   ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) & ~FL_IMMEDW);
-  
+
   ARM_INS_SET_REGS_USE(ins, ArmUsedRegisters(ins));
 }
 
@@ -2270,6 +2258,44 @@ bool ArmInsIsPop(t_arm_ins *instruction)
     return TRUE;
 
   return FALSE;
+}
+
+void ArmInsMakeVpop(t_arm_ins *ins, t_regset regs, bool single) {
+  ARM_INS_SET_TYPE(ins, IT_LOAD_MULTIPLE);
+  ARM_INS_SET_OPCODE(ins, ARM_VPOP);
+  ARM_INS_SET_REGA(ins, ARM_REG_NONE);
+  ARM_INS_SET_REGB(ins, ARM_REG_R13);
+  ARM_INS_SET_REGC(ins, ARM_REG_NONE);
+
+  // no preindex for pop
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) | FL_DIRUP);
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) | FL_WRITEBACK);
+
+  if (!single)
+    ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) | FL_VFP_DOUBLE);
+  ARM_INS_SET_MULTIPLE(ins, regs);
+
+  ARM_INS_SET_CSIZE(ins, AddressNew32(4));
+  ArmInsDefault(ins, ARM_CONDITION_AL);
+}
+
+void ArmInsMakeVpush(t_arm_ins *ins, t_regset regs, bool single) {
+  ARM_INS_SET_TYPE(ins, IT_STORE_MULTIPLE);
+  ARM_INS_SET_OPCODE(ins, ARM_VPUSH);
+  ARM_INS_SET_REGA(ins, ARM_REG_NONE);
+  ARM_INS_SET_REGB(ins, ARM_REG_R13);
+  ARM_INS_SET_REGC(ins, ARM_REG_NONE);
+
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) | FL_PREINDEX);
+  // no dirup for push
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) | FL_WRITEBACK);
+
+  if (!single)
+    ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins) | FL_VFP_DOUBLE);
+  ARM_INS_SET_MULTIPLE(ins, regs);
+
+  ARM_INS_SET_CSIZE(ins, AddressNew32(4));
+  ArmInsDefault(ins, ARM_CONDITION_AL);
 }
 
 /* vim: set shiftwidth=2 foldmethod=marker : */

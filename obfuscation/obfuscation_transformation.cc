@@ -18,7 +18,10 @@ extern "C" {
 
 using namespace std;
 
-//#define DEBUG_OBFUSCATIONS diablosupport_options.debugcounter
+#define DEBUG_OBFUSCATIONS diablosupport_options.debugcounter
+
+BBL_DYNAMIC_MEMBER_GLOBAL_ARRAY(can_transform);
+bool initialisation_phase = true;
 
 BBLObfuscationTransformation::BBLObfuscationTransformation() {
   RegisterTransformationType(this, name());
@@ -154,7 +157,8 @@ static map<string, set<string>> internal_to_possible_annotation_names = {
   { "opaquepredicate", { "opaque_predicate" } },
   { "flattenfunction", { "flatten_function" } },
   { "branchfunction", { "branch_function" } },
-  { "callfunction", { "call_function" } }
+  { "callfunction", { "call_function" } },
+  { "meta_api", { "meta_api" } }
 };
 static bool AnnotationRequestMatches(const string& internal_name, const string annotation_name) {
   VERBOSE(1, ("Trying match for annotation request name '%s' to internal name '%s'...", annotation_name.c_str(), internal_name.c_str()));
@@ -243,7 +247,7 @@ AnnotatedBblPartition SelectBblsForAllRegionsFor(t_cfg* cfg, /*const TODO */ str
 
       VERBOSE(1, ("Annotation request can proceed"));
 
-      int percent_apply = 25;
+      int percent_apply = 100;
 
       VERBOSE(0, (" -> applying obfuscation '%s' (enabled: %i)", obfuscation.name.c_str(), obfuscation.enable));
       for (auto option: obfuscation.options) {
@@ -264,7 +268,7 @@ AnnotatedBblPartition SelectBblsForAllRegionsFor(t_cfg* cfg, /*const TODO */ str
       if (obfuscation.enable) {
         /* Get a set of basic blocks to transform. For all blocks in the function, we add it with the percent_apply chance. */
         vector<t_bbl*> bbls;
-        SelectBblsFromRegion(bbls, AlwaysSelectBblFromRegion, region, percent_apply, rng_obfuscation);
+        SelectBblsFromRegion(bbls, AlwaysSelectBblFromRegion, region, percent_apply, rng_obfuscation, FALSE, FALSE);
 
         for (auto bbl: bbls) {
           all_bbls.push_back(make_pair(bbl, request->options));
@@ -276,15 +280,327 @@ AnnotatedBblPartition SelectBblsForAllRegionsFor(t_cfg* cfg, /*const TODO */ str
   return PartitionAnnotatedBbls(all_bbls, p_compatible);
 }
 
+AnnotatedBblPartition SelectBlocks(t_cfg *cfg, AnnotatedBblPartition data, BBLObfuscationTransformation* obfuscator, t_randomnumbergenerator *rng) {
+  constexpr int OBF_HOTNESS_MAX = 1000;
+  ASSERT(0 <= obfuscation_obfuscation_options.obf_hotness
+          && obfuscation_obfuscation_options.obf_hotness <= OBF_HOTNESS_MAX, ("--obf-hotness value %u should be within range [0, %d]", obfuscation_obfuscation_options.obf_hotness, OBF_HOTNESS_MAX));
+  ASSERT(0 <= obfuscation_obfuscation_options.obf_hotness_threshold
+          && obfuscation_obfuscation_options.obf_hotness_threshold <= 100, ("--obf-hotness-threshold value %u out of range [0, 100]", obfuscation_obfuscation_options.obf_hotness_threshold));
+  ASSERT(0 <= obfuscation_obfuscation_options.obf_exec_threshold
+          && obfuscation_obfuscation_options.obf_exec_threshold <= 100, ("--obf-exec-threshold value %u out of range [0, 100]", obfuscation_obfuscation_options.obf_exec_threshold));
+  ASSERT(0 <= obfuscation_obfuscation_options.obf_considered_minimum,
+          ("--obf-considered-minimum should be positive"));
+
+  /* only support one set of BBLs for now */
+  ASSERT(data.size() == 1, ("unexpected size %d", data.size()));
+
+  string boutfilename = OutputFilename();
+  string all_bbls_filename = boutfilename + ".all_bbls";
+  string considered_bbls_filename = boutfilename + ".considered_bbls";
+  string selected_bbls_filename = boutfilename + ".obf_bbls";
+
+  struct FunctionData {
+    // no need for a float variables here as the fractional part does not matter much anyway
+    size_t hotness;
+    size_t nr_bbl_hotness;
+    size_t mean_hotness;
+    size_t consider_hotness_threshold;
+
+    size_t exec;
+    size_t nr_bbl_exec;
+    size_t mean_exec;
+    size_t consider_exec_threshold;
+
+    size_t considered_value;
+    vector<t_bbl *> considered_bbls;
+    map<int, int> considered_reasons;
+    map<int, int> considered_nottf_reasons;
+
+    size_t nr_bbls;
+
+    FunctionData() {
+      hotness = 0;
+      nr_bbl_hotness = 0;
+      mean_hotness = 0;
+      consider_hotness_threshold = ~0;
+
+      exec = 0;
+      nr_bbl_exec = 0;
+      mean_exec = 0;
+      consider_exec_threshold = ~0;
+
+      considered_value = 0;
+
+      nr_bbls = 0;
+    }
+
+    string toString() {
+      static const int BUF_LEN = 25;
+      string result = "";
+
+      char buf[BUF_LEN+1];
+
+      snprintf(buf, BUF_LEN, "%11lu ", hotness);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", nr_bbl_hotness);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", mean_hotness);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", consider_hotness_threshold);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", exec);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", nr_bbl_exec);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", mean_exec);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", consider_exec_threshold);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", considered_value);
+      result += buf;
+      snprintf(buf, BUF_LEN, "%11lu ", considered_bbls.size());
+      result += buf;
+
+      return result;
+    }
+  };
+  map<t_function *, FunctionData> function_data;
+
+  /* helper to compute a BBL's hotness value */
+  auto compute_bbl_hotness = [] (t_bbl *bbl) {
+    return static_cast<size_t>(BBL_NINS(bbl)) * static_cast<size_t>(BBL_EXEC_COUNT(bbl));
+  };
+
+  auto not_tfable_string = [obfuscator] (map<int, int> reasons, size_t nr_bbls) {
+    string result = "";
+
+    for (auto p : reasons) {
+      string sub = obfuscator->statusToString(p.first);
+      sub += "=";
+      sub += to_string(p.second);
+      sub += " (";
+      size_t mean = 100.0*p.second/nr_bbls;
+      sub += to_string(mean);
+      sub += " %), ";
+
+      result += sub;
+    }
+
+    return result;
+  };
+
+#define REASON_NONE 0
+#define REASON_NOT_TRANSFORMABLE 1
+#define REASON_THRESHOLD 2
+  auto consider_bbl = [&function_data, obfuscator] (t_bbl *bbl, int& reason, int& not_tf_reason) {
+    if (BBL_EXEC_COUNT(bbl) < static_cast<t_int64>(function_data[BBL_FUNCTION(bbl)].consider_exec_threshold)) {
+      reason = REASON_THRESHOLD;
+      return false;
+    }
+
+    /* can the bbl be transformed by the selected obfuscator? */
+    if (!obfuscator->canTransform(bbl)) {
+      reason = REASON_NOT_TRANSFORMABLE;
+      not_tf_reason = obfuscator->statusCode();
+      return false;
+    }
+
+    reason = REASON_NONE;
+    return true;
+  };
+
+  vector<t_function *> all_functions;
+
+  size_t nr_ice_cold_functions = 0;
+
+  LogFile *L_ALL_BBLS = NULL;
+  INIT_LOGGING(L_ALL_BBLS, all_bbls_filename.c_str());
+
+  /* collect profile data */
+  t_function *fun;
+  CFG_FOREACH_FUN(cfg, fun) {
+    /* don't conside Diablo-specific functions */
+    if (FUNCTION_IS_HELL(fun))
+      continue;
+
+    /* don't include runtime functions */
+    if (FUNCTION_NAME(fun)
+        && (StringPatternMatch("__*", FUNCTION_NAME(fun))
+            || StringPatternMatch(".*", FUNCTION_NAME(fun))))
+      continue;
+
+    function_data[fun] = FunctionData();
+    all_functions.push_back(fun);
+
+    t_bbl *bbl;
+    FUNCTION_FOREACH_BBL(fun, bbl) {
+      /* don't consider empty BBLs */
+      if (BBL_NINS(bbl) == 0)
+        continue;
+
+      /* function data */
+      function_data[fun].hotness += compute_bbl_hotness(bbl);
+      function_data[fun].nr_bbl_hotness++;
+
+      if (BBL_EXEC_COUNT(bbl) > 0) {
+        function_data[fun].exec += BBL_EXEC_COUNT(bbl);
+        function_data[fun].nr_bbl_exec++;
+      }
+
+      LOG_MESSAGE(L_ALL_BBLS, "0x%x,%" PRId64 "\n", BBL_OLD_ADDRESS(bbl), BBL_EXEC_COUNT(bbl));
+    }
+
+    if (function_data[fun].hotness == 0) {
+      nr_ice_cold_functions++;
+    }
+    else {
+      function_data[fun].mean_hotness = function_data[fun].hotness / function_data[fun].nr_bbl_hotness;
+      function_data[fun].consider_hotness_threshold = 1.0*obfuscation_obfuscation_options.obf_hotness_threshold/100 * function_data[fun].mean_hotness;
+
+      function_data[fun].mean_exec = function_data[fun].exec / function_data[fun].nr_bbl_exec;
+      function_data[fun].consider_exec_threshold = 1.0*obfuscation_obfuscation_options.obf_exec_threshold/100 * function_data[fun].mean_exec;
+
+      VERBOSE(0, ("hotness %11llu/%11u=%11llu (threshold %11llu) exec %11llu/%11u=%11llu (threshold %11llu) @F",
+        function_data[fun].hotness, function_data[fun].nr_bbl_hotness, function_data[fun].mean_hotness, function_data[fun].consider_hotness_threshold,
+        function_data[fun].exec, function_data[fun].nr_bbl_exec, function_data[fun].mean_exec, function_data[fun].consider_exec_threshold,
+        fun));
+    }
+  }
+
+  FINI_LOGGING(L_ALL_BBLS);
+
+  VERBOSE(0, ("found %d functions in total", all_functions.size()));
+  VERBOSE(0, ("  %d functions are ice cold and will not be considered for transformation", nr_ice_cold_functions));
+  VERBOSE(0, ("  %d functions remain", all_functions.size()-nr_ice_cold_functions));
+
+  /* explicitely enable blocks that we want to transform */
+  vector<t_function *> considered_functions;
+
+  map<int, int> all_reasons;
+  map<int, int> all_nottf_reasons;
+
+  size_t total_nr_bbls = 0;
+
+  LogFile *L_CONSIDERED_BBLS = NULL;
+  INIT_LOGGING(L_CONSIDERED_BBLS, considered_bbls_filename.c_str());
+
+  LogFile *L_SELECTED_BBLS = NULL;
+  INIT_LOGGING(L_SELECTED_BBLS, selected_bbls_filename.c_str());
+
+  for (auto fun : all_functions) {
+    /* skip functions that are not executed at all */
+    bool consider_function = (function_data[fun].hotness > 0);
+
+    /* for other functions, count the number of possible insertion points */
+    t_bbl *bbl;
+    FUNCTION_FOREACH_BBL(fun, bbl) {
+      if (BBL_NINS(bbl) == 0)
+        continue;
+
+      int reason = REASON_NONE;
+      int not_tf_reason = 0;
+      if (consider_function && consider_bbl(bbl, reason, not_tf_reason)) {
+        BBL_SET_CAN_TRANSFORM(bbl, true);
+
+        function_data[fun].considered_value += compute_bbl_hotness(bbl);
+        function_data[fun].considered_bbls.push_back(bbl);
+
+        LOG_MESSAGE(L_CONSIDERED_BBLS, "0x%x,%" PRId64 "\n", BBL_OLD_ADDRESS(bbl), BBL_EXEC_COUNT(bbl));
+      }
+
+      LOG_MESSAGE(L_SELECTED_BBLS, "0x%x,%" PRId64 ",%d,%d,%d\n", BBL_OLD_ADDRESS(bbl), BBL_EXEC_COUNT(bbl), BBL_CAN_TRANSFORM(bbl), (reason == REASON_THRESHOLD), consider_function);
+
+      if (consider_function) {
+        /* record reasons for (non) consideration globally and per function */
+        function_data[fun].considered_reasons[reason]++;
+        if (reason == REASON_NOT_TRANSFORMABLE) {
+          function_data[fun].considered_nottf_reasons[not_tf_reason]++;
+          all_nottf_reasons[not_tf_reason]++;
+        }
+        function_data[fun].nr_bbls++;
+        all_reasons[reason]++;
+
+        total_nr_bbls++;
+      }
+    }
+
+    /* only consider this function if it contains at least the required number of considered BBLs */
+    if (function_data[fun].considered_bbls.size() >= static_cast<size_t>(obfuscation_obfuscation_options.obf_considered_minimum))
+      considered_functions.push_back(fun);
+  }
+
+  FINI_LOGGING(L_CONSIDERED_BBLS);
+  FINI_LOGGING(L_SELECTED_BBLS);
+
+  VERBOSE(0, ("  %d functions contain enough considered blocks (>= %d)", considered_functions.size(), obfuscation_obfuscation_options.obf_considered_minimum));
+  VERBOSE(0, ("BBL statistics: accepted=%d (%.2f %%) not_transformable=%d (%.2f %%) below_threshold=%d (%.2f %%)",
+    all_reasons[REASON_NONE], 100.0*all_reasons[REASON_NONE]/total_nr_bbls,
+    all_reasons[REASON_NOT_TRANSFORMABLE], 100.0*all_reasons[REASON_NOT_TRANSFORMABLE]/total_nr_bbls,
+    all_reasons[REASON_THRESHOLD], 100.0*all_reasons[REASON_THRESHOLD]/total_nr_bbls));
+  VERBOSE(0, ("    %s", not_tfable_string(all_nottf_reasons, total_nr_bbls).c_str()));
+
+  /* sort the considered functions according to the total hotness of the considered blocks */
+  stable_sort(considered_functions.begin(), considered_functions.end(), [&function_data] (t_function *a, t_function *b) {
+    /* return TRUE when 'a' is to be put before 'b' */
+    size_t a_hotness = function_data[a].considered_value;
+    size_t b_hotness = function_data[b].considered_value;
+
+    return a_hotness > b_hotness;
+  });
+
+  int counter = 0;
+  for (auto fun : considered_functions) {
+    VERBOSE(0, ("sorted @F", fun));
+    VERBOSE(0, ("    %s", function_data[fun].toString().c_str()));
+    VERBOSE(0, ("    accepted=%d not_transformable=%d below_threshold=%d", function_data[fun].considered_reasons[REASON_NONE], function_data[fun].considered_reasons[REASON_NOT_TRANSFORMABLE], function_data[fun].considered_reasons[REASON_THRESHOLD]));
+    VERBOSE(0, ("    not_transformable reasons: %s", not_tfable_string(function_data[fun].considered_nottf_reasons, function_data[fun].nr_bbls).c_str()));
+    counter++;
+  }
+  
+  size_t first_selected_function = static_cast<size_t>(obfuscation_obfuscation_options.obf_first_function);
+  ASSERT(0 <= first_selected_function && first_selected_function < considered_functions.size(), ("fist selected function out of range [0, %d]", considered_functions.size()));
+
+  size_t nr_selected_functions = static_cast<size_t>(obfuscation_obfuscation_options.obf_nr_functions);
+
+  /* construct result, sorted with considered BBL's having the highest hotness to BBL's having the lowest hotness value */
+  AnnotatedBblPartition result;
+  for (size_t x = first_selected_function; (x < (first_selected_function+nr_selected_functions)) && (x < considered_functions.size()); x++) {
+    vector<AnnotatedBbl> selected_bbls;
+
+    t_function *fun = considered_functions[x];
+    vector<t_bbl *> considered_bbls = function_data[fun].considered_bbls;
+
+    VERBOSE(0, ("queue function @F with %d considered BBLs", fun, considered_bbls.size()));
+
+    shuffle(considered_bbls.begin(), considered_bbls.end(), RNGGetGenerator(rng));
+
+    for (t_bbl *bbl : considered_bbls) {
+      AnnotatedBbl bbl_options;
+      bbl_options.first = bbl;
+      bbl_options.second = AnnotationIntOptions();
+
+      selected_bbls.push_back(bbl_options);
+    }
+
+    result.push_back(selected_bbls);
+  }
+
+  initialisation_phase = false;
+  return result;
+}
+
 struct NonDiscriminatoryPartitioning : public CompatibilityPartitioner {
   virtual bool compare(const AnnotatedBbl&, const AnnotatedBbl&) const { return true; }
 };
 
-void CfgObfuscateRegions(t_cfg* cfg) {
+void CfgObfuscateRegions(t_cfg* cfg, bool generate_dots) {
+  BblInitCanTransform(cfg);
+
   t_randomnumbergenerator *rng_obfuscation = RNGCreateChild(RNGGetRootGenerator(), "obfuscations");
   t_randomnumbergenerator *rng_opaquepredicate = RNGCreateChild(rng_obfuscation, "opaquepredicate");
   t_randomnumbergenerator *rng_branchfunction = RNGCreateChild(rng_obfuscation, "branchfunction");
   t_randomnumbergenerator *rng_flattenfunction = RNGCreateChild(rng_obfuscation, "flattenfunction");
+  t_randomnumbergenerator *rng_shuffle = RNGCreateChild(rng_obfuscation, "obf_shuffle");
 
   SetAllObfuscationsEnabled(true);
 
@@ -295,55 +611,138 @@ void CfgObfuscateRegions(t_cfg* cfg) {
   CfgComputeLiveness(cfg, CONTEXT_INSENSITIVE);
   CfgComputeLiveness(cfg, CONTEXT_SENSITIVE);
 
-  /* TODO: verify that if an annotation request comes in for something that we do not know: WARN/FATAL */
-  string obfuscations[] = { "opaquepredicate", "branchfunction", "flattenfunction" };
-  for (auto obfuscation_string: obfuscations) {
-    NewDiabloPhase(obfuscation_string.c_str());
+  if (generate_dots)
+  {
+    t_string initial_dot_path = "diablo-obfuscator-dots-before-with-liveness";
 
-    auto obfuscation_partitions = SelectBblsForAllRegionsFor(cfg, obfuscation_string, NonDiscriminatoryPartitioning(), rng_obfuscation);
+    t_string callgraph_dot_file = StringConcat2(initial_dot_path, "/callgraph.dot");
+    CfgDrawFunctionGraphsWithHotness (cfg, initial_dot_path);
+    CgBuild (cfg);
+    CgExport (CFG_CG(cfg), callgraph_dot_file);
+    Free(callgraph_dot_file);
+  }
 
-    for (auto partition: obfuscation_partitions) {
-      /* flattening is special: a region-based, non-local transformation */
-      if (obfuscation_string == "flattenfunction") {
-        FunctionObfuscationTransformation* obfuscator = GetRandomTypedTransformationForType<FunctionObfuscationTransformation>("flattenfunction", rng_flattenfunction);
-        ASSERT(obfuscator, ("Did not find any obfuscator for type '%s'", obfuscation_string.c_str()));
+  set<Transformation *> executed_transformations;
 
-        if (obfuscator->canTransformRegion(partition)) {
-          VERBOSE(1, ("Applying '%s' to a region of BBLs of size %i", obfuscator->name(), (int) partition.size()));
-          obfuscator->doTransformRegion(partition, rng_flattenfunction);
-        } else {
-          VERBOSE(1, ("WARNING: tried applying '%s', but FAILED", obfuscator->name()));
+  if (obfuscation_obfuscation_options.meta_api_test_set) {
+    /* perform a simple test on the meta API */
+    VERBOSE(0, ("testing the meta API with test '%s'", obfuscation_obfuscation_options.meta_api_test));
+    DiabloBrokerCall("MetaAPI_Test", cfg, obfuscation_obfuscation_options.meta_api_test);
+
+    executed_transformations.insert(GetRandomTypedTransformationForType<BBLObfuscationTransformation>("meta_api", RNGGetRootGenerator()));
+  }
+  else {
+    /* TODO: verify that if an annotation request comes in for something that we do not know: WARN/FATAL */
+    // string obfuscations[] = { "opaquepredicate", "branchfunction", "flattenfunction", "meta_api" };
+    string obfuscations[] = { "meta_api" };
+
+#ifdef DEBUG_OBFUSCATIONS
+    t_uint32 i = 0;
+#endif
+
+    BBLObfuscationTransformation *meta_api_obfuscator = GetRandomTypedTransformationForType<BBLObfuscationTransformation>("meta_api", rng_obfuscation);
+
+    for (auto obfuscation_string: obfuscations) {
+      NewDiabloPhase(obfuscation_string.c_str());
+
+      auto obfuscation_partitions = SelectBblsForAllRegionsFor(cfg, obfuscation_string, NonDiscriminatoryPartitioning(), rng_obfuscation);
+
+      /* sort according to hotness */
+      obfuscation_partitions = SelectBlocks(cfg, obfuscation_partitions, meta_api_obfuscator, rng_shuffle);
+
+      for (auto partition: obfuscation_partitions) {
+#ifdef DEBUG_OBFUSCATIONS
+        if (i >= DEBUG_OBFUSCATIONS) {
+          break;
         }
-      } else {
-        for (auto bbl_options: partition) {
-          auto bbl = bbl_options.first;
-          t_randomnumbergenerator* rng = (obfuscation_string == "branchfunction") ? rng_branchfunction : rng_opaquepredicate;
+#endif
 
-          /* TODO: obfuscation_string is probably too broad once/if we get rid of the strict sequencing of transformations */
-          BBLObfuscationTransformation* obfuscator = GetRandomTypedTransformationForType<BBLObfuscationTransformation>(obfuscation_string.c_str(), rng);
+        /* flattening is special: a region-based, non-local transformation */
+        if (obfuscation_string == "flattenfunction") {
+          FunctionObfuscationTransformation* obfuscator = GetRandomTypedTransformationForType<FunctionObfuscationTransformation>("flattenfunction", rng_flattenfunction);
+          executed_transformations.insert(obfuscator);
           ASSERT(obfuscator, ("Did not find any obfuscator for type '%s'", obfuscation_string.c_str()));
 
-          if (obfuscator->canTransform(bbl)) {
-            VERBOSE(1, ("Applying '%s' to @eiB", obfuscator->name(), bbl));
-            obfuscator->doTransform(bbl, rng);
+          if (obfuscator->canTransformRegion(partition)) {
+            VERBOSE(1, ("Applying '%s' to a region of BBLs of size %i", obfuscator->name(), (int) partition.size()));
+            obfuscator->doTransformRegion(partition, rng_flattenfunction);
           } else {
-            VERBOSE(1, ("WARNING: tried applying '%s' to @eiB, but FAILED", obfuscator->name(), bbl));
+            VERBOSE(1, ("WARNING: tried applying '%s', but FAILED", obfuscator->name()));
           }
-        }
-#if 0
-        /* Very conservative: re-compute liveness after each obfuscation application. This shouldn't be necessary, but it's always possible that there's some bug
-           left. In case of doubt: re-enable this temporarily and check if an observed bug disappears.... */
-        CfgComputeLiveness(cfg, TRIVIAL);
-        CfgComputeLiveness(cfg, CONTEXT_INSENSITIVE);
-        CfgComputeLiveness(cfg, CONTEXT_SENSITIVE);
-#endif
-      }
-    }
+        } else {
+          int nr_transformed_in_partition = 0;
 
-    CfgComputeLiveness(cfg, TRIVIAL);
-    CfgComputeLiveness(cfg, CONTEXT_INSENSITIVE);
-    CfgComputeLiveness(cfg, CONTEXT_SENSITIVE);
+          for (auto bbl_options: partition) {
+#ifdef DEBUG_OBFUSCATIONS
+            if (i >= DEBUG_OBFUSCATIONS) {
+              break;
+            }
+#endif
+
+            if (nr_transformed_in_partition == obfuscation_obfuscation_options.obf_nr_per_partition) {
+              VERBOSE(0, ("max number of transformations applied to this partition (%d)", obfuscation_obfuscation_options.obf_nr_per_partition));
+              break;
+            }
+
+            auto bbl = bbl_options.first;
+            t_randomnumbergenerator* rng = (obfuscation_string == "branchfunction") ? rng_branchfunction : rng_opaquepredicate;
+
+            /* TODO: obfuscation_string is probably too broad once/if we get rid of the strict sequencing of transformations */
+            BBLObfuscationTransformation* obfuscator = GetRandomTypedTransformationForType<BBLObfuscationTransformation>(obfuscation_string.c_str(), rng);
+          executed_transformations.insert(obfuscator);
+            ASSERT(obfuscator, ("Did not find any obfuscator for type '%s'", obfuscation_string.c_str()));
+
+            if (obfuscator->canTransform(bbl)) {
+              VERBOSE(1, ("Applying '%s' to @eiB", obfuscator->name(), bbl));
+              t_function *fun = BBL_FUNCTION(bbl);
+              t_address address = BBL_OLD_ADDRESS(bbl);
+
+              bool result = obfuscator->doTransform(bbl, rng);
+
+              if (result) {
+                nr_transformed_in_partition++;
+                VERBOSE(0, ("success(%d) @F @G", nr_transformed_in_partition, fun, address));
+              }
+
+#ifdef DEBUG_OBFUSCATIONS
+              if (result)
+                i++;
+#endif
+            } else {
+              VERBOSE(1, ("WARNING: tried applying '%s' to @eiB, but FAILED", obfuscator->name(), bbl));
+            }
+          }
+
+#if 0
+          /* Very conservative: re-compute liveness after each obfuscation application. This shouldn't be necessary, but it's always possible that there's some bug
+            left. In case of doubt: re-enable this temporarily and check if an observed bug disappears.... */
+          CfgComputeLiveness(cfg, TRIVIAL);
+          CfgComputeLiveness(cfg, CONTEXT_INSENSITIVE);
+          CfgComputeLiveness(cfg, CONTEXT_SENSITIVE);
+#endif
+        }
+      }
+
+      if (generate_dots)
+      {
+        t_string initial_dot_path = "final-old-liveness";
+
+        t_string callgraph_dot_file = StringConcat2(initial_dot_path, "/callgraph.dot");
+        CfgDrawFunctionGraphsWithHotness (cfg, initial_dot_path);
+        CgBuild (cfg);
+        CgExport (CFG_CG(cfg), callgraph_dot_file);
+        Free(callgraph_dot_file);
+      }
+
+      CfgComputeLiveness(cfg, TRIVIAL);
+      CfgComputeLiveness(cfg, CONTEXT_INSENSITIVE);
+      CfgComputeLiveness(cfg, CONTEXT_SENSITIVE);
+    }
   }
+
+  /* finalize the executed transformations */
+  for (auto tf : executed_transformations)
+    tf->finalizeAll();
 
   CfgComputeLiveness(cfg, TRIVIAL);
   CfgComputeLiveness(cfg, CONTEXT_INSENSITIVE);
@@ -358,6 +757,8 @@ void CfgObfuscateRegions(t_cfg* cfg) {
   RNGDestroy(rng_branchfunction);
   RNGDestroy(rng_flattenfunction);
   RNGDestroy(rng_obfuscation);
+
+  BblFiniCanTransform(cfg);
 }
 
 void ObjectObfuscate(t_const_string filename, t_object* obj)
@@ -484,7 +885,7 @@ void ObjectObfuscate(t_const_string filename, t_object* obj)
 
       ASSERT(obfuscator, ("Expected that the obfuscator '%s' was a bbl_obfuscation, but it wasn't!", obfuscator_raw->name()));
 
-      
+
       if (obfuscator->canTransform(bbl)
 #ifdef DEBUG_OBFUSCATIONS
           && i < DEBUG_OBFUSCATIONS
@@ -494,7 +895,7 @@ void ObjectObfuscate(t_const_string filename, t_object* obj)
           fun = BBL_FUNCTION(bbl);
 
           VERBOSE(0, ("Transforming %d a BBL of function %s with obfuscator %s, chance %d", i, FUNCTION_NAME(fun), obfuscator->name(), obfuscator->CmdlineChance()));
-          
+
 #ifdef DEBUG_OBFUSCATIONS
           if (i+1 == DEBUG_OBFUSCATIONS)
             CfgDrawFunctionGraphs(OBJECT_CFG(obj), "./dots_before");

@@ -114,6 +114,11 @@ BblRegsDef (t_bbl * bbl)
     {
       def = RegsetNewInvers (CFG_DESCRIPTION(cfg)->callee_saved, CFG_DESCRIPTION(cfg)->all_registers);
       RegsetSetDiff (def, CFG_DESCRIPTION(cfg)->cond_registers);
+
+      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(fun)) == BBL_CH_DYNCALL) {
+        RegsetSetDiff (def, CFG_DESCRIPTION(cfg)->flt_registers);
+        RegsetSetUnion (def, FUNCTION_FLOAT_RET_REGS(fun));
+      }
       return def;
     }
     else
@@ -148,6 +153,11 @@ BblRegsMaybeDef (t_bbl * bbl)
     {
       def = RegsetNewInvers (CFG_DESCRIPTION(cfg)->callee_saved, CFG_DESCRIPTION(cfg)->all_registers);
       RegsetSetDiff (def, CFG_DESCRIPTION(cfg)->cond_registers);
+
+      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(fun)) == BBL_CH_DYNCALL) {
+        RegsetSetDiff (def, CFG_DESCRIPTION(cfg)->flt_registers);
+        RegsetSetUnion (def, FUNCTION_FLOAT_RET_REGS(fun));
+      }
       return def;
     }
     else
@@ -182,8 +192,11 @@ BblRegsUse (t_bbl * bbl)
     {
       use = RegsetNewInvers (CFG_DESCRIPTION(cfg)->callee_saved, CFG_DESCRIPTION(cfg)->all_registers);
       RegsetSetDiff (use, CFG_DESCRIPTION(cfg)->cond_registers);
-      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(fun)) == BBL_CH_DYNCALL)
+      if (BBL_CALL_HELL_TYPE(FUNCTION_BBL_FIRST(fun)) == BBL_CH_DYNCALL) {
         RegsetSetUnion (use, CFG_DESCRIPTION(cfg)->dyncall_may_use);
+        RegsetSetDiff (use, RegsetIntersect(CFG_DESCRIPTION(cfg)->flt_registers, CFG_DESCRIPTION(cfg)->argument_regs));
+        RegsetSetUnion (use, FUNCTION_FLOAT_ARG_REGS(fun));
+      }
       return use;
     }
     else

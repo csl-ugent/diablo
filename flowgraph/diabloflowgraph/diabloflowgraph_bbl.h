@@ -62,6 +62,9 @@ typedef struct _t_bbl_he t_bbl_he;
 #define BBL_IS_PREFERRED_FOR_DATA_POOLS 0x1000000
 #define BBL_FORWARD_DATAPOOL 0x2000000
 #define BBL_ADVANCED_FACTORING 0x4000000
+#define BBL_AOP_SETTER 0x8000000
+#define BBL_AOP_CLOUD 0x10000000
+#define BBL_AOP_SELECT 0x20000000
 /* the following does NOT mean that the bbl is an exit block of a leaf
  * function. See the comments in CfgDetectPseudoLeaves for more information
  */

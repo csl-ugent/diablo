@@ -20,3 +20,27 @@ usage_option help
    short="h";
    description="Print this help message";
 }
+
+group "obfuscation" string_option advanced_opaque_predicates_xml
+{
+  short="aop_xml";
+  long="obfuscationAdvancedOpaquePredicates_xml";
+  description="Configuration filenames advanced opaque predicates";
+  default=NULL;
+}
+
+group "obfuscation" string_option advanced_opaque_predicates_semantic
+{
+  short="aop_semantic";
+  long="obfuscationAdvancedOpaquePredicates_antlr";
+  description="Configuration filenames advanced opaque predicates";
+  default=NULL;
+}
+
+group "obfuscation" bool_option advanced_opaque_predicates_twoway_predicates
+{
+  short="aop_tp";
+  long="obfuscationAdvancedOPTwoWayPredicates";
+  description="Split BBLs with two-way predicates";
+  default=off;
+}

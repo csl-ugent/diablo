@@ -93,3 +93,7 @@ PrintFullCommandline(int argc, char** argv)
     printf("%s ", argv[i]);
   printf("\n");
 }
+
+void EnhancedLivenessDirectoryBroker(t_string *s) {
+  *s = global_options.liveness_path;
+}

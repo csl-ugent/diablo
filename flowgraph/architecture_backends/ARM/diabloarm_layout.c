@@ -630,6 +630,8 @@ void ArmRelocate(t_cfg * cfg, t_uint32 mode)
               ArmDisassembleEncoded(T_INS(&rins), *(t_uint32 *)tmp_ptr, (ARM_INS_FLAGS(i_ins) & FL_THUMB) ? TRUE : FALSE);
 
               new_immediate = (ARM_INS_IMMEDIATE(&rins));
+              if (ARM_INS_OPCODE(i_ins) == ARM_BL
+                  && !AddressIsNull(ARM_INS_OLD_ADDRESS(i_ins)))
               ASSERT(calculated_immediate == new_immediate, ("calculated immediate (%x) does not equal disassembled immediate (%x) for @I, reloc code %s", calculated_immediate, new_immediate, i_ins, RELOC_CODE(reloc)));
               ARM_INS_SET_IMMEDIATE(i_ins, ARM_INS_IMMEDIATE(&rins));
 	    }
@@ -3564,7 +3566,8 @@ static t_bool InsertTrampolineForJmpEdge(t_cfg *cfg, t_arm_ins *ins, t_cfg_edge 
   BblInsertInFunction(new_bbl,BBL_FUNCTION(CFG_EDGE_TAIL(edge)));
   /* create the trampoline */
   trampoline = ArmInsNewForBbl(new_bbl);
-  ARM_INS_SET_FLAGS(trampoline,ARM_INS_FLAGS(trampoline) | FL_THUMB);
+  if (ARM_INS_FLAGS(ins) & FL_THUMB)
+    ARM_INS_SET_FLAGS(trampoline,ARM_INS_FLAGS(trampoline) | FL_THUMB);
   ArmInsMakeUncondBranch(trampoline);
   ArmInsAppendToBbl(trampoline,new_bbl);
   CfgEdgeCreate(cfg,new_bbl,CFG_EDGE_TAIL(edge),ET_JUMP);
@@ -4020,6 +4023,27 @@ ArmConvertThumbBranchesTo16BitIns(t_cfg * cfg)
           /* only iterate over every BBL again if we actually changed anything for this TBB/TBH */
           if (iterate)
             break;
+        }
+        else if (ARM_INS_OPCODE(i_ins) == ARM_BL) {
+          /* insert trampolines for BL instructions */
+          t_cfg_edge *edge;
+          t_int32 disp;
+          BBL_FOREACH_SUCC_EDGE(bbl,edge)
+          {
+            if (CFG_EDGE_CAT(edge) & (ET_CALL | ET_IPJUMP))
+              break;
+          }
+          ASSERT(edge,("Bbl ending in branch without ET_JUMP/ET_IPJUMP edge: @eiB",bbl));
+
+          disp = ArmCalculateBranchDisplacement(edge);
+
+          if (!Uint32CheckSignExtend(disp, 24)) {
+            VERBOSE(2, ("7 insert trampoline for %08x @I @E @G", disp, i_ins, edge, BBL_CADDRESS(CFG_EDGE_TAIL(edge))));
+            InsertTrampolineForJmpEdge(cfg,i_ins,edge,disp,(1<<24)-10000,data_pools_generated, FALSE, data_pools_generated, FALSE, INSERTTRAMPOLINE_DIRECTION_NEUTRAL);
+            (*nr_tramp)++;
+            iterate = TRUE;
+            changed_anything = TRUE;
+          }
         }
     }
   } while (iterate);
@@ -4478,6 +4502,70 @@ ArmFixupArmCortexA8Errata(t_cfg *cfg, t_bbl *chain_head)
 }
 /*}}}*/
 
+static
+void ArmConvertCallsToAddressProducers(t_cfg *cfg) {
+  STATUS(START, ("Replace BL with address producers"));
+
+  t_bbl *bbl;
+  CFG_FOREACH_BBL(cfg, bbl) {
+    t_arm_ins *last = T_ARM_INS(BBL_INS_LAST(bbl));
+
+    /* skip uninteresting blocks */
+    if (!last
+        || ARM_INS_OPCODE(last) != ARM_BL)
+      continue;
+
+    /* skip blocks that don't have an outgoing CALL edge */
+    t_cfg_edge *call_edge = NULL;
+    t_cfg_edge *edge;
+    BBL_FOREACH_SUCC_EDGE(bbl, edge) {
+      if (CFG_EDGE_CAT(edge) & ET_CALL) {
+        call_edge = edge;
+        break;
+      }
+    }
+    if (!call_edge)
+      continue;
+
+    /* create address producer right before the call instruction */
+    t_arm_ins *address_producer = NULL;
+    ArmMakeInsForIns(Mov, Before, address_producer, last, FALSE, ARM_REG_R14, ARM_REG_NONE, 0, ARM_CONDITION_AL);
+
+    t_relocatable *to;
+    if (BBL_IS_HELL(CFG_EDGE_TAIL(call_edge))) {
+      /* call to hell */
+      ASSERT(BBL_CALL_HELL_TYPE(CFG_EDGE_TAIL(call_edge)) == BBL_CH_DYNCALL, ("expected call to dynamic function from @eiB, but got @eiB", bbl, CFG_EDGE_TAIL(call_edge)));
+
+      t_reloc *original_reloc = RELOC_REF_RELOC(ARM_INS_REFERS_TO(last));
+      to = RELOC_TO_RELOCATABLE(original_reloc)[0];
+    }
+    else {
+      /* regular call */
+      to = T_RELOCATABLE(CFG_EDGE_TAIL(call_edge));
+    }
+
+    t_reloc *address_producer_reloc = RelocTableAddRelocToRelocatable(
+      OBJECT_RELOC_TABLE(CFG_OBJECT(cfg)),
+      AddressNew32(0),
+      T_RELOCATABLE(address_producer), AddressNew32(0),
+      to, AddressNew32(0),
+      FALSE, NULL, NULL, NULL,
+      "R00A00+\\" WRITE_32
+    );
+
+    ArmInsMakeAddressProducer(address_producer, 0, address_producer_reloc);
+
+    /* create the branch-to-register instruction */
+    t_arm_ins *blx = NULL;
+    ArmMakeInsForIns(CondBranchLinkAndExchange, Before, blx, last, FALSE, ARM_CONDITION_AL, ARM_REG_R14);
+
+    /* kill the old call instruction */
+    ArmInsKill(last);
+  }
+
+  STATUS(STOP, ("Replace BL with address producers"));
+}
+
 /*!
  * \todo Document
  *
@@ -4497,11 +4585,15 @@ void ArmCfgLayout(t_cfg * cfg, t_uint32 mode)
 
   STATUS(START,("Cfg Layout"));
 
+  /* change calls to address producers, if necessary */
+  if (diabloarm_options.bl_to_address_producers)
+    ArmConvertCallsToAddressProducers(cfg);
+
   /* change address producers (back) into PIC code, if necessary */
   if ((OBJECT_TYPE(obj) == OBJTYP_EXECUTABLE_PIC) ||
       (OBJECT_TYPE(obj) == OBJTYP_SHARED_LIBRARY_PIC))
     ArmConvertAddressProducersToPIC(cfg);
- 
+
   ArmInsertThumbITInstructions(cfg);
 
   CFG_FOREACH_BBL(cfg,bbl)

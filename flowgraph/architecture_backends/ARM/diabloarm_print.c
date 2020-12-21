@@ -101,22 +101,22 @@ void VirtualRegisterInformation(t_arm_ins *ins, char *vrega, char *vregabis, cha
     sprintf(opcode,"DATA");
     sprintf(operands, "|%08x|", imm);
 
-    if (isprint(((char *) &imm)[0]))
+    if (isprint(((char *) &imm)[0]) && (((char *)&imm)[0] != '"'))
       sprintf(operands+10, " %c  ", ((char *) &imm)[0]);
     else
       sprintf(operands+10,"\\%2x ",((unsigned char *) &imm)[0]);
 
-    if (isprint(((char *) &imm)[1]))
+    if (isprint(((char *) &imm)[1]) && (((char *)&imm)[0] != '"'))
       sprintf(operands+14, " %c  ", ((char *) &imm)[1]);
     else
       sprintf(operands+14,"\\%2x ",((unsigned char *) &imm)[1]);
 
-    if (isprint(((char *) &imm)[2]))
+    if (isprint(((char *) &imm)[2]) && (((char *)&imm)[0] != '"'))
       sprintf(operands+18, " %c  ", ((char *) &imm)[2]);
     else
       sprintf(operands+18,"\\%2x ",((unsigned char *) &imm)[2]);
 
-    if (isprint(((char *) &imm)[3]))
+    if (isprint(((char *) &imm)[3]) && (((char *)&imm)[0] != '"'))
       sprintf(operands+22, " %c  ", ((char *) &imm)[3]);
     else
       sprintf(operands+22,"\\%2.2x ",((unsigned char *) &imm)[3]);
@@ -1076,15 +1076,71 @@ t_bool ArmInsPrintDiabloSpecific(t_arm_ins * instruction, t_string opcode, t_str
               Conditions[ARM_INS_CONDITION(instruction)]);
 
     if (!(ARM_INS_FLAGS(instruction)&FL_VFP_DOUBLE))
-      sprintf(operands,"%s%s,",Regs[ARM_INS_REGA(instruction)], vrega);
+      sprintf(operands,"%s%s",Regs[ARM_INS_REGA(instruction)], vrega);
     else
-      sprintf(operands,"%s,",DoubleRegs[(ARM_INS_REGA(instruction)-ARM_REG_S0)/2]);
+      sprintf(operands,"%s",DoubleRegs[(ARM_INS_REGA(instruction)-ARM_REG_S0)/2]);
   }
   else
     handled = FALSE;
   sprintf(operands, "%s %s", operands, usedefs);
 
   return handled;
+}
+
+void ArmRegsetPrinterBroker(t_regset *regs, t_string_array *arr, bool *ok) {
+  *ok = true;
+
+  t_string_array *arr_r = StringArrayNew();
+  t_string_array *arr_s1 = StringArrayNew();
+  t_string_array *arr_s2 = StringArrayNew();
+  t_string_array *arr_d = StringArrayNew();
+  t_string_array *arr_other = StringArrayNew();
+
+  t_reg reg;
+  REGSET_FOREACH_REG(*regs, reg) {
+    if ((ARM_REG_F0 <= reg) && (reg <= ARM_REG_F7))
+      continue;
+
+    t_string_array *arr = arr_other;
+
+    if ((ARM_REG_R0 <= reg) && (reg <= ARM_REG_R15))
+      arr = arr_r;
+    else if ((ARM_REG_S0 <= reg) && (reg <= ARM_REG_S15))
+      arr = arr_s1;
+    else if ((ARM_REG_S16 <= reg) && (reg <= ARM_REG_S31))
+      arr = arr_s2;
+    else if ((ARM_REG_D16 <= reg) && (reg <= ARM_REG_D31))
+      arr = arr_d;
+
+    StringArrayAppendString (arr, StringIo ("%s", arm_description.register_names[reg]));
+  }
+
+  if (StringArrayNStrings(arr_r) > 0) {
+    StringArrayAppendString(arr_r, StringIo("\\l"));
+    StringArrayAppendString(arr, StringArrayJoin(arr_r, ", "));
+  }
+  if (StringArrayNStrings(arr_s1) > 0) {
+    StringArrayAppendString(arr_s1, StringIo("\\l"));
+    StringArrayAppendString(arr, StringArrayJoin(arr_s1, ", "));
+  }
+  if (StringArrayNStrings(arr_s2) > 0) {
+    StringArrayAppendString(arr_s2, StringIo("\\l"));
+    StringArrayAppendString(arr, StringArrayJoin(arr_s2, ", "));
+  }
+  if (StringArrayNStrings(arr_d) > 0) {
+    StringArrayAppendString(arr_d, StringIo("\\l"));
+    StringArrayAppendString(arr, StringArrayJoin(arr_d, ", "));
+  }
+  if (StringArrayNStrings(arr_other) > 0) {
+    StringArrayAppendString(arr_other, StringIo("\\l"));
+    StringArrayAppendString(arr, StringArrayJoin(arr_other, ", "));
+  }
+
+  StringArrayFree(arr_r);
+  StringArrayFree(arr_s1);
+  StringArrayFree(arr_s2);
+  StringArrayFree(arr_d);
+  StringArrayFree(arr_other);
 }
 
 /* vim: set shiftwidth=2 foldmethod=marker : */

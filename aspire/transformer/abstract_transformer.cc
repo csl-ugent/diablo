@@ -265,7 +265,7 @@ void AbstractTransformer::TransformOutgoingEdge (t_cfg_edge* edge)
     CfgEdgeCreate(new_cfg, bbl, tmp_bbl, ET_FALLTHROUGH);
     bbl = tmp_bbl;
   }
-
+  
   /* Do transformation-specific BBL rewriting */
   TransformOutgoingEdgeImpl (bbl, edge, to);
 

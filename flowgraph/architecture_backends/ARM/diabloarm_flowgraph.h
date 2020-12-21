@@ -12,7 +12,7 @@ typedef struct _t_address_to_bbl_he t_address_to_bbl_he;
 #ifndef ARM_FLOWGRAPH_H
 #define ARM_FLOWGRAPH_H
 void ArmAddCallFromBblToBbl (t_object* obj, t_bbl* from, t_bbl* to);
-void ArmAddInstrumentationToBbl(t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_address offset);
+void ArmAddInstrumentationToBbl(t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_section* sequencing_counter_sec, t_address offset);
 void ArmFlowgraph(t_object *obj);
 void ArmMakeAddressProducers(t_cfg *cfg);
 /* helper callback for FunctionDuplicate */

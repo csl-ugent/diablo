@@ -404,6 +404,8 @@ StaticComplexityOrigin BblsComputeStaticComplexityOrigin(const BblSet& bbls, siz
         nr_dst_oper += RegsetCountRegs(INS_REGS_DEF(ins));
       }
       else {
+        if (INS_TYPE(ins) != IT_CONSTS)
+          CfgDrawFunctionGraphs(BBL_CFG(bbl), "unhandled");
         ASSERT(INS_TYPE(ins) == IT_CONSTS, ("unhandled @I", ins));
 
         nr_ins += x->nr_ins;

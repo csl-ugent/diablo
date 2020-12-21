@@ -142,6 +142,9 @@ enum class DwarfParsedAttributeType {
 struct DwarfAttributeSpec {
   DwarfAttributeCode name;
   DwarfFormCode form;
+
+  bool use_fixed_offset;
+  t_address fixed_offset;
 };
 
 /* abstract type for decoded but unparsed attributes */
@@ -252,10 +255,14 @@ struct DwarfSecOffsetAttribute
 
 struct DwarfReferenceAttribute
                 : public DwarfAbstractAttribute {
-  DwarfReferenceAttribute() { form = DwarfAttributeForm::Reference; }
+  DwarfReferenceAttribute() {
+    form = DwarfAttributeForm::Reference;
+    data = nullptr;
+  }
   std::string ToString() { return std::to_string(value); }
 
   t_address value;
+  DwarfAbbrevTableEntry *data;
 };
 
 struct DwarfStringAttribute

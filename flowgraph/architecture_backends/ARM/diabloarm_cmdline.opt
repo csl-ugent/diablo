@@ -8,6 +8,14 @@ hidden bool_option annotate_loops
    default=off;
 }
 
+group "Binary rewriting" bool_option bl_to_address_producers
+{
+   long="bltoaddrprod";
+   short="bltoaddrprod";
+   description="Convert BL instructions to address producers. This may be necessary in large programs where the 24-bit offset does not suffice anymore.";
+   default=off;
+}
+
 group "Binary rewriting" bool_option fullthumb2
 {
    long="fullthumb2";

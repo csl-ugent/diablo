@@ -83,7 +83,6 @@ void ThumbAssemble32(t_arm_ins * ins, char * data)
     break;
 
   case IT_MUL:
-  case IT_DIV:
     Thumb32AssembleMultiply(ins, (t_uint32 *)data);
     break;
 
@@ -348,7 +347,6 @@ void ThumbAssembleOne(t_arm_ins * i_ins, char * data)
 	ThumbAssembleSWI(i_ins, (t_uint16 *) data);
 	break;
     case IT_MUL:
-    case IT_DIV:
 	ThumbAssembleALU(i_ins, (t_uint16 *) data);
 	break;
     case IT_NOP:

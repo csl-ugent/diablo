@@ -299,6 +299,15 @@ group "Optimization and analysis" bool_option single_threaded
    description="Assume that the input executable is single-threaded"
 }
 
+
+group "Optimization and analysis" string_option liveness_path
+{
+   short="lp";
+   long="liveness_path";
+   default="";
+   description="path to enhanced liveness information"
+}
+
 hidden int_option traceadr
 {
    short="t";

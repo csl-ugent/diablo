@@ -3253,4 +3253,46 @@ FunctionMarkAllTrueIncomingEdges (t_function * fun)
   }
 }
 
+static
+t_function *_GetFunctionByName(t_cfg *cfg, t_const_string name) {
+  t_function *result = NULL;
+
+  t_function *fun;
+  CFG_FOREACH_FUN(cfg, fun) {
+    if (!FUNCTION_NAME(fun))
+      continue;
+
+    if (!strcmp(FUNCTION_NAME(fun), name)) {
+      result = fun;
+      break;
+    }
+  }
+
+  return result;
+}
+
+t_function *GetFunctionByName(t_cfg *cfg, t_const_string name) {
+  t_function *result = _GetFunctionByName(cfg, name);
+
+  if (!result) {
+    /* maybe an alias? */
+    t_symbol *sym = SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(CFG_OBJECT(cfg)), name);
+    if (sym && (RELOCATABLE_RELOCATABLE_TYPE(SYMBOL_BASE(sym)) == RT_BBL)) {
+      /* symbol found, find the CFG function associated with it, if any */
+      t_address addr = BBL_OLD_ADDRESS(T_BBL(SYMBOL_BASE(sym)));
+
+      sym = SymbolTableGetFirstSymbolByAddress(OBJECT_SUB_SYMBOL_TABLE(CFG_OBJECT(cfg)), addr);
+      while (sym) {
+        result = _GetFunctionByName(cfg, SYMBOL_NAME(sym));
+        if (result)
+          break;
+
+        sym = SymbolTableGetNextSymbolByAddress(sym, addr);
+      }
+    }
+  }
+
+  return result;
+}
+
 /* vim: set shiftwidth=2 expandtab cinoptions=p5,t0,(0, foldmethod=marker tw=80 cindent: */

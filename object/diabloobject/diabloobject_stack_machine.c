@@ -255,6 +255,7 @@ StackExec (t_const_string program, const t_reloc * rel, const t_symbol * sym, ch
   while (*cmd)
   {
     DEBUG_STACK(("COMMAND %c", *cmd));
+    char current_command = *cmd;
     switch (*(cmd++))
     {
       /* ignore spaces for readability */
@@ -467,6 +468,7 @@ StackExec (t_const_string program, const t_reloc * rel, const t_symbol * sym, ch
           FATAL(("You cannot use the P operand in symbol stack programs (only in reloc stack programs)"));
         break;
       case 'R': /* associated (R)elocatable - push the address of the associated relocatable (e.g. GOT section) */
+      case 't': /* push the (t)o offset of the relocatable */
         {
           t_relocatable * relocatable=NULL;
           t_address to_offset;
@@ -492,26 +494,26 @@ StackExec (t_const_string program, const t_reloc * rel, const t_symbol * sym, ch
 	    to_offset=RELOC_TO_RELOCATABLE_OFFSET(rel)[index];
           }
 
-          if (mode == 1)
-            Push (st,
-                  AddressAdd (RELOCATABLE_MIN_ADDRESS(relocatable),
-                              to_offset));
-          else if (mode == 2)
-            Push (st,
-                  AddressAdd (RELOCATABLE_OLD_ADDRESS(relocatable),
-                              to_offset));
-          else
-            Push (st,
-                  AddressAdd (RELOCATABLE_CADDRESS(relocatable),
-                              to_offset));
+          if (current_command == 't') {
+            Push (st, to_offset);
+          }
+          else {
+            if (mode == 1)
+              Push (st,
+                    AddressAdd (RELOCATABLE_MIN_ADDRESS(relocatable),
+                                to_offset));
+            else if (mode == 2)
+              Push (st,
+                    AddressAdd (RELOCATABLE_OLD_ADDRESS(relocatable),
+                                to_offset));
+            else
+              Push (st,
+                    AddressAdd (RELOCATABLE_CADDRESS(relocatable),
+                                to_offset));
+          }
           break;
 
         }
-      case 't': /* push the (t)o offset of the relocatable */
-        FATAL(("Implement"));
-        
-        //Push (st, rel->to_offset);
-        break;
 
       case 'i': /* (i)mmediate - push a 32-bit immediate */
         {
@@ -790,16 +792,6 @@ StackExec (t_const_string program, const t_reloc * rel, const t_symbol * sym, ch
 
           oper2 = Pop (st);
           oper1 = Pop (st);
-          Push (st, AddressSub (oper1, oper2));
-          DEBUG_STACK(("@G - @G = @G", oper1, oper2, AddressSub (oper1, oper2)));
-        }
-        break;
-      case '_': /* reverse SUB pop the two top elements off the stack, sub them and push the result */
-        {
-          t_address oper1, oper2;
-
-          oper1 = Pop (st);
-          oper2 = Pop (st);
           Push (st, AddressSub (oper1, oper2));
           DEBUG_STACK(("@G - @G = @G", oper1, oper2, AddressSub (oper1, oper2)));
         }

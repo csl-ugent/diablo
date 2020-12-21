@@ -13,6 +13,9 @@ main (int argc, char **argv)
   pid_t child_process_id = 0;
   int fd_fork_stdout;
 
+  /* print the command-line arguments */
+  PrintFullCommandline(argc, argv);
+
   /* Initialise used Diablo libraries */
   DiabloAnoptArmInit (argc, argv);
 
@@ -53,8 +56,12 @@ main (int argc, char **argv)
 
     obj = LinkEmulate (global_options.objectfilename, diabloobject_options.read_debug_info);
 
-    if(diabloobject_options.read_debug_info)
+    DiabloBrokerCallInstall("EnhancedLivenessDirectory", "t_string *", (void *)EnhancedLivenessDirectoryBroker, FALSE);
+
+    if(diabloobject_options.read_debug_info) {
+      DiabloBrokerCall("ParseVersioningInformation", obj);
       DwarfFlowgraphInit();
+    }
 
     Annotations annotations;
     if (global_options.annotation_file)
@@ -102,6 +109,8 @@ main (int argc, char **argv)
     
         cfg = OBJECT_CFG(obj);
 
+        // ParseExceptionData(obj);
+
         CfgRemoveDeadCodeAndDataBlocks (cfg);
         CfgPatchToSingleEntryFunctions (cfg);
         CfgRemoveDeadCodeAndDataBlocks (cfg);
@@ -123,7 +132,7 @@ main (int argc, char **argv)
         CfgComputeLiveness (cfg, CONTEXT_INSENSITIVE);
         CfgComputeLiveness (cfg, CONTEXT_SENSITIVE);
 
-        while (ArmKillUselessInstructions (cfg));
+        // while (ArmKillUselessInstructions (cfg));
 
         RegionsInit(annotations, cfg);
 

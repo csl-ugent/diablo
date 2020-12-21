@@ -76,7 +76,8 @@ t_bool IsBinutilsMap(FILE * fp)
   if (strncmp(parse_line,"Archive member",14)!=0 &&
       strncmp(parse_line,"Memory Configuration",20)!=0 &&
       strncmp(parse_line,"Allocating common symbols",25)!=0 &&
-      strncmp(parse_line,"Discarded input sections",24)!=0)
+      strncmp(parse_line,"Discarded input sections",24)!=0 &&
+      strncmp(parse_line,"As-needed library included",26)!=0)
   {
     fseek(fp,fpos,SEEK_SET);
     Free(parse_line);

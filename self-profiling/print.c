@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/file.h>
 
 #ifdef ENABLE_LOGGING
 #ifdef __ANDROID__
@@ -25,16 +26,19 @@
 
 /* The functions that will be used by Diablo */
 #ifdef LINKIN_AFTER
-void DIABLO_Profiling_Init();
+#define STATIC
+STATIC void DIABLO_Profiling_Init();
 #else
+#define STATIC static
 /* Make this function an initialization routine, executed as late as possible (because of the fork */
-void DIABLO_Profiling_Init() __attribute__((constructor(65500)));
+STATIC void DIABLO_Profiling_Init() __attribute__((constructor(65500)));
+STATIC void DIABLO_Profiling_InitDone() __attribute__((constructor(65500)));
 #endif
 
 /* Global variables, already initialize them so they won't end up in BSS section */
-uint64_t DIABLO_Profiling_data[] __attribute__((section (".data.profiling_data"))) = { 0 };
-size_t DIABLO_Profiling_nr_of_bbls = 1;
-char DIABLO_Profiling_output_name[] __attribute__((section (".data.profiling_output_name"))) = "noname";
+STATIC uint64_t DIABLO_Profiling_data[] __attribute__((section (".data.profiling_data"))) = { 0 };
+STATIC size_t DIABLO_Profiling_nr_of_bbls = 1;
+STATIC char DIABLO_Profiling_output_name[] __attribute__((section (".data.profiling_output_name"))) = "noname";
 
 static void print()
 {
@@ -104,7 +108,7 @@ static void print()
  * For dynamically linked applications we can handle this in a cleaner fashion by installing an initialization routine (that also installs a signal handler).
  * The problem is that we can't link in any amount of functionality in a statically linked application in Diablo.
  */
-void DIABLO_Profiling_Init()
+STATIC void DIABLO_Profiling_Init()
 {
   /* don't write the final profile if SP has not been initialised by Diablo */
   if (DIABLO_Profiling_nr_of_bbls == 1)
@@ -121,4 +125,8 @@ void DIABLO_Profiling_Init()
 #else
   on_exit(print, NULL);
 #endif
+}
+
+STATIC void DIABLO_Profiling_InitDone()
+{
 }

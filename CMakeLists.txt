@@ -4,6 +4,7 @@ if (POLICY CMP0069)
   cmake_policy(SET CMP0069 NEW)
 endif()
 project(diablo)
+include(ExternalProject)
 
 # Versioning
 set(DIABLO_MAJOR_VERSION 1)
@@ -119,6 +120,40 @@ set(CMAKE_CXX_FLAGS "${COMMON_FLAGS} ${CMAKE_CXX_FLAGS}")
 set(CMAKE_C_FLAGS "${COMMON_FLAGS} ${CMAKE_C_FLAGS}")
 
 add_version_info_from_vcs(DIABLO_SVN_REVISION)
+
+# Antlr
+set(ANTLR_64BIT_CONF "")
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  set(ANTLR_64BIT_CONF "--enable-64bit")
+endif()
+ExternalProject_Add(Antlr
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/libantlr3c
+  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/antlr3c-3.3.1
+  CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/antlr3c-3.3.1/configure CPPFLAGS=-I${CMAKE_CURRENT_SOURCE_DIR}/antlr3c-3.3.1/include ${ANTLR_64BIT_CONF}
+  BUILD_COMMAND make
+  INSTALL_COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/libantlr3c/src/Antlr-build/.libs/libantlr3c.a ${CMAKE_CURRENT_BINARY_DIR}/libantlr3c
+          COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/libantlr3c/src/Antlr-build/.libs/libantlr3c.so ${CMAKE_CURRENT_BINARY_DIR}/libantlr3c
+          COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/libantlr3c/src/Antlr-build/.libs/libantlr3c.so ${CMAKE_CURRENT_BINARY_DIR}/lib
+)
+ExternalProject_Get_Property(Antlr PREFIX)
+link_directories(${PREFIX})
+ExternalProject_Get_Property(Antlr SOURCE_DIR)
+set(ANTLR_INCLUDE_DIR ${SOURCE_DIR}/include ${SOURCE_DIR})
+
+# Libdwarf
+ExternalProject_Add(Libdwarf
+  PREFIX ${CMAKE_CURRENT_BINARY_DIR}/libdwarf
+  SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libdwarf
+  CONFIGURE_COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/libdwarf/configure --enable-shared
+  BUILD_COMMAND make
+  INSTALL_COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/libdwarf/src/Libdwarf-build/libdwarf/.libs/libdwarf.so ${CMAKE_CURRENT_BINARY_DIR}/libdwarf
+          COMMAND cp ${CMAKE_CURRENT_BINARY_DIR}/libdwarf/src/Libdwarf-build/libdwarf/.libs/libdwarf.so ${CMAKE_CURRENT_BINARY_DIR}/lib
+          COMMAND ln -s ${CMAKE_CURRENT_BINARY_DIR}/lib/libdwarf.so ${CMAKE_CURRENT_BINARY_DIR}/lib/libdwarf.so.1
+)
+ExternalProject_Get_Property(Libdwarf PREFIX)
+link_directories(${PREFIX})
+ExternalProject_Get_Property(Libdwarf SOURCE_DIR)
+set(LIBDWARF_INCLUDE_DIR ${SOURCE_DIR} ${PREFIX}/src/Libdwarf-build)
 
 # Add sub-directories
 add_subdirectory(support)

@@ -1,0 +1,20 @@
+See example.c for an implementation.
+To convert it to an annotated source file, do:
+$ ./process.pl example.c > example.meta_api.c
+$ gcc -E -DMETA_API_SEMANTIC example.meta_api.c
+
+- The implementation is made with a slightly altered version of C.
+- Top-level comments should only be made with '//'.
+  '/*' style comments are not supported by the parser.
+- The first line of the file should be a '#define' for the datastructure.
+- The curly braces for function bodies should not be indented (whitespace matters), and should be on their own line.
+
+For function arguments:
+- Append '$meta_instance' to the name to make the argument a pointer to the datastructure instance.
+- Append '$meta_arg(DATATYPE)' to the name to make the argument a meta-API created type.
+
+For function bodies:
+- '$meta_setter(EFFECT);' one or more times to describe the effects of a setter.
+- '$meta_getter;' to indicate the definition of a getter.
+- '$meta_var(TYPE, NAME, DATATYPE);': declaration of the meta-API variables.
+- To use a meta-API variable, prepend a '$' to the name.

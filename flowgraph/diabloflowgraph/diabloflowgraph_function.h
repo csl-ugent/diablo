@@ -138,7 +138,8 @@ struct _t_edge_draw_data
 t_function * FunctionDuplicate (t_function *fun);
 
 /* version without annotations */
-void FunctionDrawGraph (t_function * fun, t_string filename);
+void FunctionDrawGraph(t_function * fun, t_string filename);
+void FunctionDrawGraphMarked(t_function *fun, t_string filename, t_bool marked);
 
 /* version with only hotness annotations */
 void FunctionDrawGraphWithHotness (t_function * fun, t_string filename);
@@ -148,10 +149,11 @@ void FunctionDrawGraphWithLiveness (t_function * fun, t_string filename);
 void LivenessAnnotatorSetOpt(t_bool print_before, t_bool print_after);
 
 /* generic bbl and edge annotations */
-void FunctionDrawGraphAnnotated (
+void FunctionDrawGraphAnnotatedMarked (
                                  t_function * fun, t_string filename,
                                  void (*bbl_annotator) (t_bbl *, t_bbl_draw_data *),
-                                 void (*edge_annotator) (t_cfg_edge *, t_edge_draw_data *));
+                                 void (*edge_annotator) (t_cfg_edge *, t_edge_draw_data *), t_bool marked);
+#define FunctionDrawGraphAnnotated(fun, filename, bbl_annotator, edge_annotator) FunctionDrawGraphAnnotatedMarked(fun, filename, bbl_annotator, edge_annotator, FALSE)
 
 void FunctionCreateExitBlock(t_function *ret);
 

@@ -365,6 +365,7 @@ AddDynRelativeRelocs(t_object *obj)
 
       ASSERT(node,("Couldn't find DYNABSRELOC:* symbol at @G to pair with @S",internaddr,dynrelocsym));
       absrelocsym = node->sym2;
+      ASSERT(absrelocsym, ("Found DYNABSRELOC at @G but something is wrong with the symbols @S", internaddr, dynrelocsym));
 
       /* the dynamic relative/absolute relocation has to relocate the value at the
        * address corresponding to this DYNABSRELOC:* symbol. Since its name
@@ -426,6 +427,66 @@ AddDynRelativeRelocs(t_object *obj)
 /*}}}*/
 
 static void
+AddDynTlsRelocs(t_object *obj) {
+  /* In case we're not in the link emulation phase anymore,
+   * the tentative code will take care of creating the GOT entry. */
+  if (!emulate_link)
+    return;
+
+  t_hash_table *symbolht = SymbolTableCreateHashTableForGetFirst(OBJECT_SUB_SYMBOL_TABLE(obj), "GOT:");
+
+  t_symbol *sym_it;
+  SYMBOL_TABLE_FOREACH_SYMBOL(OBJECT_SYMBOL_TABLE(obj), sym_it) {
+    if (strncmp(SYMBOL_NAME(sym_it), "TLS_DTPMODNULL:", strlen("TLS_DTPMODNULL:")) == 0) {
+      /* The TLS_DTPMODNULL:xxxxxxxx symbol encodes the address of the GOT entry to which it points.
+       * A tentative is needed to construct this GOT entry because the target address is not known yet at link-time. */
+
+      /* First, we extract the hexadecimal address from the symbl name. */
+      void *addr;
+      if (sscanf(SYMBOL_NAME(sym_it) + strlen("TLS_DTPMODNULL:"), "%p", &addr) != 1)
+        FATAL(("Could not parse address of TLS_DTPMODNULL symbol @S", sym_it));
+
+      t_address internaddr = AddressNewForObject(obj, (unsigned long)addr);
+
+      /* Second, we look for an existing symbol at that address, pointing to the GOT entry.
+       * This is a symbol with a name "GOT:.....", hence the hash table constructor. */
+      t_symbol_he *node = HashTableLookup(symbolht, &internaddr);
+      ASSERT(node, ("couldn't find GOT:* symbol at @G to pair with @S", internaddr, sym_it));
+
+      t_symbol *target = node->sym2;
+
+      /* Third, we create the tentative code from a template.
+       * It adds an entry to the .dynamic sectionfor a R_ARM_TLS_DTPMOD32 symbol (0x11),
+       * pointing to the GOT entry we indentified with the symbol we just looked up. */
+      const char *tentative_template =
+        "TlsDtpModNullRelTentative {\
+          action {\
+            ADD_SUBSECTION(\"Linker\", \".rel.dyn\",\
+                            CONCAT(\"DYNREL:\", MATCHED_NAME()),\
+                            RODATA, 4, 8)\
+          }\
+          section {\
+            RELOCATED32(0x0, \"%s\", 0, 0, 0, \"S00 \\ l * w \\ s0000$\"),\
+            RELOCATED32(0x11, 0, 0, 0, 0, \"s0000 \\ l i000000ff& | w \\ s0000$\")\
+          }\
+          address {\
+            SYMBOL(MATCHED_NAME())\
+          }\
+         }";
+      t_string tentative = StringIo(tentative_template, SYMBOL_NAME(target));
+
+      /* Finally, we do a sanity check before setting the tentative code proper.
+       * Once this has been done, the tentative code is executed because that code will not be executed automatically. */
+      ASSERT(SYMBOL_TENTATIVE(sym_it) == NULL, ("already have tentative? @S", sym_it));
+      SYMBOL_SET_TENTATIVE(sym_it, StringDup(tentative));
+      Free(tentative);
+
+      LinkerScriptParse(0, SYMBOL_TENTATIVE(sym_it), obj, sym_it);
+    }
+  }
+}
+
+static void
 AddElfSpecificDataAndSymbols(t_object *obj)
 {
   /* not very clean, but there's no (easy?) way to only install this callback
@@ -436,6 +497,7 @@ AddElfSpecificDataAndSymbols(t_object *obj)
   AssociateWeakDynamicSymbolsWithData(obj);
   MarkExportSections(ObjectGetLinkerSubObject(obj));
   AddDynRelativeRelocs(obj);
+  AddDynTlsRelocs(obj);
 }
 
 /* Add a new DT_NEEDED library to an object. The obj should be an actual obj, not a subobj. */
@@ -559,7 +621,7 @@ ElfAddFinalizationRoutineR(t_object *obj, t_relocatable *relocatable)
  * linker emulation and before flowgraphing. This is because of possible issues later on during optimization.
  */
 static void
-_ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym, t_relocatable *relocatable, t_address relocatable_offset)
+_ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym, t_relocatable *relocatable, t_address relocatable_offset, t_bool at_end)
 {
   /* We assume the init_array or the ctors have been vectorized */
   t_object* linker_obj = ObjectGetLinkerSubObject(obj);
@@ -616,17 +678,43 @@ _ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym, t_reloca
     /* If we place the new pointer at the beginning, we'll have the move all the subsequent pointers up one entry */
     if(subsec == init_array_sec)
     {
-      /* Increment the from_offset for all relocations from the subsection with the address size */
-      rr = SECTION_REFERS_TO(subsec);
-      while (rr)
-      {
-        t_reloc* reloc = RELOC_REF_RELOC(rr);
+      if (!at_end) {
+        /* Increment the from_offset for all relocations from the subsection with the address size */
+        rr = SECTION_REFERS_TO(subsec);
+        while (rr)
+        {
+          t_reloc* reloc = RELOC_REF_RELOC(rr);
 
-        RELOC_SET_FROM_OFFSET(reloc, AddressAddUint32(RELOC_FROM_OFFSET(reloc), address_size));
+          RELOC_SET_FROM_OFFSET(reloc, AddressAddUint32(RELOC_FROM_OFFSET(reloc), address_size));
 
-        /* Go to the next reloc_ref */
-        rr = RELOC_REF_NEXT(rr);
+          /* Go to the next reloc_ref */
+          rr = RELOC_REF_NEXT(rr);
+        }
       }
+      else
+        first = last;
+
+      /* the .initarraysize symbol should have its associated value incremented too */
+      t_section *init_array_size_section = NULL;
+
+      t_section *sec;
+      int tel;
+      OBJECT_FOREACH_SECTION(obj, sec, tel) {
+        if (!strcmp(SECTION_NAME(sec), ".dynamic")) {
+          t_section *subsec;
+          SECTION_FOREACH_SUBSECTION(sec, subsec) {
+            if (!strcmp(SECTION_NAME(subsec), ".dynamic.INITARRAYSIZE")) {
+              init_array_size_section = subsec;
+              break;
+            }
+          }
+        }
+      }
+
+      ASSERT(init_array_size_section, ("can't find .dynamic.INITARRAYSIZE section"));
+
+      t_uint32 *d = (t_uint32 *)SECTION_DATA(init_array_size_section);
+      d[1] += 4;
     }
 
     /* Create a new relocation so a pointer to the initialization routine will be written in the subsection */
@@ -650,15 +738,15 @@ _ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym, t_reloca
 }
 
 void
-ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym)
+ElfAddInitializationRoutine(t_object *obj, t_symbol *init_routine_sym, t_bool at_end)
 {
-  _ElfAddInitializationRoutine(obj, init_routine_sym, NULL, AddressNew32(0));
+  _ElfAddInitializationRoutine(obj, init_routine_sym, NULL, AddressNew32(0), at_end);
 }
 
 void
-ElfAddInitializationRoutineR(t_object *obj, t_relocatable *relocatable)
+ElfAddInitializationRoutineR(t_object *obj, t_relocatable *relocatable, t_bool at_end)
 {
-  _ElfAddInitializationRoutine(obj, NULL, relocatable, AddressNew32(0));
+  _ElfAddInitializationRoutine(obj, NULL, relocatable, AddressNew32(0), at_end);
 }
 
 void DiabloElfInit(int argc, char ** argv)
@@ -714,8 +802,11 @@ void DiabloElfInit(int argc, char ** argv)
     DiabloBrokerCallInstall("AddDynamicRelativeRelocation", "t_object * obj, t_relocatable * from, t_address from_offset", ElfAddDynamicRelativeRelocation, FALSE);
     DiabloBrokerCallInstall("AddFinalizationRoutine", "t_object * obj, t_symbol * fini_routine_sym", ElfAddFinalizationRoutine, FALSE);
     DiabloBrokerCallInstall("AddFinalizationRoutineR", "t_object * obj, t_relocatable *", ElfAddFinalizationRoutineR, FALSE);
-    DiabloBrokerCallInstall("AddInitializationRoutine", "t_object * obj, t_symbol * init_routine_sym", ElfAddInitializationRoutine, FALSE);
-    DiabloBrokerCallInstall("AddInitializationRoutineR", "t_object * obj, t_relocatable * relocatable", ElfAddInitializationRoutineR, FALSE);
+    DiabloBrokerCallInstall("AddInitializationRoutine", "t_object * obj, t_symbol * init_routine_sym, t_bool at_end", ElfAddInitializationRoutine, FALSE);
+    DiabloBrokerCallInstall("AddInitializationRoutineR", "t_object * obj, t_relocatable * relocatable, t_bool at_end", ElfAddInitializationRoutineR, FALSE);
+    DiabloBrokerCallInstall("ParseVersioningInformation", "t_object *obj", ElfParseVersioningInformation, FALSE);
+    DiabloBrokerCallInstall("GetDynamicVersionInformation", "t_string, void *, t_bool *", ElfGetSymbolDataBroker, FALSE);
+    DiabloBrokerCallInstall("GetExportedVersionInformation", "t_string, void *, t_bool *", ElfGetExportedSymbolDataBroker, FALSE);
   }
   elf_module_usecount++;
 }

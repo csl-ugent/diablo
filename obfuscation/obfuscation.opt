@@ -22,6 +22,198 @@ group "obfuscation" string_option obfuscation_script_file
   default=NULL;
 }
 
+group "obfuscation" int_option meta_api_verbosity
+{
+  short="mav";
+  long="meta-api-verbosity";
+  description="Set level of verbosity for the meta-api code";
+  default=1;
+}
+
+group "obfuscation" bool_option meta_api_debug
+{
+  short="madbg";
+  long="meta-api-debug";
+  description="Add printf-debug calls to ease debugging of SET/GET sequences for predicates";
+  default=false;
+}
+
+group "obfuscation" bool_option meta_api_verify_setters
+{
+  short="maver";
+  long="meta-api-verify";
+  description="Verify set values for each predicate setter";
+  default=false;
+}
+
+group "obfuscation" bool_option meta_api_enable_twoway
+{
+  short="matwoway";
+  long="meta-api-two-way";
+  description="Enable the generation of two-way opaque predicates";
+  default=on;
+}
+
+group "obfuscation" int_option meta_api_setter_count
+{
+  short="masetcount";
+  long="meta-api-setter-count";
+  description="Max number of setters inserted";
+  default=0;
+}
+
+group "obfuscation" int_option meta_api_instance_count
+{
+  short="manrinst";
+  long="meta-api-number-instances";
+  description="Number of instances of each data structure";
+  default=1;
+}
+
+group "obfuscation" string_option meta_api_test
+{
+  short="matest";
+  long="meta-api-test";
+  description="Insert one test sequence";
+  default="";
+}
+
+group "obfuscation" bool_option meta_api_restrict_pushpop
+{
+  short="mapp";
+  long="meta-api-pushpop";
+  description="Restrict the pushed/popped registers";
+  default=off;
+}
+
+group "obfuscation" int_option obf_hotness
+{
+  short="obf-hotness";
+  long="obf-hotness";
+  description="TODO";
+  default=0;
+}
+
+group "obfuscation" int_option obf_hotness_threshold
+{
+  short="obf-hotness-threshold";
+  long="obf-hotness-threshold";
+  description="In percent.";
+  default=10;
+}
+
+group "obfuscation" int_option obf_exec_threshold
+{
+  short="obf-exec-threshold";
+  long="obf-exec-threshold";
+  description="In percent.";
+  default=10;
+}
+
+group "obfuscation" int_option obf_considered_minimum
+{
+  short="obf-considered-minimum";
+  long="obf-considered-minimum";
+  description="Positive value: minimal number of BBLs that need to be taken into consideration for a function to be considered for protection.";
+  default=5;
+}
+
+group "obfuscation" int_option obf_first_function
+{
+  short="obf-first-function";
+  long="obf-first-function";
+  description="Must be >= 0.";
+  default=0;
+}
+
+group "obfuscation" int_option obf_nr_functions
+{
+  short="obf-nr-functions";
+  long="obf-nr-functions";
+  description="Must be >= 1.";
+  default=1;
+}
+
+group "obfuscation" int_option obf_nr_per_partition
+{
+  short="obf-nr-per-partition";
+  long="obf-nr-per-partition";
+  description="Must be >= 1.";
+  default=999999999;
+}
+
+group "obfuscation" int_option meta_api_max_setters_per_getter
+{
+  short="mamaxsetperget";
+  long="mamaxsetperget";
+  description="Must be >= 1. Will be divided by 10 to support 1/10 steps.";
+  default=999999999;
+}
+
+group "obfuscation" bool_option meta_api_implement_instance
+{
+  short="maimplinst";
+  long="meta-api-impl-inst";
+  description="TODO";
+  default=on;
+}
+
+group "obfuscation" bool_option meta_api_implement_get
+{
+  short="maimplget";
+  long="meta-api-impl-get";
+  description="TODO";
+  default=on;
+}
+
+group "obfuscation" bool_option meta_api_implement_set
+{
+  short="maimplset";
+  long="meta-api-impl-set";
+  description="TODO";
+  default=on;
+}
+
+group "obfuscation" bool_option meta_api_implement_reset
+{
+  short="maimplreset";
+  long="meta-api-impl-reset";
+  description="TODO";
+  default=on;
+}
+
+group "obfuscation" string_option meta_api_measure_init_address
+{
+  short=" ";
+  long="meta-api-measure-init";
+  description="TODO";
+  default=0;
+}
+
+group "obfuscation" string_option meta_api_measure_loc1_address
+{
+  short="mameasureloc1";
+  long="meta-api-measure-loc1";
+  description="TODO";
+  default=0;
+}
+
+group "obfuscation" string_option meta_api_measure_loc2_address
+{
+  short="mameasureloc2";
+  long="meta-api-measure-loc2";
+  description="TODO";
+  default=0;
+}
+
+group "obfuscation" string_option meta_api_measure_loc3_address
+{
+  short="mameasureloc3";
+  long="meta-api-measure-loc3";
+  description="TODO";
+  default=0;
+}
+
 usage_option help
 {
    long="help";

@@ -73,8 +73,10 @@ DiabloArmInit (int argc, char **argv)
 
     DiabloBrokerCallInstall ("CfgCreated", "t_object *, t_cfg *", DiabloFlowgraphArmCfgCreated, FALSE);
 
-    DiabloBrokerCallInstall("AddInstrumentationToBbl", "t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_address offset", ArmAddInstrumentationToBbl, TRUE);
+    DiabloBrokerCallInstall("AddInstrumentationToBbl", "t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_section* sequencing_counter_sec, t_address offset", ArmAddInstrumentationToBbl, TRUE);
     DiabloBrokerCallInstall("AddCallFromBblToBbl", "t_object* obj, t_bbl* from, t_bbl* to", ArmAddCallFromBblToBbl, TRUE);
+
+    DiabloBrokerCallInstall("ArchitectureSpecificRegsetPrinter", "t_regset *, t_string_array *, t_bool *", ArmRegsetPrinterBroker, TRUE);
 
     DiabloArmCppInit (argc, argv);
   }

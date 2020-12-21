@@ -2,6 +2,8 @@
 
 #include "diabloobject_dwarf.h"
 
+using namespace std;
+
 /* read in one compilation unit header */
 DwarfCompilationUnitHeader *
 ReadCompilationUnit(t_section *sec, t_address offset, t_uint32& header_size)
@@ -52,6 +54,8 @@ ReadCompilationUnit(t_section *sec, t_address offset, t_uint32& header_size)
   ret->header_size = header_size;
 
 #if DEBUG_DWARF
+  VERBOSE(DWARF_VERBOSITY, (" Offset 0x%x", ret->offset));
+  VERBOSE(DWARF_VERBOSITY, (" Header size 0x%x", ret->header_size));
   VERBOSE(DWARF_VERBOSITY, (" Length 0x%x (%d)", ret->unit_length, ret->is_64bit));
   VERBOSE(DWARF_VERBOSITY, (" Version %d", ret->version));
   VERBOSE(DWARF_VERBOSITY, (" Abbrev Offset 0x%x", ret->debug_abbrev_offset));
@@ -59,4 +63,14 @@ ReadCompilationUnit(t_section *sec, t_address offset, t_uint32& header_size)
 #endif
 
   return ret;
+}
+
+string DwarfCompilationUnitHeader::ToString() {
+  string result = "CU_header/";
+
+  t_string x = StringIo("offset=@G,abbrev_offset=@G", offset, debug_abbrev_offset);
+  result += x;
+  Free(x);
+
+  return result;
 }

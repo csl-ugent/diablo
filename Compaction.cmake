@@ -30,3 +30,17 @@ if (CompactionARM)
   )
   INSTALL(TARGETS diablo-arm DESTINATION bin)
 endif()
+
+add_executable (diablo-dwarf ${CMAKE_SOURCE_DIR}/frontends/diablo_dwarf.cc ${CMAKE_CURRENT_SOURCE_DIR}/frontends/common.cc)
+target_include_directories(diablo-dwarf
+  PRIVATE ${LIBDWARF_INCLUDE_DIR})
+
+target_link_libraries(diablo-dwarf
+  PRIVATE dwarf
+  PRIVATE ObjectDebugDwarf
+  PRIVATE FlowgraphARM
+  ${common_link_libraries})
+
+add_dependencies(diablo-dwarf Libdwarf)
+
+INSTALL(TARGETS diablo-dwarf DESTINATION bin)

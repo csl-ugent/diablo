@@ -209,6 +209,7 @@ void ArmInsMakeData(t_arm_ins * ins, t_uint32 data);
 void ArmInsMakeUncondThumbBranch(t_arm_ins * ins);
 #define ArmInsMakeUncondBranch(ins) ArmInsMakeCondBranch(ins, ARM_CONDITION_AL)
 #define ArmInsMakeUncondBranchExchange(ins,reg_b) ArmInsMakeCondBranchExchange(ins, ARM_CONDITION_AL, reg_b)
+#define ArmInsMakeUncondBranchAndLink(ins) ArmInsMakeCondBranchAndLink(ins, ARM_CONDITION_AL)
 void ArmInsMakeCondBranchExchange(t_arm_ins * ins, t_uint32 cond, t_reg reg_b);
 void ArmInsMakeCondBranch(t_arm_ins * ins, t_uint32 cond);
 void ArmInsMakeCondBranchAndLink(t_arm_ins * ins, t_uint32 cond);
@@ -216,7 +217,6 @@ void ArmInsMakeCondBranchLinkAndExchange(t_arm_ins * ins, t_uint32 cond, t_reg r
 void ArmInsMakeClz(t_arm_ins * ins, t_reg regA, t_reg regC, t_uint32 cond);
 void ArmInsMakeAdd(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeMul(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
-void ArmInsMakeDiv(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond); //custom
 void ArmInsMakeCmp(t_arm_ins * ins, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeTst(t_arm_ins * ins, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeSub(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond);
@@ -225,6 +225,8 @@ void ArmInsMakeEor(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32
 void ArmInsMakeMov(t_arm_ins * ins, t_reg regA, t_reg regC, t_uint32 immed, t_uint32 cond);
 void ArmInsMakeMovwImmed(t_arm_ins * ins, t_reg regA, t_uint32 immed, t_uint32 cond);
 void ArmInsMakePop(t_arm_ins * ins, t_uint32 regs, t_uint32 cond, t_bool thumb);
+void ArmInsMakeVpop(t_arm_ins *ins, t_regset regs, bool single);
+void ArmInsMakeVpush(t_arm_ins *ins, t_regset regs, bool single);
 void ArmInsMakeLdm(t_arm_ins * ins, t_reg regB, t_uint32 regs, t_uint32 cond, t_bool writeback, t_bool preindex, t_bool dirup);
 void ArmInsMakePush(t_arm_ins * ins, t_uint32 regs, t_uint32 cond, t_bool thumb);
 void ArmInsMakeStm(t_arm_ins * ins, t_reg regB, t_uint32 regs, t_uint32 cond, t_bool writeback, t_bool preindex, t_bool dirup);
@@ -262,6 +264,7 @@ void ArmInsDupDynamic(t_arm_ins * target, t_arm_ins * source);
 EXEC_CONDITION ArmInsCondition(t_arm_ins * ins);
 void ArmInsConvertToBranch(t_arm_ins * ins);
 t_arm_ins * ArmAddJumpInstruction(t_bbl * bbl);
+t_arm_ins * ArmAddCallInstruction(t_bbl * bbl);
 t_bool ArmInsIsCall(t_arm_ins * ins);
 void ArmComputeLiveRegsBeforeSwi(t_regset *, t_arm_ins * );
 t_bool ArmInsAssembleFromString(t_arm_ins *, t_string);

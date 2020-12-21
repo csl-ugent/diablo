@@ -353,4 +353,35 @@ RegsetFindFirstBlob (t_regset r, t_uint32 * size)
   return location;
 }
 
+t_string RegsetSerialize (t_regset r) {
+  t_string result = StringIo("0x%08x", r.regset[0]);
+  for (int i = 1; i < MAX_NR_REG_SUBSETS; i++) {
+    t_string tmp = result;
+
+    t_string t = StringIo(",0x%08x", r.regset[i]);
+    result = StringConcat2(tmp, t);
+    Free(t);
+    Free(tmp);
+  }
+
+  return result;
+}
+
+t_regset RegsetDeserialize (t_string s) {
+  t_string_array *arr = StringDivide(s, ",", FALSE, FALSE);
+
+  t_regset result = RegsetNew();
+
+  t_string_array_elem *iter;
+  int i = 0;
+  STRING_ARRAY_FOREACH_ELEM(arr, iter) {
+    result.regset[i] = StringToUint32(iter->string, strlen(iter->string));
+    i++;
+  }
+
+  StringArrayFree(arr);
+
+  return result;
+}
+
 /* vim: set shiftwidth=2 expandtab cinoptions=p5,t0,(0, foldmethod=marker tw=80 cindent: */

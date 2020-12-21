@@ -41,6 +41,7 @@ public:
   virtual t_const_string name() const = 0;
   virtual void dumpStats(const std::string& prefix) {}
   virtual bool transformationIsAvailableInRandomizedList() { return true; }
+  virtual void finalizeAll() const {}
   
   Transformation() {
     special_function_uid = FunctionUID_INVALID;

@@ -6,8 +6,8 @@
 #include <diabloflowgraph.h>
 
 //#define PRINT_INS_POINTER
-//#define PRINT_BBL_POINTER
-//#define PRINT_BBL_REGSETS
+#define PRINT_BBL_POINTER
+#define PRINT_BBL_REGSETS
 //#define PRINT_EDGE_POINTER
 
 /* Instructions {{{ */
@@ -115,7 +115,7 @@ IoModifierBbl (t_const_string modifiers, va_list * ap)
   StringArrayAppendString (array, StringIo (" [%p]", bbl));
 #endif
 #ifdef PRINT_BBL_REGSETS
-  StringArrayAppendString (array, StringIo (" live-before: @X live-after: @X", CPREGSET(BBL_CFG(bbl), BblRegsLiveBefore(bbl)), CPREGSET(BBL_CFG(bbl), BblRegsLiveAfter(bbl))));
+  StringArrayAppendString (array, StringIo ("\\l live-before: @X\\l live-after: @X\\l", CPREGSET(BBL_CFG(bbl), BblRegsLiveBefore(bbl)), CPREGSET(BBL_CFG(bbl), BblRegsLiveAfter(bbl))));
 #endif
 
   if (AddressIsEq (BBL_OLD_ADDRESS(bbl), BBL_CADDRESS(bbl)))
@@ -149,7 +149,12 @@ IoModifierBbl (t_const_string modifiers, va_list * ap)
 
   if (BBL_EXEC_COUNT(bbl))
   {
-    StringArrayAppendString (array, StringIo (" exec %d", BBL_EXEC_COUNT(bbl)));
+    StringArrayAppendString (array, StringIo (" exec %d hotness %d", BBL_EXEC_COUNT(bbl), BBL_EXEC_COUNT(bbl)*BBL_NINS(bbl)));
+  }
+
+  if (BBL_SEQUENCE_ID(bbl))
+  {
+    StringArrayAppendString (array, StringIo (" seq %d", BBL_SEQUENCE_ID(bbl)));
   }
 
   if (print_function)
@@ -161,6 +166,7 @@ IoModifierBbl (t_const_string modifiers, va_list * ap)
   DiabloBrokerCall("IoModifierAF", bbl, array);
   DiabloBrokerCall("IoModifierBblNonZero", bbl, array);
   DiabloBrokerCall("IoModifierBblTracking", bbl, array);
+  DiabloBrokerCall("IoModifierBblMetaAPI", bbl, array);
 
   for (; *modifiers != 0; modifiers++)
   {
@@ -328,24 +334,30 @@ IoModifierRegset (t_const_string modifiers, va_list * ap)
 
   RegsetSetIntersect(regs,allregs);
 
-  REGSET_FOREACH_REG(regs,reg)
-  {
-    if (flag)
+  /* architecture-specific printer */
+  t_bool arch_specific = false;
+  DiabloBrokerCall("ArchitectureSpecificRegsetPrinter", &regs, array, &arch_specific);
+
+  if (!arch_specific) {
+    REGSET_FOREACH_REG(regs,reg)
     {
-      StringArrayAppendString (array, StringIo (", %s", desc->register_names[reg]));
-      num+=strlen(desc->register_names[reg])+2;
-     }
-    else
-    {
-      StringArrayAppendString (array, StringIo ("%s", desc->register_names[reg]));
-      num+=strlen(desc->register_names[reg])+2;
-    }
-    flag = 1;
-    if(num>100)
-    {
-      num=0;
-      flag = 0;
-      StringArrayAppendString (array, StringIo ("\\l  "));
+      if (flag)
+      {
+        StringArrayAppendString (array, StringIo (", %s", desc->register_names[reg]));
+        num+=strlen(desc->register_names[reg])+2;
+      }
+      else
+      {
+        StringArrayAppendString (array, StringIo ("%s", desc->register_names[reg]));
+        num+=strlen(desc->register_names[reg])+2;
+      }
+      flag = 1;
+      if(num>100)
+      {
+        num=0;
+        flag = 0;
+        StringArrayAppendString (array, StringIo ("\\l  "));
+      }
     }
   }
 

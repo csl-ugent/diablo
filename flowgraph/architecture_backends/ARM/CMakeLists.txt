@@ -11,6 +11,7 @@ target_compile_definitions(FlowgraphARM
 target_include_current_directories(FlowgraphARM)
 target_link_libraries(FlowgraphARM
   PUBLIC Flowgraph
+  PRIVATE FlowgraphDebugDwarf
   PRIVATE MapArmAds
   PRIVATE MapBinutils
   PRIVATE MapTiLinker

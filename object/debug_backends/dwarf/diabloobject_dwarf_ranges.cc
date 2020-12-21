@@ -9,11 +9,23 @@ ReadAddressRange(DwarfCompilationUnitHeader *cu, t_section *sec, t_address offse
   DwarfRangeList *ret = new DwarfRangeList();
 
   /* look up base address for this CU */
-  DwarfAbstractParsedAttribute *attr = LookupAttributeForAbbreviationTableEntry(static_cast<DwarfAbbrevTableEntry *>(cu->children[0]), DwarfAttributeCode::DW_AT_low_pc);
-  ASSERT(attr, ("could not find DW_AT_low_pc for cu"));
+  t_address base_address = AddressNew32(0);
 
-  DwarfAddressAttribute *at_base_address = static_cast<DwarfAddressAttribute *>(attr->decoded);
-  t_address base_address = static_cast<t_address>(at_base_address->value);
+  DwarfAbstractParsedAttribute *attr = LookupAttributeForAbbreviationTableEntry(static_cast<DwarfAbbrevTableEntry *>(cu->children[0]), DwarfAttributeCode::DW_AT_low_pc);
+  if (attr) {
+    /* DW_AT_low_pc contains the base address */
+    DwarfAddressAttribute *at_base_address = static_cast<DwarfAddressAttribute *>(attr->decoded);
+    base_address = static_cast<t_address>(at_base_address->value);
+  }
+  else {
+    /* first entry in range list should have base address */
+    t_address largest_offset = DwarfReadAddress(cu->address_size, sec, offset);
+    offset = AddressAddUint32(offset, cu->address_size);
+    ASSERT(G_T_UINT32(largest_offset) == 0xffffffff, ("expected max int32 value, got @G", largest_offset));
+
+    base_address = DwarfReadAddress(cu->address_size, sec, offset);
+    offset = AddressAddUint32(offset, cu->address_size);
+  }
 
   while (true) {
     t_uint32 sz;

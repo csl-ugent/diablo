@@ -82,7 +82,7 @@ GMRTTransformer::GMRTTransformer (t_object* obj, initializer_list<t_const_string
 
   /* Install the initialization routine */
   if (SymbolTableGetSymbolByName(OBJECT_SUB_SYMBOL_TABLE(obj), FINAL_PREFIX_FOR_LINKED_IN_GMRT_OBJECT "Init"))
-    DiabloBrokerCall ("AddInitializationRoutine", obj, init_sym);
+    DiabloBrokerCall ("AddInitializationRoutine", obj, init_sym, false);
 
   DiabloBrokerCallInstall("RelocIsRelative", "t_reloc *, t_bool *", (void*)GMRTTransformer::RelocIsTransformed, FALSE);
 }

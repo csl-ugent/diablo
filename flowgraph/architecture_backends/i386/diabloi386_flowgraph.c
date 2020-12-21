@@ -1846,7 +1846,7 @@ void I386AddCallFromBblToBbl (t_object* obj, t_bbl* from, t_bbl* to)
 /* Add instrumentation to the beginning of the BBL. This is one instruction that
  * increments a certain memory location every time the BBL is executed. Used by CfgAddSelfProfiling
  */
-void I386AddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_address offset)
+void I386AddInstrumentationToBbl (t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_section* sequencing_counter_sec, t_address offset)
 {
   t_i386_ins* ins, *tmp;
   t_i386_ins* orig_first = T_I386_INS(BBL_INS_FIRST(bbl));

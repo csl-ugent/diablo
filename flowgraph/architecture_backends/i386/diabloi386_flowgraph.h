@@ -31,7 +31,7 @@
 #define I386_FLOWGRAPH_H
 t_bool I386IsPcThunk(t_bbl* target);
 void I386AddCallFromBblToBbl (t_object* obj, t_bbl* from, t_bbl* to);
-void I386AddInstrumentationToBbl(t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_address offset);
+void I386AddInstrumentationToBbl(t_object* obj, t_bbl* bbl, t_section* profiling_sec, t_section* sequencing_counter_sec, t_address offset);
 void I386Flowgraph(t_object *obj);
 void I386MakeAddressProducers(t_cfg *cfg);
 void I386StucknessAnalysis(t_object * obj);

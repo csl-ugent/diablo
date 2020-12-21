@@ -10,4 +10,5 @@ target_link_libraries(DiabloObfuscationARM
   PRIVATE FlowgraphDebugDwarf
   PRIVATE DiabloAnnotations
   PUBLIC DiabloObfuscationGeneric
+  PRIVATE DiabloMetaAPI
 )

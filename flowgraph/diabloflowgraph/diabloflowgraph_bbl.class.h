@@ -93,6 +93,7 @@ MEMBER(t_bbl_list *, dominated_by, DOMINATED_BY)
 /*! When profile information is used, this field holds the number of times this
  * basic block was executed according to the profile */
 MEMBER(t_int64, exec_count, EXEC_COUNT)
+MEMBER(t_int64, sequence_id, SEQUENCE_ID)
 /* An id that uniquely identifies each BBL, and can be used to order BBLs */
 IMEMBER(t_uint32, id, ID)
 /*! Bbl is part of a hell function */
@@ -142,6 +143,7 @@ CONSTRUCTOR(
               BBL_SET_ID(ret, bbl_global_id++);
               BBL_SET_AF_FLAGS(ret, 0);
               BBL_SET_OBJECT_SET(ret, -1);
+              BBL_SET_SEQUENCE_ID(ret, -1);
             }
            )
 

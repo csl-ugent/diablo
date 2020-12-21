@@ -15,9 +15,15 @@
 #define PREFIX_FOR_LINKED_IN_SP_OBJECT "LINKED_IN_PROFILING_OBJECT_"
 #define FINAL_PREFIX_FOR_LINKED_IN_SP_OBJECT PREFIX_FOR_LINKED_IN_SP_OBJECT SP_IDENTIFIER_PREFIX
 
+void CfgReadBlockProfileFile(t_cfg *cfg, t_string name, t_bool execution_profile);
+#define CfgReadBlockExecutionCounts(cfg, name) CfgReadBlockProfileFile(cfg, name, TRUE)
+#define CfgReadBlockSequenceCounts(cfg, name) CfgReadBlockProfileFile(cfg, name, FALSE)
+
+typedef t_uint64 t_profile_file_address;
+typedef t_int64 t_profile_file_count;
+
 void SelfProfilingInit(t_object* obj, t_string profiling_object_path);
 void CfgAddSelfProfiling (t_object* obj, t_string output_name);
-void CfgReadBlockExecutionCounts (t_cfg * cfg, t_string name);
 void CfgComputeHotBblThreshold (t_cfg * cfg, double weight_threshold);
 void CfgEstimateEdgeCounts (t_cfg * cfg);
 t_int64 CfgComputeWeight (t_cfg * cfg);

@@ -104,6 +104,7 @@ struct _t_architecture_description
   bool (*InsIsConstantProducer)(t_ins *);
   t_int64 (*InsGetConstant)(t_ins *);
   void (*InsSetConstant)(t_ins *, t_int64);
+  t_ins *(*BblAddCallInstruction) (t_bbl *);
 };
 #endif
 /* }}} */

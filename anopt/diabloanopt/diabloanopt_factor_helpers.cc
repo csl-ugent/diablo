@@ -32,7 +32,7 @@ LogFile *L_FACTORING_VAR;
 
 FunctionUID bbl_factor_function_uid;
 
-FactoringSetSourceInformation FactoringGetSourceInformation(BblSet bbls, int& nr_executed) {
+FactoringSetSourceInformation FactoringGetSourceInformation(BblSet bbls, int& nr_executed, bool regular_factoring) {
   FactoringSetSourceInformation result;
   nr_executed = 0;
 
@@ -41,18 +41,36 @@ FactoringSetSourceInformation FactoringGetSourceInformation(BblSet bbls, int& nr
     FunctionUID function;
     SourceFileUID object;
     SourceArchiveUID archive;
-    BblSourceLocation(bbl, function, object, archive);
+    bool success = BblSourceLocation(bbl, function, object, archive, regular_factoring);
 
-    result.functions.insert(function);
-    result.objects.insert(object);
-    result.archives.insert(archive);
+    if (!success) {
+      ASSERT(regular_factoring, ("should only come here with regular factoring @eiB", bbl));
 
-    if (BBL_EXEC_COUNT(bbl) > 0) {
-      result.exec_functions.insert(function);
-      result.exec_objects.insert(object);
-      result.exec_archives.insert(archive);
+      TrackingInformation tinfo = CalculateAssociatedWith(bbl);
+      result.functions.insert(tinfo.functions.begin(), tinfo.functions.end());
+      result.objects.insert(tinfo.files.begin(), tinfo.files.end());
+      result.archives.insert(tinfo.archives.begin(), tinfo.archives.end());
 
-      nr_executed++;
+      if (BBL_EXEC_COUNT(bbl) > 0) {
+        /* This is *NOT* correct,
+         * but for the regular factoring this is OK, at least for now */
+        result.exec_functions.insert(tinfo.functions.begin(), tinfo.functions.end());
+        result.exec_objects.insert(tinfo.files.begin(), tinfo.files.end());
+        result.exec_archives.insert(tinfo.archives.begin(), tinfo.archives.end());
+      }
+    }
+    else {
+      result.functions.insert(function);
+      result.objects.insert(object);
+      result.archives.insert(archive);
+
+      if (BBL_EXEC_COUNT(bbl) > 0) {
+        result.exec_functions.insert(function);
+        result.exec_objects.insert(object);
+        result.exec_archives.insert(archive);
+
+        nr_executed++;
+      }
     }
   }
 
@@ -72,7 +90,7 @@ FactoringSetSourceInformation BblFactorHolderGetSourceInformation(t_equiv_bbl_ho
   }
 
   int nr_executed = 0;
-  return FactoringGetSourceInformation(bbls, nr_executed);
+  return FactoringGetSourceInformation(bbls, nr_executed, true);
 }
 
 extern "C"
@@ -122,9 +140,8 @@ SpecialFunctionTrackResults BblFactoringOriginTracking(t_bbl *bbl) {
 
   t_int64 total_exec = 0;
 
-  t_cfg_edge *e;
-  BBL_FOREACH_PRED_EDGE(entry, e) {
-    ASSERT(CFG_EDGE_CAT(e) == ET_CALL, ("unexpected edge @E", e));
+  auto do_edge = [&result, &total_exec, &entry] (t_cfg_edge *e, bool epi) {
+    ASSERT(CFG_EDGE_CAT(e) == ET_CALL, ("unexpected edge (%d) @E", epi, e));
 
     FunctionUID f_uid = BblOriginalFunctionUID(CFG_EDGE_HEAD(e));
     ASSERT(f_uid != FunctionUID_INVALID, ("expected incoming function to be associated with original! @F @eiB", CFG_EDGE_HEAD(e), entry));
@@ -133,6 +150,26 @@ SpecialFunctionTrackResults BblFactoringOriginTracking(t_bbl *bbl) {
 
     result.exec_per_function[f_uid] = BBL_EXEC_COUNT(CFG_EDGE_HEAD(e));
     total_exec += BBL_EXEC_COUNT(CFG_EDGE_HEAD(e));
+  };
+
+  t_cfg_edge *e;
+  BBL_FOREACH_PRED_EDGE(entry, e) {
+    ASSERT((CFG_EDGE_CAT(e) == ET_CALL) || (CFG_EDGE_CAT(e) == ET_IPJUMP), ("unexpected edge @E", e));
+
+    if (CFG_EDGE_CAT(e) == ET_IPJUMP) {
+      /* epilogue factoring */
+      t_bbl *head = CFG_EDGE_HEAD(e);
+      ASSERT(BBL_NINS(head) == 1
+              && CFG_DESCRIPTION(BBL_CFG(bbl))->InsIsUnconditionalJump(BBL_INS_LAST(head)), ("unexpected block @eiB", head));
+
+      t_cfg_edge *ee;
+      BBL_FOREACH_PRED_EDGE(head, ee)
+        do_edge(ee, true);
+    }
+    else if (CFG_EDGE_CAT(e) == ET_CALL) {
+      /* regular factoring */
+      do_edge(e, false);
+    }
   }
 
   if (total_exec != BBL_EXEC_COUNT(entry))
@@ -186,10 +223,10 @@ void FactoringLogFini() {
   FINI_LOGGING(L_FACTORING_VAR);
 }
 
-void FactoringRecordTransformation(BblSet slices, size_t n_ins, FactoringResult insn_stats, bool only_source) {
+void FactoringRecordTransformation(BblSet slices, size_t n_ins, FactoringResult insn_stats, bool only_source, bool regular_factoring) {
   /* object files and archives */
   int nr_executed = 0;
-  FactoringSetSourceInformation source_info = FactoringGetSourceInformation(slices, nr_executed);
+  FactoringSetSourceInformation source_info = FactoringGetSourceInformation(slices, nr_executed, regular_factoring);
 
   if (!only_source) {
     global_factoring_stats.Merge(insn_stats);

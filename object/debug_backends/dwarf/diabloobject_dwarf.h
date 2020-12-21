@@ -52,6 +52,8 @@ typedef struct DwarfSections t_dwarf_sections;
 /* export C++ functions to C */
 #define EXTERN extern "C"
 
+class DwarfAbbrevTableEntry;
+
 #include "diabloobject_dwarf_generic.h"
 #include "diabloobject_dwarf_helpers.h"
 #include "diabloobject_dwarf_units.h"

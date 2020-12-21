@@ -29,6 +29,9 @@ typedef t_uint64 SourceArchiveBitset;
 #define ObjectSetUID_INVALID std::numeric_limits<ObjectSetUID>::max()
 #define FunctionUID_INVALID std::numeric_limits<FunctionUID>::max()
 
+#define SourceArchiveUID_INVALID std::numeric_limits<SourceArchiveUID>::max()
+#define SourceFileUID_INVALID std::numeric_limits<SourceFileUID>::max()
+
 /* use dynamic special function UIDs */
 
 struct SpecialFunctionTrackResults {
@@ -74,10 +77,15 @@ struct ObjectAndRange
 extern "C" std::vector<ObjectAndRange> objects_and_ranges;
 static inline
 SourceFileUID GetFileUID(ObjectUID idx) {
+  if (idx == ObjectUID_INVALID)
+    return SourceFileUID_INVALID;
+
   return objects_and_ranges[idx].filename_id;
 }
+std::string GetSourceFileName(SourceFileUID uid);
+std::string GetSourceFileNameBase(SourceFileUID uid);
 
-void BblSourceLocation(t_bbl *bbl, FunctionUID& function, SourceFileUID& file, SourceArchiveUID& archive);
+bool BblSourceLocation(t_bbl *bbl, FunctionUID& function, SourceFileUID& file, SourceArchiveUID& archive, bool do_precheck = FALSE);
 
 struct TrackingInformation {
   std::set<FunctionUID> functions;

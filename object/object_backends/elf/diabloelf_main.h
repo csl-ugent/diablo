@@ -203,6 +203,7 @@
 #define STT_SECTION 3
 #define STT_FILE    4
 #define STT_TLS     6
+#define STT_IFUNC   10
 #define STT_LOPROC  13
 #define STT_HIPROC  15
 

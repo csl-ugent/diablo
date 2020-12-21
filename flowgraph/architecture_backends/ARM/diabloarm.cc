@@ -35,6 +35,9 @@ void DiabloArmCppInit(int, char **)
   SetArchitectureInfoWrapper(new ARMArchitectureInfoWrapper());
   
   DiabloBrokerCallInstall("CfgConstantDistribution", "t_cfg* cfg, t_string base_path", (void *)CfgConstantDistribution, FALSE);
+  DiabloBrokerCallInstall("DwarfArchitectureSpecificStuff", "t_cfg* cfg", (void *)DwarfArmSpecificStuff, FALSE);
+  DiabloBrokerCallInstall("DwarfArchitectureSpecificFunctionHasInfo", "t_function *fun, t_bool *result", (void *)DwarfArmFunctionHasInfo, FALSE);
+  DiabloBrokerCallInstall("DwarfArchitectureSpecificFunctionFloatArgRetRegsets", "DwarfFunctionDefinition *, t_regset *, t_regset *", (void *)DwarfArmFunctionFloatArgRetRegsets, FALSE);
 }
 
 void DiabloArmCppFini()

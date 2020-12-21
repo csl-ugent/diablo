@@ -525,7 +525,7 @@ FillerRelocated32 (t_ast_successors * args, void *tsec)
 	  LINKER_SCRIPT_FATAL("Deprecated use of MATCHED_NAME. Use MATCHED_NAME() instead");
   else if (to_symbol)
     sym = SymbolTableAddSymbol (OBJECT_SYMBOL_TABLE(ObjectGetFromCache ("Linker", parser_object)),
-                                     to_symbol, "R00*s0000", 0, TRUE, TRUE, T_RELOCATABLE(OBJECT_UNDEF_SECTION(parser_object)), 
+                                     to_symbol, "R00*s0000$", 0, TRUE, TRUE, T_RELOCATABLE(OBJECT_UNDEF_SECTION(parser_object)), 
                                      AddressNullForObject(parser_object), AddressNullForObject(parser_object), NULL, AddressNullForObject(parser_object), 0);
   if (assoc_symbol)
     assoc = SymbolTableAddSymbol (OBJECT_SYMBOL_TABLE(ObjectGetFromCache ("Linker", parser_object)),
