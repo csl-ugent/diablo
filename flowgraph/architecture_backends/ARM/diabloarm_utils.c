@@ -247,6 +247,7 @@ t_regset ArmUsedRegistersX(t_arm_ins * ins, t_uint8 *used)
       break;
 
     case IT_MUL:
+    case IT_DIV:
       /* the values in ARM_REGB and ARM_REGC are certainly read
        * ARM_REGA is only read in UMLAL, SMLA* and SMLS*
        *
@@ -822,6 +823,7 @@ t_regset ArmDefinedRegistersX(t_arm_ins * ins, t_uint8 *defined)
   	case ARM_PSEUDO_CALL:
   	  break;
   	case ARM_MUL:
+    case ARM_UDIV:
   	case ARM_MLA:
   	  RegsetSetAddReg(mask,ARM_REG_Z_CONDITION);
   	  RegsetSetAddReg(mask,ARM_REG_N_CONDITION);
@@ -936,6 +938,7 @@ t_regset ArmDefinedRegistersX(t_arm_ins * ins, t_uint8 *defined)
     break;
 
   case IT_MUL:
+  case IT_DIV:
     /* the values in ARM_REGB and ARM_REGC are certainly read, ARM_REGA is only read in SMLAL and UMLAL, and always written, */
     RegsetSetAddReg(mask,ARM_INS_REGA(ins));
     def |= ARM_INS_USEDEF_REGA;
@@ -1472,6 +1475,7 @@ t_bool ArmInsIsCommutative(t_arm_ins * ins)
   switch(ARM_INS_OPCODE(ins))
   {
     case ARM_MUL:
+    case ARM_UDIV:
     case ARM_MLA:
     case ARM_UMULL:
     case ARM_UMLAL:
@@ -2758,6 +2762,7 @@ ArmIsThumb1EncodableCheckItNoIt(t_arm_ins *ins, t_bool check_condition, t_bool i
     case ARM_ORR:
     case ARM_BIC:
     case ARM_MUL:
+    case ARM_UDIV:
       /* TODO: for commutative ops, REGC==REGA would also be ok
        * (but then either switch the regs, or adjust the thumb
        *  assembler so it can deal with switched regs)
@@ -4170,6 +4175,7 @@ t_bool ArmInsMustBeInITBlock(t_arm_ins *ins)
   case ARM_BIC:
   case ARM_EOR:
   case ARM_MUL:
+  case ARM_UDIV:
   case ARM_MVN:
   case ARM_ORR:
   case ARM_SBC:

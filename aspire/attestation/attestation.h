@@ -23,12 +23,16 @@ extern "C"
 struct Attestator
 {
   private:
-    t_symbol* checksum_sym;
     t_address checksum_size;
 
   public:
     std::vector<Attestation::Area> areas;/* The areas protected by this attestator */
     std::vector<std::string> area_names;/* The names of the areas (which are a modified concatenation of the names of the regions in the area */
+
+    /* The symbols associated to the attestator */
+    t_symbol* base_address_sym;
+    t_symbol* blob_sym;
+    t_symbol* checksum_sym;
 
     /* We keep a map of all attestators, with their label as key */
     typedef std::map<std::string, Attestator> OrderedMap;
@@ -43,7 +47,8 @@ struct Attestator
      */
     static void AssociateRegionsWithAttestators(t_cfg* cfg);
     static void CalculateChecksums(t_object* obj);
-    void ReserveChecksumSpace(t_object* obj, t_const_string name);
+    void ReserveChecksumSpace();
+    static void ResolveSymbols(t_object* obj);
 };
 #endif
 

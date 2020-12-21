@@ -584,6 +584,25 @@ void ArmInsMakeMul(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32
   ArmInsDefault(ins, cond);
 }
 
+void ArmInsMakeDiv(t_arm_ins * ins, t_reg regA, t_reg regB, t_reg regC, t_uint32 immed, t_uint32 cond)
+{ //custom
+  ARM_INS_SET_TYPE(ins,  IT_DIV);
+  ARM_INS_SET_OPCODE(ins,  ARM_UDIV);
+  ARM_INS_SET_REGA(ins,  regA);
+  ARM_INS_SET_REGB(ins,  regB);
+  ARM_INS_SET_REGC(ins,  regC);
+  ARM_INS_SET_IMMEDIATE(ins,  immed);
+  ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins)& ~FL_DIRUP & ~FL_WRITEBACK & ~FL_PREINDEX);
+  if (!(ARM_INS_FLAGS(ins) & FL_THUMB))
+    ARM_INS_SET_CSIZE(ins,  AddressNew32(4));
+  else
+    ARM_INS_SET_CSIZE(ins,  AddressNew32(2));
+  if (regC == ARM_REG_NONE)
+    ARM_INS_SET_FLAGS(ins, ARM_INS_FLAGS(ins)| FL_IMMED);
+
+  ArmInsDefault(ins, cond);
+}
+
 /*!
  * \todo Document
  *

@@ -752,6 +752,7 @@ t_bool ArmInsOptEncodeConstantResult(t_arm_ins * ins, t_procstate * before, t_pr
       break;
 
     case IT_MUL:
+    case IT_DIV:
     case IT_LOAD:
       /* TODO THUMB2: in case the status bits are not live, which may often be the case in THUMB2 code because there the FL_S bit is mostly set 
          by default, not because it is needed, we could do better */ 
@@ -1397,6 +1398,7 @@ retry_with_switched_operands:
       break;
 
     case IT_MUL:
+    case IT_DIV:
       if ((!levelC)||(!levelB))
       {
 	if (!levelC) 
